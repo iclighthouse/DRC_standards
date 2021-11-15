@@ -2,6 +2,6 @@
 Dfinity Request for Comments
 
 Plan:  
-DRC20: Fungible Token Standard;  
+DRC20: Fungible Token Standard ([Comments](https://github.com/iclighthouse/DRC_standards/issues/1));  
 DRC201: Governable Token Standard;  
-DRC202: Token transaction records standard.  
+DRC202: Financial Transaction Records Standard.  

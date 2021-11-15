@@ -1,0 +1,54 @@
+//Types
+type AccountId = blob;
+type Txid = blob;
+type Operation = variant {
+    transfer: {
+        action: variant {
+            send;
+            mint;
+            burn;
+        };
+    };
+    lockTransfer: {
+        locked: nat;  // account `from` is locked for the amount
+        expiration: int;  //Expiration timestamp(Time.Time) = lockTransferTimestamp + _timeout
+        decider: AccountId; //Who has access to execute the executeTransfer() before it expires
+    };
+    executeTransfer: {
+        lockedTxid: Txid;
+        fallback: nat; // `from` receives back the amount
+    };
+    approve: {
+        allowance: nat;
+    };
+};
+type Transaction = record {
+    from: AccountId;
+    to: AccountId;
+    value: nat;   // `to` receives the amount (If lockTransfer operation, value SHOULD be 0)
+    operation: Operation;
+    data: opt blob;
+};
+type TxnRecord = record {
+    txid: Txid;
+    caller: principal; //It could be: sender/spender/decider
+    timestamp: int;
+    index: nat;
+    nonce: nat;
+    gas: Gas;
+    transaction: Transaction;
+};
+type Callback = func (record: TxnRecord) -> ();
+type MsgType = variant {
+    onTransfer;
+    onLock;
+    onExecute;
+    onApprove;
+};
+
+//Service
+service: {
+    tokenCallback: Callback = func (record: TxnRecord) -> ();
+    //other methods...
+
+}
