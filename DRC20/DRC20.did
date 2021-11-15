@@ -112,10 +112,3 @@ service: (_totalSupply:nat, _decimals:nat8, _gas:Gas, _name:opt text, _symbol:op
     allowance: (_owner: Address, _spender: Address) -> (remaining: nat) query;
     approvals: () -> (allowances: vec Allowance) query;
 }
-修改：executeTransfer/lockedTxns/lastTxns
-lockTransferFrom: _timeout: nat32
-count--nonce的描述
-txid算法描述
-添加了创始者参数
-增加getTxn
-增加cyclesBalanceOf、subscribed
