@@ -5,6 +5,7 @@ dist-ssr
 .vessel
 .config
 .tmp
+**/canister_ids.json
 
 # Various IDEs and Editors
 .vscode/
