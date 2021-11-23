@@ -1,114 +1,137 @@
-//Types
-type Metadata = record {
-    name: text;
-    content: text;
-};
-type Gas = variant {
-    cycles: nat;
-    token: nat;
-};
-// Address: principal string or account-id hex
-// When it is used as a parameter, you need to determine its type and convert it to AccountId.
+type TxnResult =
+ variant {
+   err:
+    record {
+      code:
+       variant {
+         InsufficientAllowance;
+         InsufficientBalance;
+         InsufficientGas;
+         LockedTransferExpired;
+         UndefinedError;
+       };
+      message: text;
+    };
+   ok: Txid;
+ };
+type TxnRecord =
+ record {
+   caller: principal;
+   gas: Gas;
+   index: nat;
+   nonce: nat;
+   timestamp: Time;
+   transaction: Transaction;
+   txid: Txid;
+ };
+type TxnQueryResponse =
+ variant {
+   getTxn: opt TxnRecord;
+   lastTxids: vec Txid;
+   lastTxidsGlobal: vec Txid;
+   lockedTxns: record {
+                 lockedBalance: nat;
+                 txns: vec TxnRecord;
+               };
+   txnCount: nat;
+   txnCountGlobal: nat;
+ };
+type TxnQueryRequest =
+ variant {
+   getTxn: record {txid: Txid;};
+   lastTxids: record {owner: Address;};
+   lastTxidsGlobal;
+   lockedTxns: record {owner: Address;};
+   txnCount: record {owner: Address;};
+   txnCountGlobal;
+ };
+type Txid = blob;
+type Transaction =
+ record {
+   data: opt blob;
+   from: AccountId;
+   operation: Operation;
+   to: AccountId;
+   value: nat;
+ };
+type Time = int;
+type Subscription =
+ record {
+   callback: Callback;
+   msgTypes: vec MsgType;
+ };
+type Operation =
+ variant {
+   approve: record {allowance: nat;};
+   executeTransfer: record {
+                      fallback: nat;
+                      lockedTxid: Txid;
+                    };
+   lockTransfer: record {
+                   decider: AccountId;
+                   expiration: Time;
+                   locked: nat;
+                 };
+   transfer: record {action: variant {
+                               burn;
+                               mint;
+                               send;
+                             };};
+ };
+type MsgType =
+ variant {
+   onApprove;
+   onExecute;
+   onLock;
+   onTransfer;
+ };
+type Metadata =
+ record {
+   content: text;
+   name: text;
+ };
+type Gas =
+ variant {
+   cycles: nat;
+   noFee;
+   token: nat;
+ };
+type ExecuteType =
+ variant {
+   fallback;
+   sendAll;
+   sendAndFallback: nat;
+ };
+type Callback = func (TxnRecord) -> ();
+type Allowance =
+ record {
+   remaining: nat;
+   spender: AccountId;
+ };
 type Address = text;
 type AccountId = blob;
-// Txid:
-// Require unique txid in a token. It is recommended to use DRC202 standard to generate txid.
-type Txid = blob;
-type TxnResult = variant {
-    ok: Txid;
-    err: record { 
-        code: variant {
-            InsufficientBalance;
-            InsufficientAllowance;
-            InsufficientGas;
-            LockedTransferExpired;
-            UndefinedError;
-        };
-        message: text;
-    };
-};
-type ExecuteType = variant {
-    fallback;  //operator with access: _decider(anytime), _from(when expired).
-    sendAll;  //operator with access: _decider(when not expired).
-    sendAndFallback: nat;  //operator with access: _decider(when not expired).
-};
-type Operation = variant {
-    transfer: {
-        action: variant {
-            send;
-            mint;
-            burn;
-        };
-    };
-    lockTransfer: {
-        locked: nat;  // account `from` is locked for the amount
-        expiration: int;  //Expiration timestamp(Time.Time) = lockTransferTimestamp + _timeout
-        decider: AccountId; //Who has access to execute the executeTransfer() before it expires
-    };
-    executeTransfer: {
-        lockedTxid: Txid;
-        fallback: nat; // `from` receives back the amount
-    };
-    approve: {
-        allowance: nat;
-    };
-};
-type Transaction = record {
-    from: AccountId;
-    to: AccountId;
-    value: nat;   // `to` receives the amount (If lockTransfer operation, value SHOULD be 0)
-    operation: Operation;
-    data: opt blob;
-};
-type TxnRecord = record {
-    txid: Txid;
-    caller: principal; //It could be: sender/spender/decider
-    timestamp: int;
-    index: nat;
-    nonce: nat;
-    gas: Gas;
-    transaction: Transaction;
-};
-type Callback = func (record: TxnRecord) -> ();
-type MsgType = variant {
-    onTransfer;
-    onLock;
-    onExecute;
-    onApprove;
-};
-type Subscription = {
-    callback: Callback;
-    msgTypes: vec MsgType;
-};
-type Allowance = record {
-    spender: Address;
-    remaining: nat;
-};
-
-//Service
-service: (_totalSupply:nat, _decimals:nat8, _gas:Gas, _name:opt text, _symbol:opt text, _metadata:opt vec Metadata, _founder: opt Address) -> {
-    name: () -> (text) query;
-    symbol: () -> (text) query;
-    decimals: () -> (nat8) query;
-    metadata: () -> (vec Metadata) query;
-    count: (opt Address) -> (nat) query;
-    cyclesReceive: (_account: opt Address) -> (balance: nat);
-    // withdrawCycles: (_to: principal) -> (balance: nat);
-    cyclesBalanceOf: (_owner: Address) -> (balance: nat) query;
-    gas: () -> (Gas) query;
-    totalSupply: () -> (nat) query;
-    balanceOf: (_owner: Address) -> (balance: nat) query;
-    transfer: (_to: Address, _value: nat, _data: opt blob) -> (result: TxnResult);
-    transferFrom: (_from:Address, _to: Address, _value: nat, _data: opt blob) -> (result: TxnResult);
-    lockTransfer: (_to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _data: opt blob) -> (result: TxnResult);
-    lockTransferFrom: (_from:Address, _to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _data: opt blob) -> (result: TxnResult);
-    executeTransfer: (_txid: Txid, _operation: ExecuteType) -> (result: TxnResult);
-    lockedTxns: (_owner: Address) -> (lockedBalance: nat, txns: vec TxnRecord) query;
-    subscribe: (_callback: Callback, _msgTypes: vec MsgType) -> (result: TxnResult);
-    subscribed: (_owner: Address) -> (result: ?Subscription) query;
-    lastTxns: (_owner: opt Address) -> (txids: vec Txid) query;
-    getTxn: (_txid: Txid) -> (txn: TxnRecord) query;
-    approve: (_spender: Address, _value: nat) -> (result: TxnResult);
-    allowance: (_owner: Address, _spender: Address) -> (remaining: nat) query;
-    approvals: () -> (allowances: vec Allowance) query;
+service : {
+  allowance: (Address, Address) -> (nat) query;
+  approvals: (Address) -> (vec Allowance) query;
+  approve: (Address, nat) -> (TxnResult);
+  balanceOf: (Address) -> (nat) query;
+  cyclesBalanceOf: (Address) -> (nat) query;
+  cyclesReceive: (opt Address) -> (nat);
+  decimals: () -> (nat8) query;
+  executeTransfer: (Txid, ExecuteType) -> (TxnResult);
+  gas: () -> (Gas) query;
+  lockTransfer: (Address, nat, nat32, opt Address, opt blob) ->
+   (TxnResult);
+  lockTransferFrom: (Address, Address, nat, nat32, opt Address,
+   opt blob) -> (TxnResult);
+  metadata: () -> (vec Metadata) query;
+  name: () -> (text) query;
+  standard: () -> (text) query;
+  subscribe: (Callback, vec MsgType) -> (bool);
+  subscribed: (Address) -> (opt Subscription) query;
+  symbol: () -> (text) query;
+  totalSupply: () -> (nat) query;
+  transfer: (Address, nat, opt blob) -> (TxnResult);
+  transferFrom: (Address, Address, nat, opt blob) -> (TxnResult);
+  txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
 }
