@@ -1,6 +1,11 @@
 # DRC20
 
-[TOC]
+* [DRC20](#drc20)
+   * [Introduction](#introduction)
+   * [Installation](#installation)
+   * [Usages](#usages)
+      * [1. Use with the dfx command](#1-use-with-the-dfx-command)
+      * [2. Calling in the actor](#2-calling-in-the-actor)
 
 ## Introduction
 
