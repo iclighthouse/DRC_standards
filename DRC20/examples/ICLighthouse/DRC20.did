@@ -90,16 +90,6 @@ type Metadata =
    content: text;
    name: text;
  };
-type InitArgs = 
- record {
-   decimals: nat8;
-   founder: opt Address;
-   gas: Gas;
-   metadata: opt vec Metadata;
-   name: opt text;
-   symbol: opt text;
-   totalSupply: nat;
- };
 type Gas = 
  variant {
    cycles: nat;
@@ -120,30 +110,28 @@ type Allowance =
  };
 type Address = text;
 type AccountId = blob;
-type DRC20 = 
- service {
-   standard: () -> (text) query;
-   allowance: (Address, Address) -> (nat) query;
-   approvals: (Address) -> (vec Allowance) query;
-   approve: (Address, nat) -> (TxnResult);
-   balanceOf: (Address) -> (nat) query;
-   cyclesBalanceOf: (opt Address) -> (nat) query;
-   cyclesReceive: (opt Address) -> (nat);
-   decimals: () -> (nat8) query;
-   executeTransfer: (Txid, ExecuteType) -> (TxnResult);
-   gas: () -> (Gas) query;
-   lockTransfer: (Address, nat, nat32, opt Address, opt blob) ->
-    (TxnResult);
-   lockTransferFrom: (Address, Address, nat, nat32, opt Address,
-    opt blob) -> (TxnResult);
-   metadata: () -> (vec Metadata) query;
-   name: () -> (text) query;
-   subscribe: (Callback, vec MsgType) -> (bool);
-   subscribed: (Address) -> (opt Subscription) query;
-   symbol: () -> (text) query;
-   totalSupply: () -> (nat) query;
-   transfer: (Address, nat, opt blob) -> (TxnResult);
-   transferFrom: (Address, Address, nat, opt blob) -> (TxnResult);
-   txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
- };
-service : (InitArgs) -> DRC20
+service : {
+  allowance: (Address, Address) -> (nat) query;
+  approvals: (Address) -> (vec Allowance) query;
+  approve: (Address, nat) -> (TxnResult);
+  balanceOf: (Address) -> (nat) query;
+  cyclesBalanceOf: (Address) -> (nat) query;
+  cyclesReceive: (opt Address) -> (nat);
+  decimals: () -> (nat8) query;
+  executeTransfer: (Txid, ExecuteType) -> (TxnResult);
+  gas: () -> (Gas) query;
+  lockTransfer: (Address, nat, nat32, opt Address, opt blob) ->
+   (TxnResult);
+  lockTransferFrom: (Address, Address, nat, nat32, opt Address,
+   opt blob) -> (TxnResult);
+  metadata: () -> (vec Metadata) query;
+  name: () -> (text) query;
+  standard: () -> (text) query;
+  subscribe: (Callback, vec MsgType) -> (bool);
+  subscribed: (Address) -> (opt Subscription) query;
+  symbol: () -> (text) query;
+  totalSupply: () -> (nat) query;
+  transfer: (Address, nat, opt blob) -> (TxnResult);
+  transferFrom: (Address, Address, nat, opt blob) -> (TxnResult);
+  txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
+}
