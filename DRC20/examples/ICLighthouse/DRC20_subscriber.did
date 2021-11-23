@@ -1,0 +1,53 @@
+
+type AccountId = blob;
+type Txid = blob;
+type Operation = variant {
+    transfer: record {
+        action: variant {
+            send;
+            mint;
+            burn;
+        };
+    };
+    lockTransfer: record {
+        locked: nat;  
+        expiration: int;  
+        decider: AccountId; 
+    };
+    executeTransfer: record {
+        lockedTxid: Txid;
+        fallback: nat; 
+    };
+    approve: record {
+        allowance: nat;
+    };
+};
+type Transaction = record {
+    from: AccountId;
+    to: AccountId;
+    value: nat;   
+    operation: Operation;
+    data: opt blob;
+};
+type TxnRecord = record {
+    txid: Txid;
+    caller: principal; 
+    timestamp: int;
+    index: nat;
+    nonce: nat;
+    gas: Gas;
+    transaction: Transaction;
+};
+type Callback = func (record: TxnRecord) -> ();
+type MsgType = variant {
+    onTransfer;
+    onLock;
+    onExecute;
+    onApprove;
+};
+
+
+service: {
+    tokenCallback: Callback = func (record: TxnRecord) -> ();
+
+}
