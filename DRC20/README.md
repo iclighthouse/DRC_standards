@@ -1,3 +1,4 @@
+
 # DRC20: Fungible Token Standard
 A standard interface for Dfinity tokens
  
@@ -22,7 +23,7 @@ A standard interface for Dfinity tokens. The standard complies with ERC20 interf
 
 * Scalability
 
-* Internal Atomicity
+* Improved atomicity
 
 * Governability
 
@@ -32,3 +33,9 @@ A standard interface for Dfinity tokens. The standard complies with ERC20 interf
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/DRC20.md](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/DRC20.md)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse)  
 Comments: [https://github.com/iclighthouse/DRC_standards/issues/1](https://github.com/iclighthouse/DRC_standards/issues/1);
+
+## Community
+
+Twitter: [@ICLighthouse](https://twitter.com/ICLighthouse)  
+Medium: [https://medium.com/@ICLighthouse](https://medium.com/@ICLighthouse)   
+Discord: [https://discord.gg/FQZFGGq7zv](https://discord.gg/FQZFGGq7zv)  

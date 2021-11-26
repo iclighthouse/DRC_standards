@@ -37,8 +37,7 @@ module {
     }>;
     public type ExecuteType = {
         #fallback;  //operator with access: _decider(anytime), _from(when expired).
-        #sendAll;  //operator with access: _decider(when not expired).
-        #sendAndFallback: Nat;  //operator with access: _decider(when not expired).
+        #send: ?Nat;  //if value is null means `sendAll`. operator with access: _decider(when not expired).
     };
     public type Operation = {
         #transfer: {

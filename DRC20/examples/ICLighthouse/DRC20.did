@@ -99,8 +99,7 @@ type Gas =
 type ExecuteType = 
  variant {
    fallback;
-   sendAll;
-   sendAndFallback: nat;
+   send: opt nat;
  };
 type Callback = func (TxnRecord) -> ();
 type Allowance = 

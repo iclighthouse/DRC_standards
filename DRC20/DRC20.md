@@ -104,8 +104,7 @@ type TxnResult = variant {
 };
 type ExecuteType = variant {
     fallback;  /* operator with access: _decider(anytime), _from(when expired). */
-    sendAll;  /* operator with access: _decider(when not expired). */
-    sendAndFallback: nat;  /* operator with access: _decider(when not expired). */
+    send: nat;  /* if value is null means `sendAll`;  operator with access: _decider(when not expired). */
 };
 type Operation = variant {
     transfer: record {

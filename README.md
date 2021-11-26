@@ -19,3 +19,9 @@ TODO: Standard drafting and motoko example implementation
 ## DRC203: Token Mining Standard
 
 TODO: Standard drafting and motoko example implementation
+
+## Community
+
+Twitter: [@ICLighthouse](https://twitter.com/ICLighthouse)  
+Medium: [https://medium.com/@ICLighthouse](https://medium.com/@ICLighthouse)   
+Discord: [https://discord.gg/FQZFGGq7zv](https://discord.gg/FQZFGGq7zv)  
