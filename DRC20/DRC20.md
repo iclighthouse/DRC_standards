@@ -326,7 +326,7 @@ approvals: (_owner: Address) -> (allowances: vec Allowance) query;
 Token canister subscribers should implement a callback function for handling token published messages.
 Message types are: `onTransfer`, `onLock`, `onExecute`, and `onApprove`. The callback function is given as an argument by calling `subscribe()` of token.
 ``` candid
-type Callback = func (record: TxnRecord) -> ();
+type Callback = func (txn: TxnRecord) -> ();
 ```
 
 ## Implementation
