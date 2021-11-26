@@ -3,7 +3,7 @@ module {
   public type Address = Text;
   public type Allowance = { remaining : Nat; spender : AccountId };
   public type Callback = shared TxnRecord -> async ();
-  public type ExecuteType = { #sendAndFallback : Nat; #fallback; #sendAll };
+  public type ExecuteType = { #send : ?Nat; #fallback };
   public type Gas = { #token : Nat; #cycles : Nat; #noFee };
   public type Metadata = { content : Text; name : Text };
   public type MsgType = { #onApprove; #onExecute; #onTransfer; #onLock };
