@@ -38,7 +38,7 @@ type TxnRecord = record {
     gas: Gas;
     transaction: Transaction;
 };
-type Callback = func (record: TxnRecord) -> ();
+type Callback = func (TxnRecord) -> ();
 type MsgType = variant {
     onTransfer;
     onLock;
@@ -48,6 +48,6 @@ type MsgType = variant {
 
 
 service: {
-    tokenCallback: Callback = func (record: TxnRecord) -> ();
+    tokenCallback: Callback = func (TxnRecord) -> ();
 
 }
