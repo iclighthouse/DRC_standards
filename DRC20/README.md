@@ -7,11 +7,11 @@ A standard interface for Dfinity tokens. The standard complies with ERC20 interf
 
 ## Improvements
 
-* Compatible with Principal and Account-id as Address
+* Compatible with Principal and Account-id as Address, sub-account supported
 
 * Using the pub/sub model for message notifications
 
-* Improving transaction atomicity with a lock/execute two-phase commit structure
+* Improving transaction atomicity with a lock/execute two-phase transfer structure
 
 * Scalability of transaction records storage, temporary storage in token canister and permanent storage in external canisters
 

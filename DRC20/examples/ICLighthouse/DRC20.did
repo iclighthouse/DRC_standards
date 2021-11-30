@@ -99,7 +99,8 @@ type Gas =
 type ExecuteType = 
  variant {
    fallback;
-   send: opt nat;
+   sendAll;
+   send: nat;
  };
 type Callback = func (TxnRecord) -> ();
 type Allowance = 
@@ -112,25 +113,25 @@ type AccountId = blob;
 service : {
   allowance: (Address, Address) -> (nat) query;
   approvals: (Address) -> (vec Allowance) query;
-  approve: (Address, nat) -> (TxnResult);
+  approve: (Address, nat, opt vec nat8) -> (TxnResult);
   balanceOf: (Address) -> (nat) query;
   cyclesBalanceOf: (Address) -> (nat) query;
   cyclesReceive: (opt Address) -> (nat);
   decimals: () -> (nat8) query;
-  executeTransfer: (Txid, ExecuteType) -> (TxnResult);
+  executeTransfer: (Txid, ExecuteType, opt vec nat8) -> (TxnResult);
   gas: () -> (Gas) query;
-  lockTransfer: (Address, nat, nat32, opt Address, opt blob) ->
+  lockTransfer: (Address, nat, nat32, opt Address, opt vec nat8, opt blob) ->
    (TxnResult);
-  lockTransferFrom: (Address, Address, nat, nat32, opt Address,
+  lockTransferFrom: (Address, Address, nat, nat32, opt Address, opt vec nat8,
    opt blob) -> (TxnResult);
   metadata: () -> (vec Metadata) query;
   name: () -> (text) query;
   standard: () -> (text) query;
-  subscribe: (Callback, vec MsgType) -> (bool);
+  subscribe: (Callback, vec MsgType, opt vec nat8) -> (bool);
   subscribed: (Address) -> (opt Subscription) query;
   symbol: () -> (text) query;
   totalSupply: () -> (nat) query;
-  transfer: (Address, nat, opt blob) -> (TxnResult);
-  transferFrom: (Address, Address, nat, opt blob) -> (TxnResult);
+  transfer: (Address, nat, opt vec nat8, opt blob) -> (TxnResult);
+  transferFrom: (Address, Address, nat, opt vec nat8, opt blob) -> (TxnResult);
   txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
 }

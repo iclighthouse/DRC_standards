@@ -41,8 +41,9 @@ module {
     version: shared query () -> async Nat8;
     fee : shared query () -> async (cycles: Nat); //cycles
     store : shared (_txn: TxnRecord) -> async (); 
+    storeBytes: shared (_data: [Nat8]) -> async (); 
     bucket : shared query (_token: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) -> async (bucket: ?Principal);
-    txn : shared query (_token: Principal, _txid: Txid) -> async (txn: ?TxnRecord);
+    //txn : shared query (_token: Principal, _txid: Txid) -> async (txn: ?TxnRecord);
   };
   public func generateTxid(_canister: Principal, _caller: AccountId, _nonce: Nat): Txid{
     let canister: [Nat8] = Blob.toArray(Principal.toBlob(_canister));

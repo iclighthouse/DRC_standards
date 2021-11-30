@@ -3,7 +3,7 @@ module {
   public type Address = Text;
   public type Allowance = { remaining : Nat; spender : AccountId };
   public type Callback = shared TxnRecord -> async ();
-  public type ExecuteType = { #send : ?Nat; #fallback };
+  public type ExecuteType = { #sendAll; #send : Nat; #fallback };
   public type Gas = { #token : Nat; #cycles : Nat; #noFee };
   public type Metadata = { content : Text; name : Text };
   public type MsgType = { #onApprove; #onExecute; #onTransfer; #onLock };
@@ -64,18 +64,19 @@ module {
   public type Self = actor {
     allowance : shared query (Address, Address) -> async Nat;
     approvals : shared query Address -> async [Allowance];
-    approve : shared (Address, Nat) -> async TxnResult;
+    approve : shared (Address, Nat, ?[Nat8]) -> async TxnResult;
     balanceOf : shared query Address -> async Nat;
     cyclesBalanceOf : shared query Address -> async Nat;
     cyclesReceive : shared ?Address -> async Nat;
     decimals : shared query () -> async Nat8;
-    executeTransfer : shared (Txid, ExecuteType) -> async TxnResult;
+    executeTransfer : shared (Txid, ExecuteType, ?[Nat8]) -> async TxnResult;
     gas : shared query () -> async Gas;
     lockTransfer : shared (
         Address,
         Nat,
         Nat32,
-        ?Address,
+        ?Address, 
+        ?[Nat8],
         ?Blob,
       ) -> async TxnResult;
     lockTransferFrom : shared (
@@ -83,21 +84,23 @@ module {
         Address,
         Nat,
         Nat32,
-        ?Address,
+        ?Address, 
+        ?[Nat8],
         ?Blob,
       ) -> async TxnResult;
     metadata : shared query () -> async [Metadata];
     name : shared query () -> async Text;
     standard : shared query () -> async Text;
-    subscribe : shared (Callback, [MsgType]) -> async Bool;
+    subscribe : shared (Callback, [MsgType], ?[Nat8]) -> async Bool;
     subscribed : shared query Address -> async ?Subscription;
     symbol : shared query () -> async Text;
     totalSupply : shared query () -> async Nat;
-    transfer : shared (Address, Nat, ?Blob) -> async TxnResult;
+    transfer : shared (Address, Nat, ?[Nat8], ?Blob) -> async TxnResult;
     transferFrom : shared (
         Address,
         Address,
-        Nat,
+        Nat, 
+        ?[Nat8],
         ?Blob,
       ) -> async TxnResult;
     txnQuery : shared query TxnQueryRequest -> async TxnQueryResponse;

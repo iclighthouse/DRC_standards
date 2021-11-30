@@ -25,7 +25,7 @@ Token developers can extend it as needed.
 
 * Consistency of holder's account-id.
 
-    ICP Ledger canister uses account-id(address) as account identifier, while most other canisters use principal-id as account identifier. It brings complexity to users. This standard will use **account-id** as account identity, and is compatible with the use of principal-id.
+    ICP Ledger canister uses account-id(address) as account identifier, while most other canisters use principal-id as account identifier. It brings complexity to users. This standard uses **account-id** as account identity, supports `subaccount`, and is compatible with the use of `principal-id`.
 
 * Using the pub/sub model instead of the event mechanism.
 
@@ -46,7 +46,7 @@ Token developers can extend it as needed.
 * Lock/execute model improves atomicity.
 
     Canister's asynchronous messaging model does not provide atomicity guarantees for cross-canister transfers. The non-atomicity of cross-canister transfers is one of the technical features of IC networks that cannot be solved at the system level and needs to consider designing for atomicity within the application logic. For example, creating logical locks, and escrowing token through a middleman.
-    Creating a two-phase commit structure for transactions can provide the underlying functionality to improve atomicity. Therefore, **lockTransfer()/lockTransferFrom()** and **executeTransfer()** methods are added to the standard. 
+    Creating a two-phase transfer structure can provide the underlying functionality to improve atomicity. Therefore, **lockTransfer()/lockTransferFrom()** and **executeTransfer()** methods are added to the standard. 
 
 **More Issues:**
 
@@ -104,7 +104,8 @@ type TxnResult = variant {
 };
 type ExecuteType = variant {
     fallback;  /* operator with access: _decider(anytime), _from(when expired). */
-    send: nat;  /* if value is null means `sendAll`;  operator with access: _decider(when not expired). */
+    sendAll;  /* operator with access: _decider(when not expired). */
+    send: nat;  /*  operator with access: _decider(when not expired). */
 };
 type Operation = variant {
     transfer: record {
@@ -189,6 +190,8 @@ type InitArgs = record {
 
 **NOTES**:
  - The following specifications use syntax from Candid 
+ - The optional parameter `_sa` is the subaccount of the caller, which is a 32 bytes nat8 array. If length of `_sa` is less than 32 bytes, it will be prepended with [0] to make up.
+ - The optional parameter `_data` is the custom data provided by the caller, which can be used for parameters of callback, memo, etc. The recommended specification is a _3-byte_ protocol name ("DRC", [68,82,67]) + _1-byte_ version (e.g., [1]) + _1-byte_ nonce-flag (0: no nonce; 1: filled nonce. e.g., [1]) + _4-byte_ caller's nonce (e.g., [0,0,0,1], if nonce-flag is 0, nonce is filled with [0,0,0,0]) + custom calldata no more than 65528 bytes (e.g., using candid encoding format, 4-byte method name hash + arguments data). The nonce value here is similar to the nonce in ethereum transactions. if the caller specifies a nonce according to the specification, the transaction will be rejected when given the wrong nonce.
  
 #### standard
 
@@ -251,40 +254,39 @@ balanceOf: (_owner: Address) -> (balance: nat) query;
 ```
 #### transfer
 Transfers `_value` amount of tokens from caller's account to address `_to`, returns type `TxnResult`.  
-On success, the returned TxnResult contains the txid. The `txid` is generated in the transaction, is unique in the token transactions. Recommended method of generating txid(DRC202 Standard): convert token's canisterId, caller's accountId, and caller's nonce into [nat8] arrays respectively, and join them together as `txInfo: [nat8]`. Then get the `txid` value as: "000000"(big-endian 4-bytes, `encode(caller.nonce)`) + "0000..00"(28-bytes,`sha224(txInfo)`).  
-Parameter `_data` is used in the pub/sub model as a parameter when calling the subscriber's callback method, it can also be used as the `memo` for the transaction. (same below)  
+On success, the returned TxnResult contains the txid. The `txid` is generated in the transaction, is unique in the token transactions. Recommended method of generating txid(DRC202 Standard): convert token's canisterId, caller's accountId, and caller's nonce into [nat8] arrays respectively, and join them together as `txInfo: [nat8]`. Then get the `txid` value as: "000000"(big-endian 4-bytes, `encode(caller.nonce)`) + "0000..00"(28-bytes,`sha224(txInfo)`).    
 *Note* Transfers of 0 values MUST be treated as normal transfers. An account transfer to itself is ALLOWED. 
 ``` candid
-transfer: (_to: Address, _value: nat, _data: opt blob) -> (result: TxnResult);
+transfer: (_to: Address, _value: nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### transferFrom
 Transfers `_value` amount of tokens from address `_from` to address `_to`, returns type `TxnResult`.
 The `transferFrom` method is used for allowing contracts to transfer tokens on your behalf. This can be used for example to allow a contract to transfer tokens on your behalf and/or to charge fees in sub-currencies. The caller is `spender` who SHOULD be authorized by the `_from` account and have an `allowance(_from, _spender)` value greater than `_value`.  
 *Note* Transfers of 0 values MUST be treated as normal transfers. `_from` account transfer to itself is ALLOWED.
 ``` candid
-transferFrom: (_from:Address, _to: Address, _value: nat, _data: opt blob) -> (result: TxnResult);
+transferFrom: (_from:Address, _to: Address, _value: nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### lockTransfer
 Locks a transaction, specifies a `_decider` who can decide the execution of this transaction, and sets an expiration period `_timeout` seconds after which the locked transaction will be unlocked. The parameter _timeout SHOULD not be greater than 1000000 seconds.  
-Creating a two-phase commit structure for transactions can improve atomicity. The process is, (_owner) `lock the transaction` -- (_decider) `execute the transaction` or (_owner) `fallback the transaction when expired`
+Creating a two-phase transfer structure can improve atomicity. The process is, (_owner) `lock the transaction` -- (_decider) `execute the transaction` or (_owner) `fallback the transaction when expired`
 ``` candid
-lockTransfer: (_to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _data: opt blob) -> (result: TxnResult);
+lockTransfer: (_to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### lockTransferFrom
 `spender` locks a transaction.
 ``` candid
-lockTransferFrom: (_from: Address, _to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _data: opt blob) -> (result: TxnResult);
+lockTransferFrom: (_from: Address, _to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### executeTransfer
 The `decider` executes the locked transaction `_txid`, or the `owner` can fallback the locked transaction after the lock has expired.
 ``` candid
-executeTransfer: (_txid: Txid, _executeType: ExecuteType) -> (result: TxnResult);
+executeTransfer: (_txid: Txid, _executeType: ExecuteType, _sa: opt vec nat8) -> (result: TxnResult);
 ```
 #### txnQuery
 Queries the transaction records information.  
 Query type `_request`:  
 #txnCountGlobal: returns global transaction count.  
-#txnCount: returns `owner`'s transaction count.   
+#txnCount: returns `owner`'s transaction count. It is the nonce value of his next transaction.    
 #getTxn: returns details of the transaction with id `txid`.  
 #lastTxidsGlobal: returns the latest transaction txids of the global.   
 #lastTxids: returns `owner`'s latest transaction txids.  
@@ -296,7 +298,7 @@ txnQuery: (_request: TxnQueryRequest) -> (response: TxnQueryResponse) query;
 Subscribes to the token's messages, giving the callback function and the types of messages as parameters. Subscribers will only receive messages that are related to them (the subscriber is transaction‘s _from, _to, _spender, or _decider).
 The subscriber SHOULD be a canister, Implementing callback functions in the code.
 ``` candid
-subscribe: (_callback: Callback, _msgTypes: vec MsgType) -> bool;
+subscribe: (_callback: Callback, _msgTypes: vec MsgType, _sa: opt vec nat8) -> bool;
 ```
 #### subscribed
 Returns the subscription status of the subscriber `_owner`.  
@@ -309,7 +311,7 @@ Allows `_spender` to withdraw from your account multiple times, up to the `_valu
 If this function is called again it overwrites the current allowance with `_value`.  
 **NOTE**: When you execute `approve()` to authorize the spender, it may cause security problems, you can execute `approve(_spender, 0)` to deauthorize.
 ``` candid
-approve: (_spender: Address, _value: nat) -> (result: TxnResult);
+approve: (_spender: Address, _value: nat, _sa: opt vec nat8) -> (result: TxnResult);
 ```
 #### allowance
 Returns the amount which `_spender` is still allowed to withdraw from `_owner`.
