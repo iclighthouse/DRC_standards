@@ -80,7 +80,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private var allowances = HashMap.HashMap<AccountId, HashMap.HashMap<AccountId, Nat>>(1, Blob.equal, Blob.hash);
     private var subscriptions = HashMap.HashMap<AccountId, Subscription>(1, Blob.equal, Blob.hash);
     private var cyclesBalances = HashMap.HashMap<AccountId, Nat>(1, Blob.equal, Blob.hash);
-    private stable var storageRecords = List.nil<(Txid, Nat)>();
+    private stable var storeRecords = List.nil<(Txid, Nat)>();
     private stable var publishMessages = List.nil<(AccountId, MsgType, Txid, Nat)>();
     // only for upgrade
     private stable var txnRecordsEntries : [(Txid, TxnRecord)] = [];
@@ -152,8 +152,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         return a;
     }; // AccountIdToPrincipal: accountMaps.get(_a)
     private stable let founder_: AccountId = _getAccountId(Option.get(initArgs.founder, Principal.toText(installMsg.caller)));
-    private func _getTxid(_caller: AccountId): Txid{
-        var _nonce: Nat = _getNonce(_caller);
+    private func _getTxid(_caller: Principal): Txid{
+        var _nonce: Nat = _getNonce(_getAccountIdFromPrincipal(_caller, null));
         return DRC202.generateTxid(Principal.fromActor(this), _caller, _nonce);
     };
     private func _getBalance(_a: AccountId): Nat{
@@ -626,7 +626,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     _operation: Operation, _isAllowance: Bool): (result: TxnResult) {
         let callerPrincipal = _msgCaller;
         let caller = _getAccountIdFromPrincipal(_msgCaller, _sa);
-        let txid = _getTxid(caller);
+        let txid = _getTxid(_msgCaller);
         let from = _from;
         let to = _to;
         let value = _value; 
@@ -745,15 +745,15 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         _insertTxnRecord(txn); 
         // update nonce
         _addNonce(caller); 
-        // push storageRecords
-        storageRecords := List.push((txid, 0), storageRecords);
+        // push storeRecords
+        storeRecords := List.push((txid, 0), storeRecords);
         return #ok(txid);
     };
     // records storage (DRC202 Standard)
     private func _drc202Store() : async (){
         let drc202: DRC202.Self = actor(STORAGE_CANISTER);
-        var _storageRecords = List.nil<(Txid, Nat)>();
-        var item = List.pop(storageRecords);
+        var _storeRecords = List.nil<(Txid, Nat)>();
+        var item = List.pop(storeRecords);
         let storageFee = await drc202.fee();
         while (Option.isSome(item.0)){
             switch(item.0){
@@ -765,7 +765,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                                     Cycles.add(storageFee);
                                     await drc202.store(txn);
                                 } catch(e){ //push
-                                    _storageRecords := List.push((txid, callCount+1), _storageRecords);
+                                    _storeRecords := List.push((txid, callCount+1), _storeRecords);
                                 };
                             };
                             case(_){};
@@ -776,7 +776,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             };
             item := List.pop(item.1);
         };
-        storageRecords := _storageRecords;
+        storeRecords := _storeRecords;
     };
 
     /* 
@@ -1131,8 +1131,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         globalLastTxns := Deque.pushFront(globalLastTxns, txn.txid);
         lastTxns_.put(founder_, Deque.pushFront(Deque.empty<Txid>(), txn.txid));
         genesisCreated := true;
-        // push storageRecords
-        storageRecords := List.push((txn.txid, 0), storageRecords);
+        // push storeRecords
+        storeRecords := List.push((txn.txid, 0), storeRecords);
     };
 
 };

@@ -41,13 +41,13 @@ module {
     version: shared query () -> async Nat8;
     fee : shared query () -> async (cycles: Nat); //cycles
     store : shared (_txn: TxnRecord) -> async (); 
-    storeBytes: shared (_data: [Nat8]) -> async (); 
-    bucket : shared query (_token: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) -> async (bucket: ?Principal);
+    storeBytes: shared (_txid: Txid, _data: [Nat8]) -> async ();
+    bucket : shared query (_token: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) -> async (bucket: ?Principal, isEnd: Bool);
     //txn : shared query (_token: Principal, _txid: Txid) -> async (txn: ?TxnRecord);
   };
-  public func generateTxid(_canister: Principal, _caller: AccountId, _nonce: Nat): Txid{
+  public func generateTxid(_canister: Principal, _caller: Principal, _nonce: Nat): Txid{
     let canister: [Nat8] = Blob.toArray(Principal.toBlob(_canister));
-    let caller: [Nat8] = Blob.toArray(_caller);
+    let caller: [Nat8] = Blob.toArray(Principal.toBlob(_caller));
     let nonce: [Nat8] = Binary.BigEndian.fromNat32(Nat32.fromNat(_nonce));
     let txInfo = Array.append(Array.append(canister, caller), nonce);
     let h224: [Nat8] = SHA224.sha224(txInfo);
