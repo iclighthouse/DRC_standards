@@ -193,7 +193,7 @@ type InitArgs = record {
 **NOTES**:
  - The following specifications use syntax from Candid 
  - The optional parameter `_sa` is the subaccount of the caller, which is a 32 bytes nat8 array. If length of `_sa` is less than 32 bytes, it will be prepended with [0] to make up.
- - The optional parameter `_data` is the custom data provided by the caller, which can be used for parameters of callback, memo, etc. The recommended specification is a _3-byte_ protocol name ("DRC", [68,82,67]) + _1-byte_ version (e.g., [1]) + _1-byte_ nonce-flag (0: no nonce; 1: filled nonce. e.g., [1]) + _4-byte_ caller's nonce (e.g., [0,0,0,1], if nonce-flag is 0, nonce is filled with [0,0,0,0]) + custom calldata no more than 65528 bytes (e.g., using candid encoding format, 4-byte method name hash + arguments data). The nonce value here is similar to the nonce in ethereum transactions. if the caller specifies a nonce according to the specification, the transaction will be rejected when given the wrong nonce.
+ - The optional parameter `_data` is the custom data provided by the caller, which can be used for parameters of callback, memo, etc. The recommended specification is a _3-byte_ protocol name ("DRC", [68,82,67]) + _1-byte_ version (e.g., [1]) + _1-byte_ nonce-flag (0: no nonce; 1: filled nonce.) + _4-byte_ caller's nonce (e.g., [0,0,0,1], if nonce-flag is 0, nonce is filled with [0,0,0,0]) + custom calldata no more than 65527 bytes (e.g., using candid encoding format, 4-byte method name hash + arguments data). The nonce value here is similar to the nonce in ethereum transactions. if the caller specifies a nonce according to the specification, the transaction will be rejected when given the wrong nonce.
  
 #### standard
 
