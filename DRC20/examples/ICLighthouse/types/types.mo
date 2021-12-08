@@ -99,6 +99,7 @@ module {
         #lastTxidsGlobal;
         #lastTxids: { owner: Address; };
         #lockedTxns: { owner: Address; };
+        #getEvents: { owner: ?Address; };
     };
     public type TxnQueryResponse = {
         #txnCountGlobal: Nat;
@@ -107,6 +108,7 @@ module {
         #lastTxidsGlobal: [Txid];
         #lastTxids: [Txid];
         #lockedTxns: { lockedBalance: Nat; txns: [TxnRecord]; };
+        #getEvents: [TxnRecord];
     };
     public type InitArgs = {
         totalSupply: Nat;

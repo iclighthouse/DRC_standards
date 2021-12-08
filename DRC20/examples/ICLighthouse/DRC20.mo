@@ -1056,6 +1056,30 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                 };
                 return #lockedTxns({ lockedBalance = lockedBalance; txns = txns; });   
             };
+            case(#getEvents(args)){
+                switch(args.owner) {
+                    case(null){
+                        var i: Nat = 0;
+                        return #getEvents(Array.chain(_getGlobalLastTxns(), func (value:Txid): [TxnRecord]{
+                            if (i < MAX_CACHE_NUMBER_PER){
+                                i += 1;
+                                switch(_getTxnRecord(value)){
+                                    case(?(r)){ return [r]; };
+                                    case(_){ return []; };
+                                };
+                            }else{ return []; };
+                        }));
+                    };
+                    case(?(address)){
+                        return #getEvents(Array.chain(_getLastTxns(_getAccountId(address)), func (value:Txid): [TxnRecord]{
+                            switch(_getTxnRecord(value)){
+                                case(?(r)){ return [r]; };
+                                case(_){ return []; };
+                            };
+                        }));
+                    };
+                };
+            };
         };
     };
 

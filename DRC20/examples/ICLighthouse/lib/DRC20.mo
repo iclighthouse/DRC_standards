@@ -30,6 +30,7 @@ module {
     #lastTxidsGlobal;
     #getTxn : { txid : Txid };
     #txnCountGlobal;
+    #getEvents: { owner: ?Address; };
   };
   public type TxnQueryResponse = {
     #txnCount : Nat;
@@ -38,6 +39,7 @@ module {
     #lastTxidsGlobal : [Txid];
     #getTxn : ?TxnRecord;
     #txnCountGlobal : Nat;
+    #getEvents: [TxnRecord];
   };
   public type TxnRecord = {
     gas : Gas;

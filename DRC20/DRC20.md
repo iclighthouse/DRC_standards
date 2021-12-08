@@ -166,6 +166,7 @@ type TxnQueryRequest = variant {
     lastTxidsGlobal;
     lastTxids: record { owner: Address; };
     lockedTxns: record { owner: Address; };
+    getEvents: record {owner: opt Address;};
 };
 type TxnQueryResponse = variant {
     txnCountGlobal: nat;
@@ -174,6 +175,7 @@ type TxnQueryResponse = variant {
     lastTxidsGlobal: vec Txid;
     lastTxids: vec Txid;
     lockedTxns: record { lockedBalance: nat; txns: vec TxnRecord; };
+    getEvents: vec TxnRecord;
 };
 type InitArgs = record {
     totalSupply: nat;

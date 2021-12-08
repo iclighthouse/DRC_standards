@@ -35,6 +35,7 @@ type TxnQueryResponse =
                };
    txnCount: nat;
    txnCountGlobal: nat;
+   getEvents: vec TxnRecord;
  };
 type TxnQueryRequest = 
  variant {
@@ -44,6 +45,7 @@ type TxnQueryRequest =
    lockedTxns: record {owner: Address;};
    txnCount: record {owner: Address;};
    txnCountGlobal;
+   getEvents: record {owner: opt Address;};
  };
 type Txid = blob;
 type Transaction = 
