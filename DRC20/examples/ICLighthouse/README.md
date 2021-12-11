@@ -46,7 +46,7 @@ dfx canister --no-wallet install Token --argument='(record { totalSupply=1000000
 Transfers _value amount of tokens from caller's account to address _to, returns type TxnResult.
 
 ````
-dfx canister call Token transfer '("3rpzj-jp7vd-zfai5-zhllw-pqqxi-7bfer-mds4c-5rrpo-nkgq7-3bkrg-oqe",1000,null,null)'
+dfx canister call Token transfer '("<to_account>",1000,null,null)'
 ````
 
 **approve**
@@ -54,7 +54,7 @@ dfx canister call Token transfer '("3rpzj-jp7vd-zfai5-zhllw-pqqxi-7bfer-mds4c-5r
 Allows `_spender` to withdraw from your account multiple times, up to the `_value` amount.
 
 ````
-dfx canister call Token approve '("3rpzj-jp7vd-zfai5-zhllw-pqqxi-7bfer-mds4c-5rrpo-nkgq7-3bkrg-oqe",500,null)'
+dfx canister call Token approve '("<spender_account>",500,null)'
 ````
 
 **balanceOf**
@@ -62,7 +62,7 @@ dfx canister call Token approve '("3rpzj-jp7vd-zfai5-zhllw-pqqxi-7bfer-mds4c-5rr
 Returns the account balance of the given account `_owner`, not including the locked balance.
 
 ````
-dfx canister call Token balanceOf '("cqiyt-v33t3-d5en2-bkufw-tnjbo-z5oxw-hyclw-x7ew3-ybpxg-jomqj-lae")'
+dfx canister call Token balanceOf '("<owner_account>")'
 ````
 
 **allowance**
@@ -70,7 +70,7 @@ dfx canister call Token balanceOf '("cqiyt-v33t3-d5en2-bkufw-tnjbo-z5oxw-hyclw-x
 Returns the amount which `_spender` is still allowed to withdraw from `_owner`.
 
 ````
-dfx canister call Token allowance '("3rpzj-jp7vd-zfai5-zhllw-pqqxi-7bfer-mds4c-5rrpo-nkgq7-3bkrg-oqe","cqiyt-v33t3-d5en2-bkufw-tnjbo-z5oxw-hyclw-x7ew3-ybpxg-jomqj-lae")'
+dfx canister call Token allowance '("<owner_account>","<spender_account>")'
 ````
 
 
