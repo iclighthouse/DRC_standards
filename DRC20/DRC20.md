@@ -166,7 +166,7 @@ type TxnQueryRequest = variant {
     lastTxidsGlobal;
     lastTxids: record { owner: Address; };
     lockedTxns: record { owner: Address; };
-    getEvents: record {owner: opt Address;};
+    getEvents: record { owner: opt Address; };
 };
 type TxnQueryResponse = variant {
     txnCountGlobal: nat;
@@ -193,7 +193,7 @@ type InitArgs = record {
 **NOTES**:
  - The following specifications use syntax from Candid 
  - The optional parameter `_sa` is the subaccount of the caller, which is a 32 bytes nat8 array. If length of `_sa` is less than 32 bytes, it will be prepended with [0] to make up.
- - The optional parameter `_data` is the custom data provided by the caller, which can be used for parameters of callback, memo, etc. The recommended specification is a _3-byte_ protocol name ("DRC", [68,82,67]) + _1-byte_ version (e.g., [1]) + _1-byte_ nonce-flag (0: no nonce; 1: filled nonce.) + _4-byte_ caller's nonce (e.g., [0,0,0,1], if nonce-flag is 0, nonce is filled with [0,0,0,0]) + custom calldata no more than 65527 bytes (e.g., using candid encoding format, 4-byte method name hash + arguments data). The nonce value here is similar to the nonce in ethereum transactions. if the caller specifies a nonce according to the specification, the transaction will be rejected when given the wrong nonce.
+ - The optional parameter `_data` is the custom data provided by the caller, which can be used for nonce, parameters of callback, memo, etc. The recommended specification is a _3-byte_ protocol name ("DRC", [68,82,67]) + _1-byte_ version (e.g., [1]) + _1-byte_ nonce-flag (0: no nonce; 1: filled nonce.) + _4-byte_ caller's nonce (e.g., [0,0,0,1], if nonce-flag is 0, nonce is filled with [0,0,0,0]) + custom calldata no more than 65527 bytes (e.g., using candid encoding format, 4-byte method name hash + arguments data). The nonce value here is similar to the nonce in ethereum transactions. if the caller specifies a nonce according to the specification, the transaction will be rejected when given the wrong nonce.
  
 #### standard
 
@@ -280,9 +280,9 @@ lockTransfer: (_to: Address, _value: nat, _timeout: nat32, _decider: opt Address
 lockTransferFrom: (_from: Address, _to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### executeTransfer
-The `decider` executes the locked transaction `_txid`, or the `owner` can fallback the locked transaction after the lock has expired.
+The `decider` executes the locked transaction `_txid`, or the `owner` can fallback the locked transaction after the lock has expired.  If the recipient of the locked transaction `_to` is decider, the decider can specify a new recipient `_to`.
 ``` candid
-executeTransfer: (_txid: Txid, _executeType: ExecuteType, _sa: opt vec nat8) -> (result: TxnResult);
+executeTransfer: (_txid: Txid, _executeType: ExecuteType, _to: opt Address, _sa: opt vec nat8) -> (result: TxnResult);
 ```
 #### txnQuery
 Queries the transaction records information.  
@@ -293,6 +293,7 @@ Query type `_request`:
 #lastTxidsGlobal: returns the latest transaction txids of the global.   
 #lastTxids: returns `owner`'s latest transaction txids.  
 #lockedTxns: returns the locked balance of `owner`, and the locked transaction records.
+#getEvents: returns global latest transaction events or `owner`'s latest transaction events.
 ``` candid
 txnQuery: (_request: TxnQueryRequest) -> (response: TxnQueryResponse) query;
 ```

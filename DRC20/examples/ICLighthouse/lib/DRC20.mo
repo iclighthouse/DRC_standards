@@ -71,7 +71,7 @@ module {
     cyclesBalanceOf : shared query Address -> async Nat;
     cyclesReceive : shared ?Address -> async Nat;
     decimals : shared query () -> async Nat8;
-    executeTransfer : shared (Txid, ExecuteType, ?[Nat8]) -> async TxnResult;
+    executeTransfer : shared (Txid, ExecuteType, ?Address, ?[Nat8]) -> async TxnResult;
     gas : shared query () -> async Gas;
     lockTransfer : shared (
         Address,

@@ -120,7 +120,7 @@ service : {
   cyclesBalanceOf: (Address) -> (nat) query;
   cyclesReceive: (opt Address) -> (nat);
   decimals: () -> (nat8) query;
-  executeTransfer: (Txid, ExecuteType, opt vec nat8) -> (TxnResult);
+  executeTransfer: (Txid, ExecuteType, opt Address, opt vec nat8) -> (TxnResult);
   gas: () -> (Gas) query;
   lockTransfer: (Address, nat, nat32, opt Address, opt vec nat8, opt blob) ->
    (TxnResult);

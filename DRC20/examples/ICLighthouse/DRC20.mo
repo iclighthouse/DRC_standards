@@ -944,7 +944,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         return res;
     };
     /// The `decider` executes the locked transaction `_txid`, or the `owner` can fallback the locked transaction after the lock has expired.
-    public shared(msg) func executeTransfer(_txid: Txid, _executeType: ExecuteType, _sa: ?[Nat8]) : async (result: TxnResult) {
+    /// If the recipient of the locked transaction `_to` is decider, the decider can specify a new recipient `_to`.
+    public shared(msg) func executeTransfer(_txid: Txid, _executeType: ExecuteType, _to: ?Address, _sa: ?[Nat8]) : async (result: TxnResult) {
         let txid = _txid;
         let caller = _getAccountIdFromPrincipal(msg.caller, _sa);
         // Fee/2 is charged whether the transaction is successful or not
@@ -954,7 +955,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         switch(_getTxnRecord(txid)){
             case(?(txn)){
                 let from = txn.transaction.from;
-                let to = txn.transaction.to;
+                var to = txn.transaction.to;
                 if (not(_inLockedTxns(txid, from))){
                     return #err({ code=#UndefinedError; message="The transaction isn't in locked"; });
                 };
@@ -964,6 +965,12 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                         let expiration = v.expiration;
                         let decider = v.decider;
                         var fallback: Nat = 0;
+                        if (caller == decider and decider == to){
+                            switch(_to){
+                                case(?(newTo)){ to := _getAccountId(newTo); };
+                                case(_){};
+                            };
+                        };
                         switch(_executeType){
                             case(#fallback){
                                 if (not( caller == decider or (Time.now() > expiration and caller == from) )) {
