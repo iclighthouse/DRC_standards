@@ -46,7 +46,7 @@ dfx canister --no-wallet install Token --argument='(record { totalSupply=1000000
 Transfers _value amount of tokens from caller's account to address _to, returns type TxnResult.
 
 ````
-dfx canister call Token transfer '("3rpzj-jp7vd-zfai5-zhllw-pqqxi-7bfer-mds4c-5rrpo-nkgq7-3bkrg-oqe",1000,null)'
+dfx canister call Token transfer '("3rpzj-jp7vd-zfai5-zhllw-pqqxi-7bfer-mds4c-5rrpo-nkgq7-3bkrg-oqe",1000,null,null)'
 ````
 
 **approve**
@@ -54,7 +54,7 @@ dfx canister call Token transfer '("3rpzj-jp7vd-zfai5-zhllw-pqqxi-7bfer-mds4c-5r
 Allows `_spender` to withdraw from your account multiple times, up to the `_value` amount.
 
 ````
-dfx canister call Token approve '("3rpzj-jp7vd-zfai5-zhllw-pqqxi-7bfer-mds4c-5rrpo-nkgq7-3bkrg-oqe",500)'
+dfx canister call Token approve '("3rpzj-jp7vd-zfai5-zhllw-pqqxi-7bfer-mds4c-5rrpo-nkgq7-3bkrg-oqe",500,null)'
 ````
 
 **balanceOf**
@@ -80,11 +80,12 @@ dfx canister call Token allowance '("3rpzj-jp7vd-zfai5-zhllw-pqqxi-7bfer-mds4c-5
 ````
 import DRC20 "DRC20";
 
+actor {
     var token: DRC20.DRC20 = actor("xxxxx-xxxxx-xx");
 
     public func testTransfer() : async () {
 
-	let res = await token.transfer(Principal.toText([user's principal]), [amount], null);
+	let res = await token.transfer(Principal.toText([user's principal]), [amount], null, null);
 
 	switch(res){
             case(#ok(txid)){  .....  };
@@ -92,6 +93,7 @@ import DRC20 "DRC20";
         };
 	...
     };
+}
 ````
 
 
