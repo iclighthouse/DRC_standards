@@ -280,7 +280,7 @@ lockTransfer: (_to: Address, _value: nat, _timeout: nat32, _decider: opt Address
 lockTransferFrom: (_from: Address, _to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### executeTransfer
-The `decider` executes the locked transaction `_txid`, or the `owner` can fallback the locked transaction after the lock has expired.  If the recipient of the locked transaction `_to` is decider, the decider can specify a new recipient `_to`.
+The `decider` executes the locked transaction `_txid`, or the `owner` can fallback the locked transaction after the lock has expired. If the recipient of the locked transaction `_to` is decider, the decider can specify a new recipient `_to`.
 ``` candid
 executeTransfer: (_txid: Txid, _executeType: ExecuteType, _to: opt Address, _sa: opt vec nat8) -> (result: TxnResult);
 ```
@@ -288,12 +288,12 @@ executeTransfer: (_txid: Txid, _executeType: ExecuteType, _to: opt Address, _sa:
 Queries the transaction records information.  
 Query type `_request`:  
 #txnCountGlobal: returns global transaction count.  
-#txnCount: returns `owner`'s transaction count. It is the nonce value of his next transaction.    
+#txnCount: returns `owner`s transaction count. It is the nonce value of his next transaction.    
 #getTxn: returns details of the transaction with id `txid`.  
-#lastTxidsGlobal: returns the latest transaction txids of the global.   
-#lastTxids: returns `owner`'s latest transaction txids.  
-#lockedTxns: returns the locked balance of `owner`, and the locked transaction records.
-#getEvents: returns global latest transaction events or `owner`'s latest transaction events.
+#lastTxidsGlobal: returns global latest transaction txids.   
+#lastTxids: returns `owner`s latest transaction txids.  
+#lockedTxns: returns the locked balance of `owner`, and the locked transaction records.   
+#getEvents: returns global latest transaction events or `owner`s transaction events.   
 ``` candid
 txnQuery: (_request: TxnQueryRequest) -> (response: TxnQueryResponse) query;
 ```
