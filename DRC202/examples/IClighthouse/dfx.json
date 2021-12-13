@@ -1,7 +1,7 @@
 {
   "canisters": {
-    "DRC20": {
-      "main": "./DRC20.mo",
+    "DRC202": {
+      "main": "DRC202Proxy.mo",
       "type": "motoko",
       "args" : "--compacting-gc"
     }

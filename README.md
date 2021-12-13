@@ -13,15 +13,11 @@ Comments: [https://github.com/iclighthouse/DRC_standards/issues/1](https://githu
 
 TODO: Standard drafting and motoko example implementation
 
-## DRC202: Token Transaction Records Storage Standard 
+## DRC202: Token Transaction Records Standard 
 2021-11-22: Finished generating txid method `generateTxid()`, drafting the basic access interface `version()`,`fee()`,`store()`,`txn()`. [https://github.com/iclighthouse/DRC_standards/tree/main/DRC202](https://github.com/iclighthouse/DRC_standards/tree/main/DRC202)    
 TODO: Standard drafting and motoko example implementation
 
 ## DRC203: Token Mining Standard
-
-TODO: Standard drafting and motoko example implementation
-
-## DRC204: Token Atomic Swap Standard
 
 TODO: Standard drafting and motoko example implementation
 

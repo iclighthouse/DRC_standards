@@ -25,6 +25,8 @@ A standard interface for Dfinity tokens. The standard complies with ERC20 interf
 
 * Improved atomicity
 
+* Idempotency
+
 * Governability
 
 

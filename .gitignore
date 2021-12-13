@@ -5,14 +5,18 @@ dist-ssr
 .vessel
 .config
 .tmp
-**/canister_ids.json
 
 # Various IDEs and Editors
 .vscode/
 .idea/
-.history/
+.history
 **/*~
 
 # frontend code
 node_modules/
 dist/
+
+canister_ids.json
+.dfx/
+issues/
+docs/

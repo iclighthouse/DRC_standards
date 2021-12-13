@@ -19,7 +19,7 @@ import List "mo:base/List";
 import Time "mo:base/Time";
 import Deque "mo:base/Deque";
 import Cycles "mo:base/ExperimentalCycles";
-import Types "./types/types";
+import Types "./lib/Types";
 import AID "./lib/AID";
 import Hex "./lib/Hex";
 import Binary "./lib/Binary";

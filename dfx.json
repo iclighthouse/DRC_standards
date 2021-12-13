@@ -1,7 +1,12 @@
 {
   "canisters": {
     "DRC20": {
-      "main": "./DRC20.mo",
+      "main": "./DRC20/examples/IClighthouse/DRC20.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC202": {
+      "main": "./DRC202/examples/IClighthouse/DRC202Proxy.mo",
       "type": "motoko",
       "args" : "--compacting-gc"
     }
