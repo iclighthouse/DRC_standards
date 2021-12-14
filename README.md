@@ -25,7 +25,7 @@ TODO: Standard drafting and motoko example implementation
 
 TODO: Standard drafting and motoko example implementation
 
-## DRC205: Swap Records Storage Standard
+## DRC205: Swap Transaction Records Storage Standard
 
 TODO: Standard drafting and motoko example implementation
 
