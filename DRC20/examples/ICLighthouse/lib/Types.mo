@@ -64,13 +64,13 @@ module {
     public type Transaction = {
         from: AccountId;
         to: AccountId;
-        value: Nat;   // `to` receives the amount (If lockTransfer operation, value SHOULD be 0)
+        value: Nat;   // `to` receives the amount (If the txn is lockTransfer, value SHOULD be 0)
         operation: Operation;
         data: ?Blob;
     };
     public type TxnRecord = {
         txid: Txid;
-        caller: Principal; //maybe: sender/spender/decider
+        caller: Principal; // sender/spender/decider
         timestamp: Time.Time; //Time
         index: Nat;
         nonce: Nat;

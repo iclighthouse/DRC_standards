@@ -242,6 +242,9 @@ module {
         var crc : [Nat8] = CRC32.crc32(Array.freeze(hash));
         return Blob.fromArray(Array.append(crc, Array.freeze(hash)));   
     };
+    public func anonymous(): Principal{ // 2vxsx-fae
+        principalBlobToPrincipal(Blob.fromArray([4:Nat8]));
+    };
     // get DRC20 calldata
     public func getCalldata(_data: ?Blob): [Nat8]{
         var data = Blob.toArray(Option.get(_data, Blob.fromArray([])));

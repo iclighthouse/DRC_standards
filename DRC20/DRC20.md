@@ -131,7 +131,7 @@ type Operation = variant {
 type Transaction = record {
     from: AccountId;
     to: AccountId;
-    value: nat;   /* `to` receives the amount (If lockTransfer operation, value SHOULD be 0)  */
+    value: nat;   /* `to` receives the amount (If the txn is lockTransfer, value SHOULD be 0)  */
     operation: Operation;
     data: opt blob;
 };
