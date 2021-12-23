@@ -56,9 +56,9 @@ import Cycles "mo:base/ExperimentalCycles";
     Notes: Timer_tick() will be executed once the eventType `TimerTick` has been subscribed to in the Monitor. There is no guarantee that timer_tick() will be triggered on time.
 
 **Step 2**
-Set canister's own canister-id as its controller.  
+Set canister's own canister-id and/or blackhole (7hdtw-jqaaa-aaaak-aaccq-cai) as its controller.  
 ```
-dfx canister --network ic call aaaaa-aa update_settings '(record {canister_id=principal "<your_canister_id>"; settings= record {controllers=vec {principal "<your_controller_principal>"; principal "<your_canister_id>"}}})'
+dfx canister --network ic call aaaaa-aa update_settings '(record {canister_id=principal "<your_canister_id>"; settings= record {controllers=vec {principal "<your_controller_principal>"; principal "<your_canister_id>"; principal "7hdtw-jqaaa-aaaak-aaccq-cai"}}})'
 ```
 
 **Step 3**
