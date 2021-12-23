@@ -2,7 +2,7 @@
  * Module     : DRC205Proxy.mo
  * Author     : ICLighthouse Team
  * Stability  : Experimental
- * Canister   : 6ylab-kiaaa-aaaak-aacga-cai
+ * CanisterId : 6ylab-kiaaa-aaaak-aacga-cai
  * Github     : https://github.com/iclighthouse/DRC_standards/
  */
 import Prim "mo:⛔";

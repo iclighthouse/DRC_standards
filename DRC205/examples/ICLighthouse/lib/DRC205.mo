@@ -1,6 +1,6 @@
 /**
  * Module     : DRC205.mo
- * Canister   : 6ylab-kiaaa-aaaak-aacga-cai
+ * CanisterId : 6ylab-kiaaa-aaaak-aacga-cai
  */
 import Principal "mo:base/Principal";
 import Array "mo:base/Array";

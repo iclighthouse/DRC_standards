@@ -3,6 +3,7 @@
  * Author     : ICLighthouse Team
  * License    : Apache License 2.0
  * Stability  : Experimental
+ * CanisterId : y5a36-liaaa-aaaak-aacqa-cai
  * Github     : https://github.com/iclighthouse/DRC_standards/
  */
 import Prim "mo:⛔";
