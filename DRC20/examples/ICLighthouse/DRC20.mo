@@ -13,13 +13,14 @@ import Option "mo:base/Option";
 import Blob "mo:base/Blob";
 import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
+import Int "mo:base/Int";
 import Int32 "mo:base/Int32";
 import Iter "mo:base/Iter";
 import List "mo:base/List";
 import Time "mo:base/Time";
 import Deque "mo:base/Deque";
 import Cycles "mo:base/ExperimentalCycles";
-import Types "./lib/Types";
+import Types "./lib/DRC20";
 import AID "./lib/AID";
 import Hex "./lib/Hex";
 import Binary "./lib/Binary";
@@ -47,6 +48,16 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     type Allowance = Types.Allowance;
     type TxnQueryRequest =Types.TxnQueryRequest;
     type TxnQueryResponse =Types.TxnQueryResponse;
+    type CoinSeconds = Types.CoinSeconds;
+    type From = Address;
+    type To = Address;
+    type Spender = Address;
+    type Decider = Address;
+    type Amount = Nat;
+    type Sa = [Nat8];
+    type Nonce = Nat;
+    type Data = Blob;
+    type Timeout = Nat32;
 
     /*
     * Config 
@@ -54,7 +65,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private stable var MAX_CACHE_TIME: Int = 3 * 30 * 24 * 3600 * 1000000000; // 3 months
     private stable var MAX_CACHE_NUMBER_PER: Nat = 30; 
     private stable var FEE_TO: AccountId = AID.blackhole();  
-    private stable var STORAGE_CANISTER: Text = "oearr-eyaaa-aaaak-aabja-cai";
+    private stable var STORAGE_CANISTER: Text = "y5a36-liaaa-aaaak-aacqa-cai";
     private stable var MAX_PUBLICATION_TRIES: Nat = 2; 
     private stable var MAX_STORAGE_TRIES: Nat = 2; 
 
@@ -67,6 +78,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private stable var symbol_: Text = Option.get(initArgs.symbol, "");
     private stable let decimals_: Nat8 = initArgs.decimals;
     private stable var totalSupply_: Nat = initArgs.totalSupply;
+    private stable var totalCoinSeconds: CoinSeconds = {coinSeconds = 0; updateTime = Time.now()};
     private stable var gas_: Gas = initArgs.gas;
     private stable var metadata_: [Metadata] = Option.get(initArgs.metadata, []);
     private var txnRecords = HashMap.HashMap<Txid, TxnRecord>(1, Blob.equal, Blob.hash);
@@ -74,6 +86,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private stable var globalLastTxns = Deque.empty<Txid>();
     private stable var index: Nat = 0;
     private var balances = HashMap.HashMap<AccountId, Nat>(1, Blob.equal, Blob.hash);
+    private var coinSeconds = HashMap.HashMap<AccountId, CoinSeconds>(1, Blob.equal, Blob.hash);
     private var nonces = HashMap.HashMap<AccountId, Nat>(1, Blob.equal, Blob.hash);
     private var lastTxns_ = HashMap.HashMap<AccountId, Deque.Deque<Txid>>(1, Blob.equal, Blob.hash); //from to caller
     private var lockedTxns_ = HashMap.HashMap<AccountId, [Txid]>(1, Blob.equal, Blob.hash); //from
@@ -85,6 +98,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     // only for upgrade
     private stable var txnRecordsEntries : [(Txid, TxnRecord)] = [];
     private stable var balancesEntries : [(AccountId, Nat)] = [];
+    private stable var coinSecondsEntries : [(AccountId, CoinSeconds)] = [];
     private stable var noncesEntries : [(AccountId, Nat)] = [];
     private stable var lastTxns_Entries : [(AccountId, Deque.Deque<Txid>)] = [];
     private stable var lockedTxns_Entries : [(AccountId, [Txid])] = [];
@@ -109,7 +123,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private func _deleteTxnRecord(_txid: Txid, _isDeep: Bool): (){
         switch(txnRecords.get(_txid)){
             case(?(record)){ //Existence record
-                var caller = AID.principalToAccountBlob(record.caller, null);
+                var caller = record.caller;
                 var from = record.transaction.from;
                 var to = record.transaction.to;
                 var timestamp = record.timestamp;
@@ -152,8 +166,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         return a;
     }; // AccountIdToPrincipal: accountMaps.get(_a)
     private stable let founder_: AccountId = _getAccountId(Option.get(initArgs.founder, Principal.toText(installMsg.caller)));
-    private func _getTxid(_caller: Principal): Txid{
-        var _nonce: Nat = _getNonce(_getAccountIdFromPrincipal(_caller, null));
+    private func _getTxid(_caller: AccountId): Txid{
+        var _nonce: Nat = _getNonce(_caller);
         return DRC202.generateTxid(Principal.fromActor(this), _caller, _nonce);
     };
     private func _getBalance(_a: AccountId): Nat{
@@ -167,6 +181,13 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         };
     };
     private func _setBalance(_a: AccountId, _v: Nat): (){
+        let originalValue = _getBalance(_a);
+        if (originalValue > 0){ // CoinSeconds
+            let now = Time.now();
+            let coinSecondsItem = Option.get(coinSeconds.get(_a), {coinSeconds = 0; updateTime = now });
+            let newCoinSeconds = coinSecondsItem.coinSeconds + originalValue * (Int.abs(now - coinSecondsItem.updateTime) / 1000000000);
+            coinSeconds.put(_a, {coinSeconds = newCoinSeconds; updateTime = now});
+        };
         if(_v == 0){
             balances.delete(_a);
         } else {
@@ -269,7 +290,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             };
         };
     };
-    private func _cleanLasTxns(_a: AccountId): (){
+    private func _cleanLastTxns(_a: AccountId): (){
         switch(lastTxns_.get(_a)){
             case(?(q)){  
                 var txids: Deque.Deque<Txid> = q;
@@ -279,17 +300,15 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                     switch (Deque.popBack(txids)){
                         case(?(q, v)){
                             txids := q;
-                            switch(Deque.peekFront(txids)){
-                                case(?(v)){};
-                                case(_){
-                                    lastTxns_.delete(_a);
-                                };
-                            };
                         };
                         case(_){};
                     };
                 };
-                lastTxns_.put(_a, txids);
+                if (size == 0){
+                    lastTxns_.delete(_a);
+                }else{
+                    lastTxns_.put(_a, txids);
+                };
             };
             case(_){};
         };
@@ -306,7 +325,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                         var txids: Deque.Deque<Txid> = q;
                         txids := Deque.pushFront(txids, _txid);
                         lastTxns_.put(_a, txids);
-                        _cleanLasTxns(_a);
+                        _cleanLastTxns(_a);
                     };
                     case(_){
                         var new = Deque.empty<Txid>();
@@ -586,6 +605,10 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         var balance_to = _getBalance(_to);
         balance_to += _value;
         _setBalance(_to, balance_to);
+        totalCoinSeconds := {
+            coinSeconds = totalCoinSeconds.coinSeconds + totalSupply_ * (Int.abs(Time.now() - totalCoinSeconds.updateTime) / 1000000000); 
+            updateTime = Time.now();
+        };
         totalSupply_ += _value;
         return true;
     };
@@ -595,6 +618,10 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             if (not(_isCheck)) { 
                 balance_from -= _value;
                 _setBalance(_from, balance_from);
+                totalCoinSeconds := {
+                    coinSeconds = totalCoinSeconds.coinSeconds + totalSupply_ * (Int.abs(Time.now() - totalCoinSeconds.updateTime) / 1000000000); 
+                    updateTime = Time.now();
+                };
                 totalSupply_ -= _value;
             };
             return true;
@@ -622,11 +649,11 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         return true;
     };
     // Do not update state variables before calling _transfer
-    private func _transfer(_msgCaller: Principal, _sa: ?[Nat8], _from: AccountId, _to: AccountId, _value: Nat, _data: ?Blob, 
+    private func _transfer(_msgCaller: Principal, _sa: ?[Nat8], _from: AccountId, _to: AccountId, _value: Nat, _nonce: ?Nat, _data: ?Blob, 
     _operation: Operation, _isAllowance: Bool): (result: TxnResult) {
         var callerPrincipal = _msgCaller;
         let caller = _getAccountIdFromPrincipal(_msgCaller, _sa);
-        let txid = _getTxid(_msgCaller);
+        let txid = _getTxid(caller);
         let from = _from;
         let to = _to;
         let value = _value; 
@@ -635,19 +662,12 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         if (_isAllowance){
             allowed := _getAllowance(from, caller);
         };
-        let data = Blob.toArray(Option.get(_data, Blob.fromArray([0])));
+        let data = Option.get(_data, Blob.fromArray([]));
         if (data.size() > 65536){
-            return #err({ code=#UndefinedError; message="The length of _data must be less than 64KB"; });
+            return #err({ code=#UndefinedError; message="The length of _data must be less than 65536B"; });
         };
-        if (data.size() >= 9){
-            let protocol = AID.slice(data, 0, ?2);
-            let version: Nat8 = data[3];
-            if (protocol[0] == 68 and protocol[1] == 82 and protocol[2] == 67 and data[4] == 1){
-                let txnNonce = Nat32.toNat(Binary.BigEndian.toNat32(AID.slice(data, 5, ?8)));
-                if (_getNonce(caller) != txnNonce){
-                    return #err({ code=#UndefinedError; message="Wrong nonce! The nonce value should be "#Nat.toText(_getNonce(caller)); });
-                };
-            };
+        if (Option.isSome(_nonce) and _getNonce(caller) != Option.get(_nonce,0)){
+            return #err({ code=#NonceError; message="Wrong nonce! The nonce value should be "#Nat.toText(_getNonce(caller)); });
         };
         // check and operate
         switch(_operation){
@@ -730,7 +750,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         // insert record
         var txn: TxnRecord = {
             txid = txid;
-            caller = callerPrincipal; // If you want to maintain anonymity, you can hide the principal of the caller
+            msgCaller = null; // If you want to maintain anonymity, you can hide the principal of the caller
+            caller = caller;
             timestamp = Time.now();
             index = index;
             nonce = _getNonce(caller);
@@ -830,15 +851,33 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         return gas_;
     };
     /// Returns the total token supply.
-    public query func totalSupply() : async Nat{
+    public query func totalSupply() : async Amount{
         return totalSupply_;
     };
+    /// Returns coinSeconds value
+    public query func getCoinSeconds(_owner: ?Address) : async (totalCoinSeconds: CoinSeconds, accountCoinSeconds: ?CoinSeconds){
+        let now = Time.now();
+        let newTotalCoinSeconds = { coinSeconds = totalCoinSeconds.coinSeconds + totalSupply_ * (Int.abs(now - totalCoinSeconds.updateTime) / 1000000000); updateTime = now; };
+        switch(_owner){
+            case(?(owner)){ 
+                let account = _getAccountId(owner);
+                switch(coinSeconds.get(account)){
+                    case(?(coinSecondsItem)){
+                        let newAccountCoinSeconds = { coinSeconds = coinSecondsItem.coinSeconds + _getBalance(account) * (Int.abs(now - coinSecondsItem.updateTime) / 1000000000); updateTime = now; };
+                        return (newTotalCoinSeconds, ?newAccountCoinSeconds);
+                    };
+                    case(_){ return (newTotalCoinSeconds, null); };
+                };
+            };
+            case(_){ return (newTotalCoinSeconds, null); };
+        };
+    };
     /// Returns the account balance of the given account _owner, not including the locked balance.
-    public query func balanceOf(_owner: Address) : async (balance: Nat){
+    public query func balanceOf(_owner: Address) : async (balance: Amount){
         return _getBalance(_getAccountId(_owner));
     };
     /// Transfers _value amount of tokens from caller's account to address _to, returns type TxnResult.
-    public shared(msg) func transfer(_to: Address, _value: Nat, _sa: ?[Nat8], _data: ?Blob) : async (result: TxnResult) {
+    public shared(msg) func transfer(_to: To, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
         let from = _getAccountIdFromPrincipal(msg.caller, _sa);
         let to = _getAccountId(_to);
         let operation: Operation = #transfer({ action = #send; });
@@ -847,17 +886,19 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
         };
         // transfer
-        let res = _transfer(msg.caller, _sa, from, to, _value, _data, operation, false);
+        let res = _transfer(msg.caller, _sa, from, to, _value, _nonce, _data, operation, false);
         // publish
         let pub = _publish();
         // records storage (DRC202 Standard)
         let store = _drc202Store();
         // Fee/2 is charged for the post (Ignore charging fail)
-        ignore _chargeFee(from, 50, false);
-        return res;
+        switch(res){
+            case(#ok(v)){ ignore _chargeFee(from, 50, false); return res; };
+            case(#err(v)){ return res; };
+        };
     };
     /// Transfers _value amount of tokens from address _from to address _to, returns type TxnResult.
-    public shared(msg) func transferFrom(_from: Address, _to: Address, _value: Nat, _sa: ?[Nat8], _data: ?Blob) : 
+    public shared(msg) func transferFrom(_from: From, _to: To, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : 
     async (result: TxnResult) {
         let caller = _getAccountIdFromPrincipal(msg.caller, _sa);
         let from = _getAccountId(_from);
@@ -868,20 +909,22 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
         };
         // transfer
-        let res = _transfer(msg.caller, _sa, from, to, _value, _data, operation, true);
+        let res = _transfer(msg.caller, _sa, from, to, _value, _nonce, _data, operation, true);
         // publish
         let pub = _publish();
         // records storage (DRC202 Standard)
         let store = _drc202Store();
         // Fee/2 is charged for the post (Ignore charging fail)
-        ignore _chargeFee(caller, 50, false);
-        return res;
+        switch(res){
+            case(#ok(v)){ ignore _chargeFee(caller, 50, false); return res; };
+            case(#err(v)){ return res; };
+        };
     };
     /// Locks a transaction, specifies a `_decider` who can decide the execution of this transaction, 
     /// and sets an expiration period `_timeout` seconds after which the locked transaction will be unlocked.
     /// The parameter _timeout should not be greater than 1000000 seconds.
-    public shared(msg) func lockTransfer(_to: Address, _value: Nat, _timeout: Nat32, 
-    _decider: ?Address, _sa: ?[Nat8], _data: ?Blob) : async (result: TxnResult) {
+    public shared(msg) func lockTransfer(_to: To, _value: Amount, _timeout: Timeout, 
+    _decider: ?Decider, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
         if (_timeout > 1000000){
             return #err({ code=#UndefinedError; message="_timeout should not be greater than 1000000 seconds."; });
         };
@@ -902,18 +945,20 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
         };
         // transfer
-        let res = _transfer(msg.caller, _sa, from, to, 0, _data, operation, false);
+        let res = _transfer(msg.caller, _sa, from, to, 0, _nonce, _data, operation, false);
         // publish
         let pub = _publish();
         // records storage (DRC202 Standard)
         let store = _drc202Store();
         // Fee/2 is charged for the post (Ignore charging fail)
-        ignore _chargeFee(from, 50, false);
-        return res;
+        switch(res){
+            case(#ok(v)){ ignore _chargeFee(from, 50, false); return res; };
+            case(#err(v)){ return res; };
+        };
     };
     /// `spender` locks a transaction.
-    public shared(msg) func lockTransferFrom(_from: Address, _to: Address, _value: Nat, 
-    _timeout: Nat32, _decider: ?Address, _sa: ?[Nat8], _data: ?Blob) : async (result: TxnResult) {
+    public shared(msg) func lockTransferFrom(_from: From, _to: To, _value: Amount, 
+    _timeout: Timeout, _decider: ?Decider, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
         if (_timeout > 1000000){
             return #err({ code=#UndefinedError; message="_timeout should not be greater than 1000000 seconds."; });
         };
@@ -935,18 +980,20 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
         };
         // transfer
-        let res = _transfer(msg.caller, _sa, from, to, 0, _data, operation, true);
+        let res = _transfer(msg.caller, _sa, from, to, 0, _nonce, _data, operation, true);
         // publish
         let pub = _publish();
         // records storage (DRC202 Standard)
         let store = _drc202Store();
         // Fee/2 is charged for the post (Ignore charging fail)
-        ignore _chargeFee(caller, 50, false);
-        return res;
+        switch(res){
+            case(#ok(v)){ ignore _chargeFee(caller, 50, false); return res; };
+            case(#err(v)){ return res; };
+        };
     };
     /// The `decider` executes the locked transaction `_txid`, or the `owner` can fallback the locked transaction after the lock has expired.
     /// If the recipient of the locked transaction `_to` is decider, the decider can specify a new recipient `_to`.
-    public shared(msg) func executeTransfer(_txid: Txid, _executeType: ExecuteType, _to: ?Address, _sa: ?[Nat8]) : async (result: TxnResult) {
+    public shared(msg) func executeTransfer(_txid: Txid, _executeType: ExecuteType, _to: ?To, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
         let txid = _txid;
         let caller = _getAccountIdFromPrincipal(msg.caller, _sa);
         // Fee/2 is charged whether the transaction is successful or not
@@ -1006,14 +1053,16 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                             lockedTxid = txid;  
                             fallback = fallback;
                         });
-                        let res = _transfer(msg.caller, _sa, from, to, value, null, operation, false);
+                        let res = _transfer(msg.caller, _sa, from, to, value, _nonce, _data, operation, false);
                         // publish
                         let pub = _publish();
                         // records storage (DRC202 Standard)
                         let store = _drc202Store();
                         // Fee/2 is charged for the post (Ignore charging fail)
-                        ignore _chargeFee(caller, 50, false);
-                        return res;
+                        switch(res){
+                            case(#ok(v)){ ignore _chargeFee(caller, 50, false); return res; };
+                            case(#err(v)){ return res; };
+                        };
                     };
                     case(_){
                         return #err({ code=#UndefinedError; message="The status of the transaction record is not locked"; });
@@ -1092,7 +1141,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     };
 
     /// Subscribes to the token's messages, giving the callback function and the types of messages as parameters.
-    public shared(msg) func subscribe(_callback: Callback, _msgTypes: [MsgType], _sa: ?[Nat8]) : async Bool{
+    public shared(msg) func subscribe(_callback: Callback, _msgTypes: [MsgType], _sa: ?Sa) : async Bool{
         let caller = _getAccountIdFromPrincipal(msg.caller, _sa);
         assert(_chargeFee(caller, 100, false));
         let sub: Subscription = {
@@ -1108,7 +1157,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     };
     /// Allows `_spender` to withdraw from your account multiple times, up to the `_value` amount.
     /// If this function is called again it overwrites the current allowance with `_value`. 
-    public shared(msg) func approve(_spender: Address, _value: Nat, _sa: ?[Nat8]) : async (result: TxnResult){
+    public shared(msg) func approve(_spender: Spender, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult){
         let from = _getAccountIdFromPrincipal(msg.caller, _sa);
         let to = _getAccountId(_spender);
         let operation: Operation = #approve({ allowance = _value; });
@@ -1117,17 +1166,19 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
         };
         // transfer
-        let res = _transfer(msg.caller, _sa, from, to, 0, null, operation, false);
+        let res = _transfer(msg.caller, _sa, from, to, 0, _nonce, _data, operation, false);
         // publish
         let pub = _publish();
         // records storage (DRC202 Standard)
         let store = _drc202Store();
         // Fee/2 is charged for the post (Ignore charging fail)
-        ignore _chargeFee(from, 50, false);
-        return res;
+        switch(res){
+            case(#ok(v)){ ignore _chargeFee(from, 50, false); return res; };
+            case(#err(v)){ return res; };
+        };
     };
     /// Returns the amount which `_spender` is still allowed to withdraw from `_owner`.
-    public query func allowance(_owner: Address, _spender: Address) : async (remaining: Nat) {
+    public query func allowance(_owner: Address, _spender: Spender) : async (remaining: Amount) {
         return _getAllowance(_getAccountId(_owner), _getAccountId(_spender));
     };
     /// Returns all your approvals with a non-zero amount.
@@ -1141,9 +1192,11 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private stable var genesisCreated: Bool = false;
     if (not(genesisCreated)){
         balances.put(founder_, totalSupply_);
+        coinSeconds.put(founder_, {coinSeconds = 0; updateTime = Time.now()});
         var txn: TxnRecord = {
             txid = Blob.fromArray([0:Nat8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]);
-            caller = installMsg.caller;
+            msgCaller = ?installMsg.caller;
+            caller = AID.principalToAccountBlob(installMsg.caller, null);
             timestamp = Time.now();
             index = index;
             nonce = 0;

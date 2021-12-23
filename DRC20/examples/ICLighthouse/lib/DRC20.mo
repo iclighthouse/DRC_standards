@@ -1,12 +1,27 @@
+/**
+ * Module     : DRC20.mo
+ * Author     : ICLight.house Team
+ * Github     : https://github.com/iclighthouse/DRC_standards/
+ */
 module {
   public type AccountId = Blob;
   public type Address = Text;
+  public type From = Address;
+  public type To = Address;
+  public type Spender = Address;
+  public type Decider = Address;
+  public type Amount = Nat;
+  public type Sa = [Nat8];
+  public type Nonce = Nat;
+  public type Data = Blob;
+  public type Timeout = Nat32;
   public type Allowance = { remaining : Nat; spender : AccountId };
   public type Callback = shared TxnRecord -> async ();
   public type ExecuteType = { #sendAll; #send : Nat; #fallback };
   public type Gas = { #token : Nat; #cycles : Nat; #noFee };
   public type Metadata = { content : Text; name : Text };
   public type MsgType = { #onApprove; #onExecute; #onTransfer; #onLock };
+  public type CoinSeconds = { coinSeconds: Nat; updateTime: Int };
   public type Operation = {
     #approve : { allowance : Nat };
     #lockTransfer : { locked : Nat; expiration : Time; decider : AccountId };
@@ -47,7 +62,8 @@ module {
     txid : Txid;
     nonce : Nat;
     timestamp : Time;
-    caller : Principal;
+    msgCaller : ?Principal;
+    caller : AccountId;
     index : Nat;
   };
   public type TxnResult = {
@@ -58,37 +74,49 @@ module {
         #InsufficientAllowance;
         #UndefinedError;
         #InsufficientBalance;
+        #NonceError;
         #LockedTransferExpired;
       };
       message : Text;
     };
   };
+  public type InitArgs = {
+      totalSupply: Nat;
+      decimals: Nat8;
+      gas: Gas;
+      name: ?Text;
+      symbol: ?Text;
+      metadata: ?[Metadata];
+      founder: ?Address;
+  };
   public type Self = actor {
-    allowance : shared query (Address, Address) -> async Nat;
+    allowance : shared query (Address, Spender) -> async Amount;
     approvals : shared query Address -> async [Allowance];
-    approve : shared (Address, Nat, ?[Nat8]) -> async TxnResult;
-    balanceOf : shared query Address -> async Nat;
+    approve : shared (Spender, Amount, ?Nonce, ?Sa, ?Data) -> async TxnResult;
+    balanceOf : shared query Address -> async Amount;
     cyclesBalanceOf : shared query Address -> async Nat;
     cyclesReceive : shared ?Address -> async Nat;
     decimals : shared query () -> async Nat8;
-    executeTransfer : shared (Txid, ExecuteType, ?Address, ?[Nat8]) -> async TxnResult;
+    executeTransfer : shared (Txid, ExecuteType, ?To, ?Nonce, ?Sa, ?Data) -> async TxnResult;
     gas : shared query () -> async Gas;
     lockTransfer : shared (
-        Address,
-        Nat,
-        Nat32,
-        ?Address, 
-        ?[Nat8],
-        ?Blob,
+        To,
+        Amount,
+        Timeout,
+        ?Decider, 
+        ?Nonce,
+        ?Sa,
+        ?Data,
       ) -> async TxnResult;
     lockTransferFrom : shared (
-        Address,
-        Address,
-        Nat,
-        Nat32,
-        ?Address, 
-        ?[Nat8],
-        ?Blob,
+        From,
+        To,
+        Amount,
+        Timeout,
+        ?Decider, 
+        ?Nonce,
+        ?Sa,
+        ?Data,
       ) -> async TxnResult;
     metadata : shared query () -> async [Metadata];
     name : shared query () -> async Text;
@@ -96,15 +124,17 @@ module {
     subscribe : shared (Callback, [MsgType], ?[Nat8]) -> async Bool;
     subscribed : shared query Address -> async ?Subscription;
     symbol : shared query () -> async Text;
-    totalSupply : shared query () -> async Nat;
-    transfer : shared (Address, Nat, ?[Nat8], ?Blob) -> async TxnResult;
+    totalSupply : shared query () -> async Amount;
+    transfer : shared (To, Amount, ?Nonce, ?Sa, ?Data) -> async TxnResult;
     transferFrom : shared (
-        Address,
-        Address,
-        Nat, 
-        ?[Nat8],
-        ?Blob,
+        From,
+        To,
+        Amount, 
+        ?Nonce,
+        ?Sa,
+        ?Data,
       ) -> async TxnResult;
     txnQuery : shared query TxnQueryRequest -> async TxnQueryResponse;
+    getCoinSeconds : shared query ?Address -> async (CoinSeconds, ?CoinSeconds);
   }
 }

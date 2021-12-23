@@ -2,7 +2,7 @@
 DRC: 20  
 Title: Dfinity Fungible Token Standard  
 Author: Avida <avida.life@hotmail.com>, Simpson <icpstaking-wei@hotmail.com>  
-Status: Drafting  
+Status: Draft  
 Category: Token DRC  
 Created: 2021-11-03
 ***
@@ -73,127 +73,133 @@ DRC20 Token Contract.
 ### Types
 
 ``` candid
-type Metadata = record {
-    name: text;
-    content: text;
-};
-type Gas = variant {
-    cycles: nat;
-    token: nat;
-    noFee;
-};
-/* Address: principal string or account-id hex */
-type Address = text;
-type AccountId = blob;
-/* Txid:
-   Require unique txid in a token. It is recommended to use DRC202 standard to generate txid.
-*/
-type Txid = blob;
 type TxnResult = variant {
-    ok: Txid;
-    err: record { 
-        code: variant {
-            InsufficientBalance;
-            InsufficientAllowance;
-            InsufficientGas;
-            LockedTransferExpired;
-            UndefinedError;
-        };
-        message: text;
+   err: record {
+      code: variant {
+         InsufficientAllowance;
+         InsufficientBalance;
+         InsufficientGas;
+         LockedTransferExpired;
+         NonceError;
+         UndefinedError;
+       };
+      message: text;
     };
-};
-type ExecuteType = variant {
-    fallback;  /* operator with access: _decider(anytime), _from(when expired). */
-    sendAll;  /* operator with access: _decider(when not expired). */
-    send: nat;  /*  operator with access: _decider(when not expired). */
-};
-type Operation = variant {
-    transfer: record {
-        action: variant {
-            send;
-            mint;
-            burn;
-        };
-    };
-    lockTransfer: record {
-        locked: nat;  /* be locked for the amount */
-        expiration: int;  /* Expiration timestamp(Time.Time) = lockTransferTimestamp + _timeout */
-        decider: AccountId; /* Who has access to execute the executeTransfer() before it expires */
-    };
-    executeTransfer: record {
-        lockedTxid: Txid;
-        fallback: nat; /* `from` receives back the amount */
-    };
-    approve: record {
-        allowance: nat;
-    };
-};
-type Transaction = record {
-    from: AccountId;
-    to: AccountId;
-    value: nat;   /* `to` receives the amount (If the txn is lockTransfer, value SHOULD be 0)  */
-    operation: Operation;
-    data: opt blob;
+   ok: Txid;
 };
 type TxnRecord = record {
-    txid: Txid;
-    caller: principal; /* It could be: sender/spender/decider */
-    timestamp: int;
-    index: nat;
-    nonce: nat;
-    gas: Gas;
-    transaction: Transaction;
-};
-type Callback = func (record: TxnRecord) -> ();
-type MsgType = variant {
-    onTransfer;
-    onLock;
-    onExecute;
-    onApprove;
-};
-type Subscription = record {
-    callback: Callback;
-    msgTypes: vec MsgType;
-};
-type Allowance = record {
-    spender: AccountId;
-    remaining: nat;
-};
-type TxnQueryRequest = variant {
-    txnCountGlobal;
-    txnCount: record { owner: Address; };
-    getTxn: record { txid: Txid; };
-    lastTxidsGlobal;
-    lastTxids: record { owner: Address; };
-    lockedTxns: record { owner: Address; };
-    getEvents: record { owner: opt Address; };
+   caller: AccountId;
+   gas: Gas;
+   index: nat;
+   msgCaller: opt principal;
+   nonce: nat;
+   timestamp: Time;
+   transaction: Transaction;
+   txid: Txid;
 };
 type TxnQueryResponse = variant {
-    txnCountGlobal: nat;
-    txnCount: nat;
-    getTxn: opt TxnRecord;
-    lastTxidsGlobal: vec Txid;
-    lastTxids: vec Txid;
-    lockedTxns: record { lockedBalance: nat; txns: vec TxnRecord; };
-    getEvents: vec TxnRecord;
+   getEvents: vec TxnRecord;
+   getTxn: opt TxnRecord;
+   lastTxids: vec Txid;
+   lastTxidsGlobal: vec Txid;
+   lockedTxns: record { lockedBalance: nat; txns: vec TxnRecord; };
+   txnCount: nat;
+   txnCountGlobal: nat;
 };
+type TxnQueryRequest = variant {
+   getEvents: record {owner: opt Address;};
+   getTxn: record {txid: Txid;};
+   lastTxids: record {owner: Address;};
+   lastTxidsGlobal;
+   lockedTxns: record {owner: Address;};
+   txnCount: record {owner: Address;};
+   txnCountGlobal;
+};
+type Txid = blob;
+type Transaction = record {
+   data: opt blob;
+   from: AccountId;
+   operation: Operation;
+   to: AccountId;
+   value: nat;
+};
+type To = text;
+type Timeout = nat32;
+type Time = int;
+type Subscription = record {
+   callback: Callback;
+   msgTypes: vec MsgType;
+};
+type Spender = text;
+type Sa = vec nat8;
+type Operation = variant {
+   approve: record {allowance: nat;};
+   executeTransfer: record { fallback: nat; lockedTxid: Txid; };
+   lockTransfer: record { decider: AccountId; expiration: Time; locked: nat; };
+   transfer: record {action: variant { burn; mint; send; };};
+};
+type Nonce = nat;
+type MsgType = variant {
+   onApprove;
+   onExecute;
+   onLock;
+   onTransfer;
+};
+type Metadata = record { content: text; name: text; };
 type InitArgs = record {
-    totalSupply: nat;
-    decimals: nat8;
-    gas: Gas;
-    name: opt text;
-    symbol: opt text;
-    metadata: opt vec Metadata;
-    founder: opt Address;
+   decimals: nat8;
+   founder: opt Address;
+   gas: Gas;
+   metadata: opt vec Metadata;
+   name: opt text;
+   symbol: opt text;
+   totalSupply: nat;
 };
+type Gas = variant { cycles: nat; noFee; token: nat; };
+type From = text;
+type ExecuteType = variant { fallback; send: nat; sendAll; };
+type Decider = text;
+type Data = blob;
+type CoinSeconds = record { coinSeconds: nat; updateTime: int; };
+type Callback = func (TxnRecord) -> ();
+type Amount = nat;
+type Allowance = record { remaining: nat; spender: AccountId; };
+type Address = text;
+type AccountId = blob;
+type DRC20 = service {
+   allowance: (Address, Spender) -> (Amount) query;
+   approvals: (Address) -> (vec Allowance) query;
+   approve: (Spender, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   balanceOf: (Address) -> (Amount) query;
+   cyclesBalanceOf: (Address) -> (nat) query;
+   cyclesReceive: (opt Address) -> (nat);
+   decimals: () -> (nat8) query;
+   executeTransfer: (Txid, ExecuteType, opt To, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   gas: () -> (Gas) query;
+   lockTransfer: (To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   lockTransferFrom: (From, To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   metadata: () -> (vec Metadata) query;
+   name: () -> (text) query;
+   standard: () -> (text) query;
+   subscribe: (Callback, vec MsgType, opt Sa) -> (bool);
+   subscribed: (Address) -> (opt Subscription) query;
+   symbol: () -> (text) query;
+   totalSupply: () -> (Amount) query;
+   transfer: (To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   transferFrom: (From, To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
+   getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
+ };
+service : (InitArgs) -> DRC20
 ```
 
 ### Methods
 
 **NOTES**:
  - The following specifications use syntax from Candid 
+ - The optional parameter `_nonce` is used to specify the nonce of the transaction. The nonce value for each AccountId starts at 0 and increases by 1 for each specific transaction. If the caller specifies an incorrect nonce value, the transaction will be rejected. The specific transactions include: approve(), transfer(), transferFrom(), lockTransfer(), lockTransferFrom(), executeTransfer().
  - The optional parameter `_sa` is the subaccount of the caller, which is a 32 bytes nat8 array. If length of `_sa` is less than 32 bytes, it will be prepended with [0] to make up.
- - The optional parameter `_data` is the custom data provided by the caller, which can be used for nonce, parameters of callback, memo, etc. The recommended specification is a _3-byte_ protocol name ("DRC", [68,82,67]) + _1-byte_ version (e.g., [1]) + _1-byte_ nonce-flag (0: no nonce; 1: filled nonce.) + _4-byte_ caller's nonce (e.g., [0,0,0,1], if nonce-flag is 0, nonce is filled with [0,0,0,0]) + custom calldata no more than 65527 bytes (e.g., using candid encoding format, 4-byte method name hash + arguments data). The nonce value here is similar to the nonce in ethereum transactions. if the caller specifies a nonce according to the specification, the transaction will be rejected when given the wrong nonce.
+ - The optional parameter `_data` is the custom data provided by the caller, which can be used for nonce, calldata, memo, etc. The length of `_data` should be less than 65536 bytes (It is recommended to use candid encoding format, 4-byte method name hash + arguments data). 
  
 #### standard
 
@@ -254,35 +260,41 @@ Returns the account balance of the given account `_owner`, not including the loc
 ``` candid
 balanceOf: (_owner: Address) -> (balance: nat) query;
 ```
+#### getCoinSeconds
+Returns total `CoinSeconds` and the given account `_owner`s `CoinSeconds`. CoinSeconds is the time-weighted cumulative value of the account balance. CoinSeconds = Σ(balance_i * period_i).  
+OPTIONAL - This method can be used to improve usability, but the value may not be present.  
+``` candid
+getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
+```
 #### transfer
 Transfers `_value` amount of tokens from caller's account to address `_to`, returns type `TxnResult`.  
 On success, the returned TxnResult contains the txid. The `txid` is generated in the transaction, is unique in the token transactions. Recommended method of generating txid(DRC202 Standard): convert token's canisterId, caller's principal, and caller's nonce into [nat8] arrays respectively, and join them together as `txInfo: [nat8]`. Then get the `txid` value as: "000000"(big-endian 4-bytes, `encode(caller.nonce)`) + "0000..00"(28-bytes,`sha224(txInfo)`).    
 *Note* Transfers of 0 values MUST be treated as normal transfers. An account transfer to itself is ALLOWED. 
 ``` candid
-transfer: (_to: Address, _value: nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
+transfer: (_to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### transferFrom
 Transfers `_value` amount of tokens from address `_from` to address `_to`, returns type `TxnResult`.
 The `transferFrom` method is used for allowing contracts to transfer tokens on your behalf. This can be used for example to allow a contract to transfer tokens on your behalf and/or to charge fees in sub-currencies. The caller is `spender` who SHOULD be authorized by the `_from` account and have an `allowance(_from, _spender)` value greater than `_value`.  
 *Note* Transfers of 0 values MUST be treated as normal transfers. `_from` account transfer to itself is ALLOWED.
 ``` candid
-transferFrom: (_from:Address, _to: Address, _value: nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
+transferFrom: (_from:Address, _to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### lockTransfer
 Locks a transaction, specifies a `_decider` who can decide the execution of this transaction, and sets an expiration period `_timeout` seconds after which the locked transaction will be unlocked. The parameter _timeout SHOULD not be greater than 1000000 seconds.  
 Creating a two-phase transfer structure can improve atomicity. The process is, (_owner) `lock the transaction` -- (_decider) `execute the transaction` or (_owner) `fallback the transaction when expired`
 ``` candid
-lockTransfer: (_to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
+lockTransfer: (_to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### lockTransferFrom
 `spender` locks a transaction.
 ``` candid
-lockTransferFrom: (_from: Address, _to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
+lockTransferFrom: (_from: Address, _to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### executeTransfer
 The `decider` executes the locked transaction `_txid`, or the `owner` can fallback the locked transaction after the lock has expired. If the recipient of the locked transaction `_to` is decider, the decider can specify a new recipient `_to`.
 ``` candid
-executeTransfer: (_txid: Txid, _executeType: ExecuteType, _to: opt Address, _sa: opt vec nat8) -> (result: TxnResult);
+executeTransfer: (_txid: Txid, _executeType: ExecuteType, _to: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### txnQuery
 Queries the transaction records information.  
@@ -314,7 +326,7 @@ Allows `_spender` to withdraw from your account multiple times, up to the `_valu
 If this function is called again it overwrites the current allowance with `_value`.  
 **NOTE**: When you execute `approve()` to authorize the spender, it may cause security problems, you can execute `approve(_spender, 0)` to deauthorize.
 ``` candid
-approve: (_spender: Address, _value: nat, _sa: opt vec nat8) -> (result: TxnResult);
+approve: (_spender: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### allowance
 Returns the amount which `_spender` is still allowed to withdraw from `_owner`.

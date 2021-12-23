@@ -8,6 +8,7 @@ type TxnResult =
          InsufficientBalance;
          InsufficientGas;
          LockedTransferExpired;
+         NonceError;
          UndefinedError;
        };
       message: text;
@@ -16,9 +17,10 @@ type TxnResult =
  };
 type TxnRecord = 
  record {
-   caller: principal;
+   caller: AccountId;
    gas: Gas;
    index: nat;
+   msgCaller: opt principal;
    nonce: nat;
    timestamp: Time;
    transaction: Transaction;
@@ -26,6 +28,7 @@ type TxnRecord =
  };
 type TxnQueryResponse = 
  variant {
+   getEvents: vec TxnRecord;
    getTxn: opt TxnRecord;
    lastTxids: vec Txid;
    lastTxidsGlobal: vec Txid;
@@ -35,17 +38,16 @@ type TxnQueryResponse =
                };
    txnCount: nat;
    txnCountGlobal: nat;
-   getEvents: vec TxnRecord;
  };
 type TxnQueryRequest = 
  variant {
+   getEvents: record {owner: opt Address;};
    getTxn: record {txid: Txid;};
    lastTxids: record {owner: Address;};
    lastTxidsGlobal;
    lockedTxns: record {owner: Address;};
    txnCount: record {owner: Address;};
    txnCountGlobal;
-   getEvents: record {owner: opt Address;};
  };
 type Txid = blob;
 type Transaction = 
@@ -56,12 +58,16 @@ type Transaction =
    to: AccountId;
    value: nat;
  };
+type To = text;
+type Timeout = nat32;
 type Time = int;
 type Subscription = 
  record {
    callback: Callback;
    msgTypes: vec MsgType;
  };
+type Spender = text;
+type Sa = vec nat8;
 type Operation = 
  variant {
    approve: record {allowance: nat;};
@@ -80,6 +86,7 @@ type Operation =
                                send;
                              };};
  };
+type Nonce = nat;
 type MsgType = 
  variant {
    onApprove;
@@ -92,19 +99,34 @@ type Metadata =
    content: text;
    name: text;
  };
+type InitArgs = 
+ record {
+   decimals: nat8;
+   founder: opt Address;
+   gas: Gas;
+   metadata: opt vec Metadata;
+   name: opt text;
+   symbol: opt text;
+   totalSupply: nat;
+ };
 type Gas = 
  variant {
    cycles: nat;
    noFee;
    token: nat;
  };
+type From = text;
 type ExecuteType = 
  variant {
    fallback;
-   sendAll;
    send: nat;
+   sendAll;
  };
+type Decider = text;
+type Data = blob;
+type CoinSeconds = record { coinSeconds: nat; updateTime: int; };
 type Callback = func (TxnRecord) -> ();
+type Amount = nat;
 type Allowance = 
  record {
    remaining: nat;
@@ -112,28 +134,32 @@ type Allowance =
  };
 type Address = text;
 type AccountId = blob;
-service : {
-  allowance: (Address, Address) -> (nat) query;
-  approvals: (Address) -> (vec Allowance) query;
-  approve: (Address, nat, opt vec nat8) -> (TxnResult);
-  balanceOf: (Address) -> (nat) query;
-  cyclesBalanceOf: (Address) -> (nat) query;
-  cyclesReceive: (opt Address) -> (nat);
-  decimals: () -> (nat8) query;
-  executeTransfer: (Txid, ExecuteType, opt Address, opt vec nat8) -> (TxnResult);
-  gas: () -> (Gas) query;
-  lockTransfer: (Address, nat, nat32, opt Address, opt vec nat8, opt blob) ->
-   (TxnResult);
-  lockTransferFrom: (Address, Address, nat, nat32, opt Address, opt vec nat8,
-   opt blob) -> (TxnResult);
-  metadata: () -> (vec Metadata) query;
-  name: () -> (text) query;
-  standard: () -> (text) query;
-  subscribe: (Callback, vec MsgType, opt vec nat8) -> (bool);
-  subscribed: (Address) -> (opt Subscription) query;
-  symbol: () -> (text) query;
-  totalSupply: () -> (nat) query;
-  transfer: (Address, nat, opt vec nat8, opt blob) -> (TxnResult);
-  transferFrom: (Address, Address, nat, opt vec nat8, opt blob) -> (TxnResult);
-  txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
-}
+type DRC20 = service {
+   allowance: (Address, Spender) -> (Amount) query;
+   approvals: (Address) -> (vec Allowance) query;
+   approve: (Spender, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   balanceOf: (Address) -> (Amount) query;
+   cyclesBalanceOf: (Address) -> (nat) query;
+   cyclesReceive: (opt Address) -> (nat);
+   decimals: () -> (nat8) query;
+   executeTransfer: (Txid, ExecuteType, opt To, opt Nonce, opt Sa,
+    opt Data) -> (TxnResult);
+   gas: () -> (Gas) query;
+   lockTransfer: (To, Amount, Timeout, opt Decider, opt Nonce, opt Sa,
+    opt Data) -> (TxnResult);
+   lockTransferFrom: (From, To, Amount, Timeout, opt Decider, opt Nonce,
+    opt Sa, opt Data) -> (TxnResult);
+   metadata: () -> (vec Metadata) query;
+   name: () -> (text) query;
+   standard: () -> (text) query;
+   subscribe: (Callback, vec MsgType, opt Sa) -> (bool);
+   subscribed: (Address) -> (opt Subscription) query;
+   symbol: () -> (text) query;
+   totalSupply: () -> (Amount) query;
+   transfer: (To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   transferFrom: (From, To, Amount, opt Nonce, opt Sa, opt Data) ->
+    (TxnResult);
+   txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
+   getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
+ };
+service : (InitArgs) -> DRC20

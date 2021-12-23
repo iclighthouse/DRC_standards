@@ -31,7 +31,8 @@ type Transaction = record {
 };
 type TxnRecord = record {
     txid: Txid;
-    caller: principal; 
+    msgCaller: opt principal;
+    caller: AccountId;
     timestamp: int;
     index: nat;
     nonce: nat;

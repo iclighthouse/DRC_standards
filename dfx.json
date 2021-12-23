@@ -9,6 +9,16 @@
       "main": "./DRC202/examples/IClighthouse/DRC202Proxy.mo",
       "type": "motoko",
       "args" : "--compacting-gc"
+    },
+    "DRC205": {
+      "main": "./DRC205/examples/IClighthouse/DRC205Proxy.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC207": {
+      "main": "./DRC207/examples/IClighthouse/CustomCanister.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
     }
     
   },
