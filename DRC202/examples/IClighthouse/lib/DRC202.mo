@@ -1,6 +1,6 @@
 /**
  * Module     : DRC202.mo
- * CanisterId : oearr-eyaaa-aaaak-aabja-cai
+ * CanisterId : y5a36-liaaa-aaaak-aacqa-cai
  */
 import Principal "mo:base/Principal";
 import Array "mo:base/Array";
@@ -11,6 +11,7 @@ import Binary "Binary";
 import SHA224 "SHA224";
 
 module {
+  public type Address = Text;
   public type AccountId = Blob;
   public type Time = Time.Time;
   public type Txid = Blob;
@@ -34,7 +35,8 @@ module {
     txid : Txid;
     nonce : Nat;
     timestamp : Time;
-    caller : Principal;
+    msgCaller : ?Principal;
+    caller : AccountId;
     index : Nat;
   };
   public type Self = actor {
@@ -45,9 +47,9 @@ module {
     bucket : shared query (_token: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) -> async (bucket: ?Principal, isEnd: Bool);
     //txn : shared query (_token: Principal, _txid: Txid) -> async (txn: ?TxnRecord);
   };
-  public func generateTxid(_canister: Principal, _caller: Principal, _nonce: Nat): Txid{
+  public func generateTxid(_canister: Principal, _caller: AccountId, _nonce: Nat): Txid{
     let canister: [Nat8] = Blob.toArray(Principal.toBlob(_canister));
-    let caller: [Nat8] = Blob.toArray(Principal.toBlob(_caller));
+    let caller: [Nat8] = Blob.toArray(_caller);
     let nonce: [Nat8] = Binary.BigEndian.fromNat32(Nat32.fromNat(_nonce));
     let txInfo = Array.append(Array.append(canister, caller), nonce);
     let h224: [Nat8] = SHA224.sha224(txInfo);

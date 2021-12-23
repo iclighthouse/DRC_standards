@@ -16,8 +16,9 @@ import Option "mo:base/Option";
 import Prim "mo:⛔";
 import Principal "mo:base/Principal";
 import Text "mo:base/Text";
-import Types "Types";
+import Types "DRC202";
 import SHA224 "SHA224";
+import Tools "Tools";
 
 module {
     public type Gas = Types.Gas;
@@ -87,16 +88,6 @@ module {
         let decimals = Nat8.toNat(_bytes[8]);
         return value * (10 ** decimals);
     };
-    private func _principalFormat(_p: Text) : Text{
-        var i: Nat = 0;
-        var t: Text = "";
-        for (c in _p.chars()){
-            if (i > 0 and i % 5 == 0) { t #= "-"; };
-            t #= Text.fromChar(c);
-            i += 1;
-        };
-        return t;
-    };
 
     public func generateSid(token: Token, txid: Txid) : Blob{
         let h224 = SHA224.sha224(Array.append(Blob.toArray(Principal.toBlob(token)), Blob.toArray(txid)));
@@ -107,10 +98,23 @@ module {
         var data: [Nat8] = _data;
         //txid: 32bytes
         data := Array.append(data, Blob.toArray(txn.txid));
-        //caller: 1byte length + Up to 53bytes Content
-        var callerText = Text.replace(Principal.toText(txn.caller), #char('-'), "");
-        data := Array.append(data, [Nat8.fromNat(callerText.size())]);
-        data := Array.append(data, Blob.toArray(Text.encodeUtf8(callerText)));
+        //msgCaller: option 1byte + 1byte length + Up to 32bytes Content
+        switch(txn.msgCaller){
+            case(?(_msgCaller)){ // 1
+                data := Array.append(data, [1: Nat8]);
+                //var msgCallerText = Text.replace(Principal.toText(_msgCaller), #char('-'), "");
+                //data := Array.append(data, [Nat8.fromNat(msgCallerText.size())]);
+                //data := Array.append(data, Blob.toArray(Text.encodeUtf8(msgCallerText)));
+                let principal = Blob.toArray(Principal.toBlob(_msgCaller)); 
+                data := Array.append(data, [Nat8.fromNat(principal.size())]);
+                data := Array.append(data, principal);
+            };
+            case(null){ // 0
+                data := Array.append(data, [0: Nat8]);
+            };
+        };
+        //caller: 32bytes
+        data := Array.append(data, Blob.toArray(txn.caller));
         //timestamp: 8bytes
         data := Array.append(data, Binary.BigEndian.fromNat64(Nat64.fromIntWrap(txn.timestamp)));
         //index: 8bytes
@@ -189,13 +193,24 @@ module {
         let version: Nat8 = data[0];
         //txid: 32bytes
         let txid: Txid = Blob.fromArray(slice<Nat8>(data, 1, ?32));
-        //caller: 1byte length + Up to 53bytes Content
+        //msgCaller: option 1byte + 1byte length + Up to 32bytes Content
         pos := 33;
-        let callerLength = Nat8.toNat(data[pos]);
+        let optionMsgCaller: Nat8 = data[pos];
+        var msgCaller: ?Principal = null; 
         pos += 1;
-        let caller_ = slice<Nat8>(data, pos, ?(pos+callerLength-1));
-        let caller = Principal.fromText(_principalFormat(Option.get(Text.decodeUtf8(Blob.fromArray(caller_)),"")));
-        pos += callerLength;
+        switch(optionMsgCaller){
+            case(1: Nat8){
+                let length = Nat8.toNat(data[pos]);
+                pos += 1;
+                let msgCaller_ = slice<Nat8>(data, pos, ?(pos+length-1));
+                msgCaller := ?Tools.principalBlobToPrincipal(Blob.fromArray(msgCaller_));
+                pos += length;
+            };
+            case(_){};
+        };
+        //caller: 32bytes
+        let caller = Blob.fromArray(slice<Nat8>(data, pos, ?(pos+31)));
+        pos += 32;
         //timestamp: 8bytes
         let timestamp: Int = Nat64.toNat(Binary.BigEndian.toNat64(slice<Nat8>(data, pos, ?(pos+7))));
         pos += 8;
@@ -280,6 +295,7 @@ module {
         };
         let txn: TxnRecord = {
             txid = txid;
+            msgCaller = msgCaller;
             caller = caller;
             timestamp = timestamp;
             index = index;

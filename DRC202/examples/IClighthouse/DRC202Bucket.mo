@@ -13,7 +13,7 @@ import Trie "mo:base/Trie";
 import Cycles "mo:base/ExperimentalCycles";
 import CyclesWallet "./sys/CyclesWallet";
 import TokenRecord "./lib/TokenRecord";
-import Monitee "./lib/Monitee";
+import DRC207 "./lib/DRC207";
 
 shared(installMsg) actor class BucketActor() = this {
     type Bucket = TokenRecord.Bucket;
@@ -104,10 +104,30 @@ shared(installMsg) actor class BucketActor() = this {
         await cyclesWallet.wallet_receive();
         //Cycles.refunded();
     };
-    /// query canister status: Add itself as a controller, canister_id = Principal.fromActor(<your actor name>)
-    public func canister_status() : async Monitee.canister_status {
-        let ic : Monitee.IC = actor("aaaaa-aa");
+    
+    // DRC207 ICMonitor
+    /// DRC207 support
+    public func drc207() : async DRC207.DRC207Support{
+        return {
+            monitorable_by_self = true;
+            monitorable_by_blackhole = { allowed = true; canister_id = ?Principal.fromText("7hdtw-jqaaa-aaaak-aaccq-cai"); };
+            cycles_receivable = true;
+            timer = { enable = false; interval_seconds = null; }; 
+        };
+    };
+    /// canister_status
+    public func canister_status() : async DRC207.canister_status {
+        let ic : DRC207.IC = actor("aaaaa-aa");
         await ic.canister_status({ canister_id = Principal.fromActor(this) });
     };
+    /// receive cycles
+    // public func wallet_receive(): async (){
+    //     let amout = Cycles.available();
+    //     let accepted = Cycles.accept(amout);
+    // };
+    /// timer tick
+    // public func timer_tick(): async (){
+    //     //
+    // };
 
 }
