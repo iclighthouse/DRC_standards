@@ -135,6 +135,7 @@ module {
         ?Data,
       ) -> async TxnResult;
     txnQuery : shared query TxnQueryRequest -> async TxnQueryResponse;
+    txnRecord : shared (Txid) -> async ?TxnRecord;
     getCoinSeconds : shared query ?Address -> async (CoinSeconds, ?CoinSeconds);
   }
 }

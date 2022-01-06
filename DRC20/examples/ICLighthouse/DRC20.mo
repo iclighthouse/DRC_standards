@@ -63,7 +63,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     * Config 
     */
     private stable var MAX_CACHE_TIME: Int = 3 * 30 * 24 * 3600 * 1000000000; // 3 months
-    private stable var MAX_CACHE_NUMBER_PER: Nat = 30; 
+    private stable var MAX_CACHE_NUMBER_PER: Nat = 100; 
     private stable var FEE_TO: AccountId = AID.blackhole();  
     private stable var STORAGE_CANISTER: Text = "y5a36-liaaa-aaaak-aacqa-cai";
     private stable var MAX_PUBLICATION_TRIES: Nat = 2; 
@@ -130,11 +130,17 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                 if (not(_inLockedTxns(_txid, from))){ //Not in from's LockedTxns
                     if (Time.now() - timestamp > MAX_CACHE_TIME){ //Expired
                         txnRecords.delete(_txid);
+                        _cleanLastTxns(caller);
+                        _cleanLastTxns(from);
+                        _cleanLastTxns(to);
+                        switch(record.transaction.operation){
+                            case(#lockTransfer(v)){ _cleanLastTxns(v.decider); };
+                            case(_){};
+                        };
                     } else if (_isDeep and not(_inLastTxns(_txid, caller)) and 
                         not(_inLastTxns(_txid, from)) and not(_inLastTxns(_txid, to))) {
-                        //If isDeep=true: Not expired, not in caller, from, to's LastTxns
                         switch(record.transaction.operation){
-                            case(#lockTransfer(v)){ //Not in decider's LastTxns
+                            case(#lockTransfer(v)){ 
                                 if (not(_inLastTxns(_txid, v.decider))){
                                     txnRecords.delete(_txid);
                                 };
@@ -182,12 +188,11 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     };
     private func _setBalance(_a: AccountId, _v: Nat): (){
         let originalValue = _getBalance(_a);
-        if (originalValue > 0){ // CoinSeconds
-            let now = Time.now();
-            let coinSecondsItem = Option.get(coinSeconds.get(_a), {coinSeconds = 0; updateTime = now });
-            let newCoinSeconds = coinSecondsItem.coinSeconds + originalValue * (Int.abs(now - coinSecondsItem.updateTime) / 1000000000);
-            coinSeconds.put(_a, {coinSeconds = newCoinSeconds; updateTime = now});
-        };
+        // CoinSeconds
+        let now = Time.now();
+        let coinSecondsItem = Option.get(coinSeconds.get(_a), {coinSeconds = 0; updateTime = now });
+        let newCoinSeconds = coinSecondsItem.coinSeconds + originalValue * (Int.abs(now - coinSecondsItem.updateTime) / 1000000000);
+        coinSeconds.put(_a, {coinSeconds = newCoinSeconds; updateTime = now});
         if(_v == 0){
             balances.delete(_a);
         } else {
@@ -226,7 +231,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         globalTxns := Deque.pushFront(globalTxns, (_txid, Time.now()));
         globalLastTxns := Deque.pushFront(globalLastTxns, _txid);
         var size = List.size(globalLastTxns.0) + List.size(globalLastTxns.1);
-        while (size > MAX_CACHE_NUMBER_PER * 5){
+        while (size > MAX_CACHE_NUMBER_PER){
             size -= 1;
             switch (Deque.popBack(globalLastTxns)){
                 case(?(q, v)){
@@ -303,6 +308,37 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                         };
                         case(_){};
                     };
+                };
+                switch(Deque.peekBack(txids)){
+                    case (?(txid)){
+                        let txn_ = _getTxnRecord(txid);
+                        switch(txn_){
+                            case(?(txn)){
+                                var timestamp = txn.timestamp;
+                                while (Time.now() - timestamp > MAX_CACHE_TIME and size > 0){
+                                    switch (Deque.popBack(txids)){
+                                        case(?(q, v)){
+                                            txids := q;
+					                        size -= 1;
+                                        };
+                                        case(_){};
+                                    };
+                                    switch(Deque.peekBack(txids)){
+                                        case(?(txid)){
+                                            let txn_ = _getTxnRecord(txid);
+                                            switch(txn_){
+                                                case(?(txn)){ timestamp := txn.timestamp; };
+                                                case(_){ timestamp := Time.now(); };
+                                            };
+                                        };
+                                        case(_){ timestamp := Time.now(); };
+                                    };
+                                };
+                            };
+                            case(_){};
+                        };
+                    };
+                    case(_){};
                 };
                 if (size == 0){
                     lastTxns_.delete(_a);
@@ -492,6 +528,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         var _publishMessages = List.nil<(AccountId, MsgType, Txid, Nat)>();
         var item = List.pop(publishMessages);
         while (Option.isSome(item.0)){
+            publishMessages := item.1;
             switch(item.0){
                 case(?(account, msgType, txid, callCount)){
                     switch(_getSubCallback(account, msgType)){
@@ -514,7 +551,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                 };
                 case(_){};
             };
-            item := List.pop(item.1);
+            item := List.pop(publishMessages);
         };
         publishMessages := _publishMessages;
     };
@@ -542,27 +579,56 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             }
         };
     };
-    private func _chargeFee(_caller: AccountId, _percent: Nat, _isCheck: Bool): Bool{
+    private func _checkFee(_caller: AccountId, _percent: Nat, _amount: Nat): Bool{
         let cyclesAvailable = Cycles.available(); 
         switch(gas_){
             case(#cycles(v)){
                 if(v > 0) {
                     let fee = Nat.max(v * _percent / 100, 1);
                     if (cyclesAvailable >= fee){
-                        if (not(_isCheck)) { 
-                            let accepted = Cycles.accept(fee); 
-                            let feeToBalance = _getCyclesBalances(FEE_TO);
-                            _setCyclesBalances(FEE_TO, feeToBalance + accepted);
-                        };
                         return true;
                     } else {
                         let callerBalance = _getCyclesBalances(_caller);
                         if (callerBalance >= fee){
-                            if (not(_isCheck)) { 
-                                _setCyclesBalances(_caller, callerBalance - fee);
-                                let feeToBalance = _getCyclesBalances(FEE_TO);
-                                _setCyclesBalances(FEE_TO, feeToBalance + fee);
-                            };
+                            return true;
+                        } else {
+                            return false;
+                        };
+                    };
+                };
+                return true;
+            };
+            case(#token(v)){ 
+                if(v > 0) {
+                    let fee = Nat.max(v * _percent / 100, 1);
+                    if (_getBalance(_caller) >= fee + _amount){
+                        return true;
+                    } else {
+                        return false;
+                    };
+                };
+                return true;
+            };
+            case(_){ return true; };
+        };
+    };
+    private func _chargeFee(_caller: AccountId, _percent: Nat): Bool{
+        let cyclesAvailable = Cycles.available(); 
+        switch(gas_){
+            case(#cycles(v)){
+                if(v > 0) {
+                    let fee = Nat.max(v * _percent / 100, 1);
+                    if (cyclesAvailable >= fee){
+                        let accepted = Cycles.accept(fee); 
+                        let feeToBalance = _getCyclesBalances(FEE_TO);
+                        _setCyclesBalances(FEE_TO, feeToBalance + accepted);
+                        return true;
+                    } else {
+                        let callerBalance = _getCyclesBalances(_caller);
+                        if (callerBalance >= fee){
+                            _setCyclesBalances(_caller, callerBalance - fee);
+                            let feeToBalance = _getCyclesBalances(FEE_TO);
+                            _setCyclesBalances(FEE_TO, feeToBalance + fee);
                             return true;
                         } else {
                             return false;
@@ -575,7 +641,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                 if(v > 0) {
                     let fee = Nat.max(v * _percent / 100, 1);
                     if (_getBalance(_caller) >= fee){
-                        if (not(_isCheck)) { ignore _send(_caller, FEE_TO, fee, false); };
+                        ignore _send(_caller, FEE_TO, fee, false);
                         return true;
                     } else {
                         return false;
@@ -778,6 +844,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         var item = List.pop(storeRecords);
         let storageFee = await drc202.fee();
         while (Option.isSome(item.0)){
+            storeRecords := item.1;
             switch(item.0){
                 case(?(txid, callCount)){
                     if (callCount < MAX_STORAGE_TRIES){
@@ -796,7 +863,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                 };
                 case(_){};
             };
-            item := List.pop(item.1);
+            item := List.pop(storeRecords);
         };
         storeRecords := _storeRecords;
     };
@@ -881,8 +948,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let from = _getAccountIdFromPrincipal(msg.caller, _sa);
         let to = _getAccountId(_to);
         let operation: Operation = #transfer({ action = #send; });
-        // Fee/2 is charged whether the transaction is successful or not
-        if(not(_chargeFee(from, 50, false))){
+        // check fee
+        if(not(_checkFee(from, 100, _value))){
             return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
         };
         // transfer
@@ -891,9 +958,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let pub = _publish();
         // records storage (DRC202 Standard)
         let store = _drc202Store();
-        // Fee/2 is charged for the post (Ignore charging fail)
+        // charge fee
         switch(res){
-            case(#ok(v)){ ignore _chargeFee(from, 50, false); return res; };
+            case(#ok(v)){ ignore _chargeFee(from, 100); return res; };
             case(#err(v)){ return res; };
         };
     };
@@ -904,8 +971,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let from = _getAccountId(_from);
         let to = _getAccountId(_to);
         let operation: Operation = #transfer({ action = #send; });
-        // Fee/2 is charged whether the transaction is successful or not
-        if(not(_chargeFee(caller, 50, false))){
+        // check fee
+        if(not(_checkFee(caller, 100, 0))){
             return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
         };
         // transfer
@@ -914,9 +981,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let pub = _publish();
         // records storage (DRC202 Standard)
         let store = _drc202Store();
-        // Fee/2 is charged for the post (Ignore charging fail)
+        // charge fee
         switch(res){
-            case(#ok(v)){ ignore _chargeFee(caller, 50, false); return res; };
+            case(#ok(v)){ ignore _chargeFee(caller, 100); return res; };
             case(#err(v)){ return res; };
         };
     };
@@ -940,8 +1007,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         });
         let from = _getAccountIdFromPrincipal(msg.caller, _sa);
         let to = _getAccountId(_to);
-        // Fee/2 is charged whether the transaction is successful or not
-        if(not(_chargeFee(from, 50, false))){
+        // check fee
+        if(not(_checkFee(from, 100, _value))){
             return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
         };
         // transfer
@@ -950,9 +1017,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let pub = _publish();
         // records storage (DRC202 Standard)
         let store = _drc202Store();
-        // Fee/2 is charged for the post (Ignore charging fail)
+        // charge fee
         switch(res){
-            case(#ok(v)){ ignore _chargeFee(from, 50, false); return res; };
+            case(#ok(v)){ ignore _chargeFee(from, 100); return res; };
             case(#err(v)){ return res; };
         };
     };
@@ -975,8 +1042,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let caller = _getAccountIdFromPrincipal(msg.caller, _sa);
         let from = _getAccountId(_from);
         let to = _getAccountId(_to);
-        // Fee/2 is charged whether the transaction is successful or not
-        if(not(_chargeFee(caller, 50, false))){
+        // check fee
+        if(not(_checkFee(caller, 100, 0))){
             return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
         };
         // transfer
@@ -985,9 +1052,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let pub = _publish();
         // records storage (DRC202 Standard)
         let store = _drc202Store();
-        // Fee/2 is charged for the post (Ignore charging fail)
+        // charge fee
         switch(res){
-            case(#ok(v)){ ignore _chargeFee(caller, 50, false); return res; };
+            case(#ok(v)){ ignore _chargeFee(caller, 100); return res; };
             case(#err(v)){ return res; };
         };
     };
@@ -996,8 +1063,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     public shared(msg) func executeTransfer(_txid: Txid, _executeType: ExecuteType, _to: ?To, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
         let txid = _txid;
         let caller = _getAccountIdFromPrincipal(msg.caller, _sa);
-        // Fee/2 is charged whether the transaction is successful or not
-        if(not(_chargeFee(caller, 50, false))){
+        // check fee
+        if(not(_checkFee(caller, 100, 0))){
             return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
         };
         switch(_getTxnRecord(txid)){
@@ -1058,9 +1125,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                         let pub = _publish();
                         // records storage (DRC202 Standard)
                         let store = _drc202Store();
-                        // Fee/2 is charged for the post (Ignore charging fail)
+                        // charge fee
                         switch(res){
-                            case(#ok(v)){ ignore _chargeFee(caller, 50, false); return res; };
+                            case(#ok(v)){ ignore _chargeFee(caller, 100); return res; };
                             case(#err(v)){ return res; };
                         };
                     };
@@ -1140,10 +1207,37 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         };
     };
 
+    /// returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in the token canister.
+    public shared func txnRecord(_txid: Txid) : async ?TxnRecord{
+        let drc202: DRC202.Self = actor(STORAGE_CANISTER);
+        var step: Nat = 0;
+        func _getTxn(_token: Principal, _txid: Txid) : async ?TxnRecord{
+            switch(await drc202.bucket(_token, _txid, step, null)){
+                case(?(bucketId)){
+                    let bucket: DRC202.Bucket = actor(Principal.toText(bucketId));
+                    switch(await bucket.txn(_token, _txid)){
+                        case(?(txn, time)){ return ?txn; };
+                        case(_){
+                            step += 1;
+                            return await _getTxn(_token, _txid);
+                        };
+                    };
+                };
+                case(_){ return null; };
+            };
+        };
+        switch(_getTxnRecord(_txid)){
+            case(?(txn)){ return ?txn; };
+            case(_){
+                return await _getTxn(Principal.fromActor(this), _txid);
+            };
+        };
+    };
+
     /// Subscribes to the token's messages, giving the callback function and the types of messages as parameters.
     public shared(msg) func subscribe(_callback: Callback, _msgTypes: [MsgType], _sa: ?Sa) : async Bool{
         let caller = _getAccountIdFromPrincipal(msg.caller, _sa);
-        assert(_chargeFee(caller, 100, false));
+        assert(_chargeFee(caller, 100));
         let sub: Subscription = {
             callback = _callback;
             msgTypes = _msgTypes;
@@ -1161,8 +1255,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let from = _getAccountIdFromPrincipal(msg.caller, _sa);
         let to = _getAccountId(_spender);
         let operation: Operation = #approve({ allowance = _value; });
-        // Fee/2 is charged whether the transaction is successful or not
-        if(not(_chargeFee(from, 50, false))){
+        // check fee
+        if(not(_checkFee(from, 100, 0))){
             return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
         };
         // transfer
@@ -1171,9 +1265,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let pub = _publish();
         // records storage (DRC202 Standard)
         let store = _drc202Store();
-        // Fee/2 is charged for the post (Ignore charging fail)
+        // charge fee
         switch(res){
-            case(#ok(v)){ ignore _chargeFee(from, 50, false); return res; };
+            case(#ok(v)){ ignore _chargeFee(from, 100); return res; };
             case(#err(v)){ return res; };
         };
     };

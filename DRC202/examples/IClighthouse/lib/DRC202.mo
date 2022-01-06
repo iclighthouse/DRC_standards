@@ -15,6 +15,7 @@ module {
   public type AccountId = Blob;
   public type Time = Time.Time;
   public type Txid = Blob;
+  public type Token = Principal;
   public type Gas = { #token : Nat; #cycles : Nat; #noFee };
   public type Operation = {
     #approve : { allowance : Nat };
@@ -44,8 +45,11 @@ module {
     fee : shared query () -> async (cycles: Nat); //cycles
     store : shared (_txn: TxnRecord) -> async (); 
     storeBytes: shared (_txid: Txid, _data: [Nat8]) -> async (); 
-    bucket : shared query (_token: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) -> async (bucket: ?Principal, isEnd: Bool);
-    //txn : shared query (_token: Principal, _txid: Txid) -> async (txn: ?TxnRecord);
+    bucket : shared query (_token: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) -> async (bucket: ?Principal);
+  };
+  public type Bucket = actor {
+    txnBytes: shared query (_token: Token, _txid: Txid) -> async ?([Nat8], Time.Time);
+    txn: shared query (_token: Token, _txid: Txid) -> async ?(TxnRecord, Time.Time);
   };
   public func generateTxid(_canister: Principal, _caller: AccountId, _nonce: Nat): Txid{
     let canister: [Nat8] = Blob.toArray(Principal.toBlob(_canister));

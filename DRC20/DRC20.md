@@ -188,6 +188,7 @@ type DRC20 = service {
    transfer: (To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    transferFrom: (From, To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
+   txnRecord : (Txid) -> (opt TxnRecord);
    getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
  };
 service : (InitArgs) -> DRC20
@@ -246,7 +247,7 @@ cyclesBalanceOf: (_owner: Address) -> (balance: nat) query;
 ```
 #### gas
 Returns the transaction fee of the token. E.g. `"variant { token=10000000 }"`.  
-*Note* Support `cycles`, `token` as gas charging method. If selected `token` as gas, it will be additionally charged from the balance of account `_from`, not be charged from the `_value` of transfer().
+*Note* Support `cycles`, `token` as gas charging method. If selected `token` as gas, it will be additionally charged from the balance of account `caller`, not be charged from the `_value` of transfer().
 ``` candid
 gas: () -> (Gas) query;
 ```
@@ -268,14 +269,14 @@ getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
 ```
 #### transfer
 Transfers `_value` amount of tokens from caller's account to address `_to`, returns type `TxnResult`.  
-On success, the returned TxnResult contains the txid. The `txid` is generated in the transaction, is unique in the token transactions. Recommended method of generating txid(DRC202 Standard): convert token's canisterId, caller's principal, and caller's nonce into [nat8] arrays respectively, and join them together as `txInfo: [nat8]`. Then get the `txid` value as: "000000"(big-endian 4-bytes, `encode(caller.nonce)`) + "0000..00"(28-bytes,`sha224(txInfo)`).    
+On success, the returned TxnResult contains the txid. The `txid` is generated in the transaction, is unique in the token transactions. Recommended method of generating txid(DRC202 Standard): convert token's canisterId, caller's accountId, and caller's nonce into [nat8] arrays respectively, and join them together as `txInfo: [nat8]`. Then get the `txid` value as: "000000"(big-endian 4-bytes, `encode(caller.nonce)`) + "0000..00"(28-bytes,`sha224(txInfo)`).    
 *Note* Transfers of 0 values MUST be treated as normal transfers. An account transfer to itself is ALLOWED. 
 ``` candid
 transfer: (_to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### transferFrom
 Transfers `_value` amount of tokens from address `_from` to address `_to`, returns type `TxnResult`.
-The `transferFrom` method is used for allowing contracts to transfer tokens on your behalf. This can be used for example to allow a contract to transfer tokens on your behalf and/or to charge fees in sub-currencies. The caller is `spender` who SHOULD be authorized by the `_from` account and have an `allowance(_from, _spender)` value greater than `_value`.  
+The `transferFrom` method is used for allowing contracts to transfer tokens on your behalf. This can be used for example to allow a contract to transfer tokens on your behalf and/or to charge fees. The caller is `spender` who SHOULD be authorized by the `_from` account and have an `allowance(_from, _spender)` value greater than `_value`.  
 *Note* Transfers of 0 values MUST be treated as normal transfers. `_from` account transfer to itself is ALLOWED.
 ``` candid
 transferFrom: (_from:Address, _to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
@@ -300,7 +301,7 @@ executeTransfer: (_txid: Txid, _executeType: ExecuteType, _to: opt Address, _non
 Queries the transaction records information.  
 Query type `_request`:  
 #txnCountGlobal: returns global transaction count.  
-#txnCount: returns `owner`s transaction count. It is the nonce value of his next transaction.    
+#txnCount: returns `owner`s transaction count. It is the `nonce` value of his next transaction.    
 #getTxn: returns details of the transaction with id `txid`.  
 #lastTxidsGlobal: returns global latest transaction txids.   
 #lastTxids: returns `owner`s latest transaction txids.  
@@ -308,6 +309,12 @@ Query type `_request`:
 #getEvents: returns global latest transaction events or `owner`s transaction events.   
 ``` candid
 txnQuery: (_request: TxnQueryRequest) -> (response: TxnQueryResponse) query;
+```
+#### txnRecord
+returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in the token canister.   
+OPTIONAL - This method can be used to improve usability, but the value may not be present.
+``` candid
+txnRecord : (Txid) -> (opt TxnRecord);
 ```
 #### subscribe
 Subscribes to the token's messages, giving the callback function and the types of messages as parameters. Subscribers will only receive messages that are related to them (the subscriber is transaction‘s _from, _to, _spender, or _decider).
@@ -324,7 +331,7 @@ subscribed: (_owner: Address) -> (result: opt Subscription) query;
 #### approve
 Allows `_spender` to withdraw from your account multiple times, up to the `_value` amount.
 If this function is called again it overwrites the current allowance with `_value`.  
-**NOTE**: When you execute `approve()` to authorize the spender, it may cause security problems, you can execute `approve(_spender, 0)` to deauthorize.
+**NOTE**: When you execute `approve()` to authorize the spender, it may cause security problems, you can execute `approve(_spender, 0, ...)` to deauthorize.
 ``` candid
 approve: (_spender: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
@@ -334,7 +341,8 @@ Returns the amount which `_spender` is still allowed to withdraw from `_owner`.
 allowance: (_owner: Address, _spender: Address) -> (remaining: nat) query;
 ```
 #### approvals
-Returns all your approvals with a non-zero amount.
+Returns all your approvals with a non-zero amount.  
+OPTIONAL - This method can be used to improve usability, but the value may not be present.
 ``` candid
 approvals: (_owner: Address) -> (allowances: vec Allowance) query;
 ```

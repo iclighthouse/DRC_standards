@@ -55,6 +55,8 @@ module {
         time: Time.Time;
         index: Nat;
         nonce: Nonce;
+        orderType: { #AMM; #OrderBook; };
+        details: [{counterparty: Txid; token0Value: BalanceChange; token1Value: BalanceChange;}];
         data: ?Data;
     };
 
@@ -63,13 +65,18 @@ module {
     fee : shared query () -> async (cycles: Nat); //cycles
     store : shared (_txn: TxnRecord) -> async (); 
     storeBytes: shared (_txid: Txid, _data: [Nat8]) -> async (); 
-    bucket : shared query (_canister: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) -> async (bucket: ?Principal, isEnd: Bool);
+    bucket : shared query (_canister: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) -> async (bucket: ?Principal);
   };
-  public func generateTxid(_canister: Principal, _caller: AccountId, _nonce: Nat): Txid{
-    let canister: [Nat8] = Blob.toArray(Principal.toBlob(_canister));
+  public type Bucket = actor {
+    txnBytes: shared query (_app: Principal, _txid: Txid) -> async ?([Nat8], Time.Time);
+    txn: shared query (_app: Principal, _txid: Txid) -> async ?(TxnRecord, Time.Time);
+  };
+  public func generateTxid(_app: Principal, _caller: AccountId, _nonce: Nat): Txid{
+    let appType: [Nat8] = [83:Nat8, 87, 65, 80]; //SWAP
+    let canister: [Nat8] = Blob.toArray(Principal.toBlob(_app));
     let caller: [Nat8] = Blob.toArray(_caller);
     let nonce: [Nat8] = Binary.BigEndian.fromNat32(Nat32.fromNat(_nonce));
-    let txInfo = Array.append(Array.append(canister, caller), nonce);
+    let txInfo = Array.append(Array.append(Array.append(appType, canister), caller), nonce);
     let h224: [Nat8] = SHA224.sha224(txInfo);
     return Blob.fromArray(Array.append(nonce, h224));
   };

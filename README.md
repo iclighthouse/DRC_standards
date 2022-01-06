@@ -30,6 +30,10 @@ TODO: Standard drafting and motoko example implementation
 TODO: Standard drafting and motoko example implementation
 
 
+## DRC207: Monitorable Canister standards
+
+TODO: Standard drafting and motoko example implementation
+
 ## Community
 
 Twitter: [@ICLighthouse](https://twitter.com/ICLighthouse)  

@@ -159,16 +159,16 @@ shared(installMsg) actor class ProxyActor() = this {
             };
         };
     };
-    private func _checkBloom(_sid: Sid, _step: Nat) : (?Bucket, Bool){
+    private func _checkBloom(_sid: Sid, _step: Nat) : ?Bucket{
         var step: Nat = 0;
         for ((bucket, bloom) in blooms.entries()){
             if (step < _step and bloom.check(_sid)){
                 step += 1;
             }else if (step == _step and bloom.check(_sid)){
-                return (?bucket, false);
+                return ?bucket;
             };
         };
-        return (null, true);
+        return null;
     };
     private func _execStorage() : async (){
         let bucket: Bucket = await _getBucket();
@@ -285,7 +285,7 @@ shared(installMsg) actor class ProxyActor() = this {
         storeTxns := List.push((_token, #Bytes({txid = _txid; data = _data;}), 0), storeTxns);
         await _execStorage();
     };
-    public query func bucket(_token: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) : async (bucket: ?Principal, isEnd: Bool){
+    public query func bucket(_token: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) : async (bucket: ?Principal){
         let _sid = TokenRecord.generateSid(_token, _txid);
         return _checkBloom(_sid, _step);
     };

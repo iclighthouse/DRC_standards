@@ -24,6 +24,7 @@ import TrieMap "mo:base/TrieMap";
 import Cycles "mo:base/ExperimentalCycles";
 import CyclesWallet "./sys/CyclesWallet";
 import SwapRecord "./lib/SwapRecord";
+import DRC205 "./lib/DRC205";
 import DRC205Bucket "DRC205Bucket";
 import DRC207 "./lib/DRC207";
 
@@ -158,16 +159,16 @@ shared(installMsg) actor class ProxyActor() = this {
             };
         };
     };
-    private func _checkBloom(_sid: Sid, _step: Nat) : (?Bucket, Bool){
+    private func _checkBloom(_sid: Sid, _step: Nat) : ?Bucket{
         var step: Nat = 0;
         for ((bucket, bloom) in blooms.entries()){
             if (step < _step and bloom.check(_sid)){
                 step += 1;
             }else if (step == _step and bloom.check(_sid)){
-                return (?bucket, false);
+                return ?bucket;
             };
         };
-        return (null, true);
+        return null;
     };
     private func _execStorage() : async (){
         let bucket: Bucket = await _getBucket();
@@ -222,13 +223,8 @@ shared(installMsg) actor class ProxyActor() = this {
         await _execStorage();
     };
 
-    public query func generateTxid(_app: Principal, _caller: Principal, _nonce: Nat): async Txid{
-        let canister: [Nat8] = Blob.toArray(Principal.toBlob(_app));
-        let caller: [Nat8] = Blob.toArray(Principal.toBlob(_caller));
-        let nonce: [Nat8] = Binary.BigEndian.fromNat32(Nat32.fromNat(_nonce));
-        let txInfo = Array.append(Array.append(canister, caller), nonce);
-        let h224: [Nat8] = SHA224.sha224(txInfo);
-        return Blob.fromArray(Array.append(nonce, h224));
+    public query func generateTxid(_app: Principal, _caller: AccountId, _nonce: Nat): async Txid{
+        return DRC205.generateTxid(_app, _caller, _nonce);
     };
 
 
@@ -284,7 +280,7 @@ shared(installMsg) actor class ProxyActor() = this {
         storeTxns := List.push((_app, #Bytes({txid = _txid; data = _data;}), 0), storeTxns);
         await _execStorage();
     };
-    public query func bucket(_app: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) : async (bucket: ?Principal, isEnd: Bool){
+    public query func bucket(_app: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) : async (bucket: ?Principal){
         let _sid = SwapRecord.generateSid(_app, _txid);
         return _checkBloom(_sid, _step);
     };

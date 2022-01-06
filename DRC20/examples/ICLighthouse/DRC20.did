@@ -160,6 +160,7 @@ type DRC20 = service {
    transferFrom: (From, To, Amount, opt Nonce, opt Sa, opt Data) ->
     (TxnResult);
    txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
+   txnRecord : (Txid) -> (opt TxnRecord);
    getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
  };
 service : (InitArgs) -> DRC20
