@@ -75,6 +75,8 @@ module {
         #UndefinedError;
         #InsufficientBalance;
         #NonceError;
+        #NoLockedTransfer;
+        #DuplicateExecutedTransfer;
         #LockedTransferExpired;
       };
       message : Text;

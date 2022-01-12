@@ -1071,11 +1071,11 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             case(?(txn)){
                 let from = txn.transaction.from;
                 var to = txn.transaction.to;
-                if (not(_inLockedTxns(txid, from))){
-                    return #err({ code=#UndefinedError; message="The transaction isn't in locked"; });
-                };
                 switch(txn.transaction.operation){
                     case(#lockTransfer(v)){
+                        if (not(_inLockedTxns(txid, from))){
+                            return #err({ code=#DuplicateExecutedTransfer; message="The transaction has already been executed"; });
+                        };
                         let locked = v.locked;
                         let expiration = v.expiration;
                         let decider = v.decider;
@@ -1132,12 +1132,12 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                         };
                     };
                     case(_){
-                        return #err({ code=#UndefinedError; message="The status of the transaction record is not locked"; });
+                        return #err({ code=#NoLockedTransfer; message="No Locked Transfer"; });
                     };
                 };
             };
             case(_){
-                return #err({ code=#UndefinedError; message="No transaction record exists"; });
+                return #err({ code=#NoLockedTransfer; message="No Locked Transfer"; });
             };
         };
     };

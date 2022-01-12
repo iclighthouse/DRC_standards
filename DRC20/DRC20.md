@@ -79,6 +79,8 @@ type TxnResult = variant {
          InsufficientAllowance;
          InsufficientBalance;
          InsufficientGas;
+         NoLockedTransfer;
+         DuplicateExecutedTransfer;
          LockedTransferExpired;
          NonceError;
          UndefinedError;
@@ -235,13 +237,13 @@ metadata: () -> (vec Metadata) query;
 ```
 #### cyclesReceive
 Sends/donates cycles to the token canister in `_account`'s name, and return cycles balance of the account. If the parameter `_account` is null, it means donation. 
-OPTIONAL - This method can be used to improve usability, but the value may not be present.
+OPTIONAL - This method can be used to improve usability, but the method may not be present.
 ``` candid
 cyclesReceive: (_account: opt Address) -> (balance: nat);
 ```
 #### cyclesBalanceOf
 Returns the cycles balance of the given account `_owner` in the token.  
-OPTIONAL - This method can be used to improve usability, but the value may not be present.
+OPTIONAL - This method can be used to improve usability, but the method may not be present.
 ``` candid
 cyclesBalanceOf: (_owner: Address) -> (balance: nat) query;
 ```
@@ -263,9 +265,9 @@ balanceOf: (_owner: Address) -> (balance: nat) query;
 ```
 #### getCoinSeconds
 Returns total `CoinSeconds` and the given account `_owner`s `CoinSeconds`. CoinSeconds is the time-weighted cumulative value of the account balance. CoinSeconds = Σ(balance_i * period_i).  
-OPTIONAL - This method can be used to improve usability, but the value may not be present.  
+OPTIONAL - This method can be used to improve usability, but the method may not be present.  
 ``` candid
-getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
+getCoinSeconds: (opt Address) -> (totalCoinSeconds: CoinSeconds, accountCoinSeconds: opt CoinSeconds) query;
 ```
 #### transfer
 Transfers `_value` amount of tokens from caller's account to address `_to`, returns type `TxnResult`.  
@@ -312,7 +314,7 @@ txnQuery: (_request: TxnQueryRequest) -> (response: TxnQueryResponse) query;
 ```
 #### txnRecord
 returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in the token canister.   
-OPTIONAL - This method can be used to improve usability, but the value may not be present.
+OPTIONAL - This method can be used to improve usability, but the method may not be present.
 ``` candid
 txnRecord : (Txid) -> (opt TxnRecord);
 ```
@@ -324,7 +326,7 @@ subscribe: (_callback: Callback, _msgTypes: vec MsgType, _sa: opt vec nat8) -> b
 ```
 #### subscribed
 Returns the subscription status of the subscriber `_owner`.  
-OPTIONAL - This method can be used to improve usability, but the value may not be present.
+OPTIONAL - This method can be used to improve usability, but the method may not be present.
 ``` candid
 subscribed: (_owner: Address) -> (result: opt Subscription) query;
 ```
@@ -342,7 +344,7 @@ allowance: (_owner: Address, _spender: Address) -> (remaining: nat) query;
 ```
 #### approvals
 Returns all your approvals with a non-zero amount.  
-OPTIONAL - This method can be used to improve usability, but the value may not be present.
+OPTIONAL - This method can be used to improve usability, but the method may not be present.
 ``` candid
 approvals: (_owner: Address) -> (allowances: vec Allowance) query;
 ```
