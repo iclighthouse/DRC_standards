@@ -15,7 +15,11 @@ TODO: Standard drafting and motoko example implementation
 
 ## DRC202: Token Transaction Records Storage Standard 
 
-TODO: Standard drafting and motoko example implementation
+2022-1-3: Drafted standard.   
+2022-1-17: Implemented the example with motoko.   
+Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC202](https://github.com/iclighthouse/DRC_standards/tree/main/DRC202)  
+Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse)  
+Comments: [https://github.com/iclighthouse/DRC_standards/issues/4](https://github.com/iclighthouse/DRC_standards/issues/4);  
 
 ## DRC203: Token Mining Standard
 

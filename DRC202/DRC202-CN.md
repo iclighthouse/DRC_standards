@@ -113,9 +113,7 @@ service_bucket : () -> BucketActor
 
 ProxyActor是一个用于交易记录存储的代理合约，可以自动创建和管理Bucket合约。
 
-#### Methods
-
-##### standard
+#### standard
 
 返回标准名称。   
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
@@ -124,7 +122,7 @@ OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 standard: () -> (text) query;
 ```
 
-##### version
+#### version
 
 返回版本值。    
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
@@ -133,7 +131,7 @@ OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 version: () -> (nat8) query;
 ```
 
-##### fee
+#### fee
 
 返回存储一条交易记录所需支付的费用（cycles）。
 
@@ -141,7 +139,7 @@ version: () -> (nat8) query;
 fee: () -> (cycles: nat) query;
 ```
 
-##### store
+#### store
 
 存储一条交易记录`_txn`。
 
@@ -149,14 +147,14 @@ fee: () -> (cycles: nat) query;
 store: (_txn: TxnRecord) -> ();
 ```
 
-##### storeBytes
+#### storeBytes
 
 以二进制数据格式存储一条交易记录`_txn`。
 
 ``` candid
 storeBytes: (_txid: Txid, _data: vec nat8) -> ();
 ```
-##### getLastTxns
+#### getLastTxns
 
 返回最新存储的交易记录。
 
@@ -164,7 +162,7 @@ storeBytes: (_txid: Txid, _data: vec nat8) -> ();
 getLastTxns: () -> (vec record { index: nat; token: Token; indexInToken: nat; txid: Txid; }) query;
 ```
 
-##### bucket
+#### bucket
 
 返回指定`_token`的交易记录`_txid`所在的bucket（默认`_step`为0）。由于使用BloomFilter作为路由，这个查询不一定准确。如果目标交易记录不在该bucket中，你可以按`step+1`重新查询bucket，直到返回null。
 
@@ -172,7 +170,7 @@ getLastTxns: () -> (vec record { index: nat; token: Token; indexInToken: nat; tx
 bucket: (_token: Token, _txid: Txid, _step: nat, _version: opt nat8) -> (opt Bucket) query;
 ```
 
-##### generateTxid
+#### generateTxid
 
 根据给定的`_token`, `_caller`, `_nonce`值生成txid。  
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
@@ -181,7 +179,7 @@ OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 generateTxid: (_token: Token, _caller: AccountId, _nonce: nat) -> (Txid) query;
 ```
 
-##### stats
+#### stats
 
 返回统计数据。  
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
@@ -190,7 +188,7 @@ OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 stats: () -> (record { bucketCount: nat; errCount: nat; storeErrPool: nat; tokenCount: nat; txnCount: nat; }) query;
 ```
 
-##### bucketInfo
+#### bucketInfo
 
 返回关于`_bucket`的信息。如果没有指定`_bucket`，则返回当前bucket的信息。   
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
@@ -198,7 +196,7 @@ OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 ``` candid
 bucketInfo: (_bucket: opt Bucket) -> (Bucket, BucketInfo);
 ```
-##### maxBucketMemory
+#### maxBucketMemory
 
 返回已设置的每个bucket的最大允许存储容量。   
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
@@ -207,7 +205,7 @@ OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 maxBucketMemory: () -> (nat) query;
 ```
 
-##### setMaxMemory
+#### setMaxMemory
 
 设置每个bucket的最大允许存储容量`_memory`。 
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
@@ -216,7 +214,7 @@ OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 setMaxMemory: (_memory: nat) -> (bool);
 ```
 
-##### setFee
+#### setFee
 
 设置每条交易记录存储需要支付的cycles金额`_fee`。   
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
@@ -230,9 +228,7 @@ setFee: (_fee: nat) -> (bool);
 
 BucketActor用于存储交易记录数据并实现公共查询接口。
 
-#### Methods
-
-##### txn
+#### txn
 
 返回指定`_token`和`_txid`的交易记录。
 
@@ -240,7 +236,7 @@ BucketActor用于存储交易记录数据并实现公共查询接口。
 txn: (_token: Token, _txid: Txid) -> (opt record { TxnRecord; Time; }) query;
 ```
 
-##### txnBytes
+#### txnBytes
 
 返回指定`_token`和`_txid`的交易记录的二进制数据。
 
@@ -248,7 +244,7 @@ txn: (_token: Token, _txid: Txid) -> (opt record { TxnRecord; Time; }) query;
 txnBytes: (_token: Token, _txid: Txid) -> (opt record { vec nat8; Time; }) query;
 ```
 
-##### bucketInfo 
+#### bucketInfo 
 
 返回关于当前bucket的信息。    
 OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
@@ -257,7 +253,7 @@ OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在
 bucketInfo: () -> (BucketInfo) query;
 ```
 
-##### last
+#### last
 
 返回最后存储记录的sid和时间戳。   
 OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
@@ -266,7 +262,7 @@ OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在
 last: () -> (record { Sid; Time; }) query;
 ```
 
-##### txnBytes2
+#### txnBytes2
 
 返回指定`_sid`的交易记录的二进制数据。     
 OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
