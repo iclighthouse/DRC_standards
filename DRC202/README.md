@@ -3,15 +3,14 @@
 A standard interface for token transaction tecords scalable storage.
  
 ## Abstract
-完善中
 
-## Improvements
-
-完善中
+DRC202 is a standard for scalable storage of token transaction records. It supports multi-token storage, automatic scaling to create storage canisters (buckets), and automatic routing of query records.
 
 ## Features
 
-完善中
+- Infinite scalability
+- Automatic routing
+- Multi-token support
 
 ## Resources
 

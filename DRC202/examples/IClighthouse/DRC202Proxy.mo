@@ -43,10 +43,11 @@ shared(installMsg) actor class ProxyActor() = this {
         #Txn: TxnRecord;
         #Bytes: {txid: Txid; data: [Nat8]};
     };
-
+    
     private var version_: Nat8 = 1;
     private var bucketCyclesInit: Nat = 200000000000;
     private var maxStorageTries: Nat = 3;
+    private stable var standard_: Text = "DRC202 1.0"; 
     private stable var owner: Principal = installMsg.caller;
     private stable var fee_: Nat = 100000000;  //cycles
     private stable var maxMemory: Nat = 3900 * 1024 * 1024; //3.8GB
@@ -223,7 +224,7 @@ shared(installMsg) actor class ProxyActor() = this {
         await _execStorage();
     };
 
-    public query func generateTxid(_token: Principal, _caller: AccountId, _nonce: Nat): async Txid{
+    public query func generateTxid(_token: Token, _caller: AccountId, _nonce: Nat): async Txid{
         let canister: [Nat8] = Blob.toArray(Principal.toBlob(_token));
         let caller: [Nat8] = Blob.toArray(_caller);
         let nonce: [Nat8] = Binary.BigEndian.fromNat32(Nat32.fromNat(_nonce));
@@ -232,7 +233,9 @@ shared(installMsg) actor class ProxyActor() = this {
         return Blob.fromArray(Array.append(nonce, h224));
     };
 
-
+    public query func standard() : async Text{
+        return standard_;
+    };
     public query func version() : async Nat8{
         return version_;
     };
@@ -285,7 +288,7 @@ shared(installMsg) actor class ProxyActor() = this {
         storeTxns := List.push((_token, #Bytes({txid = _txid; data = _data;}), 0), storeTxns);
         await _execStorage();
     };
-    public query func bucket(_token: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) : async (bucket: ?Principal){
+    public query func bucket(_token: Token, _txid: Txid, _step: Nat, _version: ?Nat8) : async (bucket: ?Bucket){
         let _sid = TokenRecord.generateSid(_token, _txid);
         return _checkBloom(_sid, _step);
     };
