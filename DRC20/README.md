@@ -32,7 +32,8 @@ A standard interface for Dfinity tokens. The standard complies with ERC20 interf
 
 ## Resources
 
-Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/DRC20.md](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/DRC20.md)  
+Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/DRC20.md](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/DRC20.md)   
+[https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/DRC20-CN.md](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/DRC20-CN.md)   
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse)  
 Comments: [https://github.com/iclighthouse/DRC_standards/issues/1](https://github.com/iclighthouse/DRC_standards/issues/1);
 

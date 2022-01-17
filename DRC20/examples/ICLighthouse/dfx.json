@@ -1,6 +1,6 @@
 {
   "canisters": {
-    "DRC20": {
+    "Token": {
       "main": "./DRC20.mo",
       "type": "motoko",
       "args" : "--compacting-gc"

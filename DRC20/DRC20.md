@@ -23,30 +23,39 @@ Token developers can extend it as needed.
 
 **Improved features:** 
 
-* Consistency of holder's account-id.
+* Account ID format compatibility.
 
     ICP Ledger canister uses account-id(address) as account identifier, while most other canisters use principal-id as account identifier. It brings complexity to users. This standard uses **account-id** as account identity, supports `subaccount`, and is compatible with the use of `principal-id`.
 
-* Using the pub/sub model instead of the event mechanism.
+* Using the pub/sub model to implement message notifications.
 
-    Dfinity does not have an effective event notification mechanism, and the off-chain SDK needs to actively query the network status. In another scenario, the application canister can use the publisher-subscriber model to subscribe to token canister’s messages and execute callback methods. Therefore, this standard adds **subscribe()** method. Subscribers need to implemente callback methods for **onTransfer**, **onLock**, **onExecute**, and **onApprove** messages. The query history records method can be used as a supplement when the subscriber fails to receive a message.
-
-* Solving malicious exploits of approvals.
-
-    In order to prevent the abuse of the approval method and facilitate risk management, this standard adds **approvals()** method to facilitate holders to check their approvals.
+    Dfinity does not have an established event notification mechanism and the usual practice is for dapp to actively query for events. In another scenario, the application canister needs to use the pub/sub model to subscribe to token canister messages and execute callback functions. Therefore, this standard adds the **subscribe()** method and subscribers need to implement callback functions for **onTransfer**, **onLock**, **onExecute** and **onApprove** messages.When a subscriber fails to receive a message (which rarely happens), the txnQuery() method can be used as a supplement.
 
 * Transaction records storage and query.
 
-    Dfinity does not store smart contract transaction records in blocks like ethereum. Token canister needs to keep transaction record data by itself. The storage space of canister is limited and it is dangerous to store all transaction records in one canister. This standard provides the **txnQuery()** method for querying the recent transaction records.  It is recommended that only the recent records be kept in the token canister, and more history records can be stored in a separate canister. 
-
-* Preventing canister cycles balance attack.
-
-    According to IC network rules, the caller of canister is not required to pay gas, and it is up to canister to pay gas. It may lead to ddos attacks. So the token canister should ask the caller of the update call to pay gas. This standard adds the **gas()** method to help the caller estimate the cost of gas. The setGas method is not included in the standard, it is up to the developers to decide, it may be a fixed fee or set through an external governance canister. 
+    Dfinity does not store smart contract transaction records in blocks like ethereum. Token canister needs to keep transaction record data by itself. The storage space of canister is limited and it is dangerous to store all transaction records in one canister. This standard provides the **txnQuery()** method to query the recent transaction records cached in token canister, more history can be stored in external scalable canisters.
 
 * Lock/execute model improves atomicity.
 
     Canister's asynchronous messaging model does not provide atomicity guarantees for cross-canister transfers. The non-atomicity of cross-canister transfers is one of the technical features of IC networks that cannot be solved at the system level and needs to consider designing for atomicity within the application logic. For example, creating logical locks, and escrowing token through a middleman.
     Creating a two-phase transfer structure can provide the underlying functionality to improve atomicity. Therefore, **lockTransfer()/lockTransferFrom()** and **executeTransfer()** methods are added to the standard. 
+
+* Preventing Duplicate Transaction.
+
+   There are two possible risks when sending a transaction: the risk of sending duplicate transactions and the risk of not knowing the status of the transaction due to a network failure. 
+   This standard introduces two rules to solve this trouble: (1) the optional use of the nonce mechanism. The sender can be assured that the transaction will only be executed once (idempotency) and that the nonce mechanism will ensure that multiple transactions are executed in a specific order. (2) The transaction id (txid) can be calculated before it is sent. If the txid depends on the return of the transaction execution, you will not get the txid and the status of the transaction when an exception is thrown. This standard uses the DRC202 standard for txid calculation.
+
+* Preventing canister cycles balance attack.
+
+    According to IC network rules, the caller of canister is not required to pay gas, and it is up to canister to pay gas. It may lead to ddos attacks. So the token canister should ask the caller of the update call to pay gas. This standard adds the **gas()** method to help the caller estimate the cost of gas. The setGas method is not included in the standard, it is up to the developers to decide, it may be a fixed fee or set through an external governance canister. 
+
+* Solving malicious exploits of approvals.
+
+    In order to prevent the abuse of the approval method and facilitate risk management, this standard adds **approvals()** method to facilitate holders to check their approvals.
+
+* Average daily balance and time weighted balance.
+
+    The length of time an account's balance is held is taken as an important consideration in a variety of usage scenarios such as mining and airdrops. Traditional token solutions such as snapshots and locking have resulted in complex business processes and security issues. This standard introduces the concept of "CoinSeconds", which is a time-weighted cumulative value of an account's balance. 1 CoinSeconds means 1 token held for 1 second. It can be used to calculate average daily balances, time-weighted balance ratios, etc.
 
 **More Issues:**
 
@@ -58,11 +67,11 @@ Token developers can extend it as needed.
 
 * Preventing re-entrance attacks
 
-   Token canister calls to the callback method carry the risk of re-entrance attacks. Measures: Collect gas from the sender and update the canister state before the callback call. 
+   Token canister calls to the callback method carry the risk of re-entrance attacks. Measures: The caller is required to pay gas. It uses pub/sub instead of synchronous callback or notify, and updates the state before the external call.
 
 * Mint and burn methods
     
-    Token distribution rules and economic models should be considered by the token issuer. It is better practice that the token does not contain the mint() and burn() methods. Developers can extend this if they really need to. If you just need the burn() method, _807077e900000000000000000000000000000000000000000000000000000000_(this's 0 address with checksum) can be used as the blackhole address.
+    It is better practice that the token does not contain the mint() and burn() methods. Token distribution rules and economic models should be considered by the token issuer. Developers can extend this if they really need to. If you just need the burn() method, _807077e900000000000000000000000000000000000000000000000000000000_(this's 0 address with checksum) can be used as the blackhole address.
 
 ## Specification
 
@@ -199,10 +208,10 @@ service : (InitArgs) -> DRC20
 ### Methods
 
 **NOTES**:
- - The following specifications use syntax from Candid 
- - The optional parameter `_nonce` is used to specify the nonce of the transaction. The nonce value for each AccountId starts at 0 and increases by 1 for each specific transaction. If the caller specifies an incorrect nonce value, the transaction will be rejected. The specific transactions include: approve(), transfer(), transferFrom(), lockTransfer(), lockTransferFrom(), executeTransfer().
+ - The following specifications use syntax from Candid.
+ - The optional parameter `_nonce` is used to specify the nonce of the transaction. The nonce value for each AccountId starts at 0 and is incremented by 1 on the success of each specific transaction. If the caller specifies an incorrect nonce value, the transaction will be rejected. The specific transactions include: approve(), transfer(), transferFrom(), lockTransfer(), lockTransferFrom(), executeTransfer().
  - The optional parameter `_sa` is the subaccount of the caller, which is a 32 bytes nat8 array. If length of `_sa` is less than 32 bytes, it will be prepended with [0] to make up.
- - The optional parameter `_data` is the custom data provided by the caller, which can be used for nonce, calldata, memo, etc. The length of `_data` should be less than 65536 bytes (It is recommended to use candid encoding format, 4-byte method name hash + arguments data). 
+ - The optional parameter `_data` is the custom data provided by the caller, which can be used for calldata, memo, etc. The length of `_data` should be less than 65536 bytes (It is recommended to use candid encoding format, e.g. 4-byte method name hash + arguments data). 
  
 #### standard
 
@@ -249,7 +258,7 @@ cyclesBalanceOf: (_owner: Address) -> (balance: nat) query;
 ```
 #### gas
 Returns the transaction fee of the token. E.g. `"variant { token=10000000 }"`.  
-*Note* Support `cycles`, `token` as gas charging method. If selected `token` as gas, it will be additionally charged from the balance of account `caller`, not be charged from the `_value` of transfer().
+*Note* Supports `cycles`, `token` as payment method for gas. If selected `token` as gas, it will be additionally charged from the balance of account `caller`, not be charged from the `_value` of the transfer.
 ``` candid
 gas: () -> (Gas) query;
 ```
@@ -285,7 +294,7 @@ transferFrom: (_from:Address, _to: Address, _value: nat, _nonce: opt nat, _sa: o
 ```
 #### lockTransfer
 Locks a transaction, specifies a `_decider` who can decide the execution of this transaction, and sets an expiration period `_timeout` seconds after which the locked transaction will be unlocked. The parameter _timeout SHOULD not be greater than 1000000 seconds.  
-Creating a two-phase transfer structure can improve atomicity. The process is, (_owner) `lock the transaction` -- (_decider) `execute the transaction` or (_owner) `fallback the transaction when expired`
+Creating a two-phase transfer structure can improve atomicity. The process is that (1) the owner locks the transaction and (2) the decider executes the transaction or the owner fallback the transaction after it has expired.
 ``` candid
 lockTransfer: (_to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
@@ -300,7 +309,7 @@ The `decider` executes the locked transaction `_txid`, or the `owner` can fallba
 executeTransfer: (_txid: Txid, _executeType: ExecuteType, _to: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### txnQuery
-Queries the transaction records information.  
+Queries transaction counts and recent transaction records cached in token canister.   
 Query type `_request`:  
 #txnCountGlobal: returns global transaction count.  
 #txnCount: returns `owner`s transaction count. It is the `nonce` value of his next transaction.    
@@ -319,7 +328,7 @@ OPTIONAL - This method can be used to improve usability, but the method may not 
 txnRecord : (Txid) -> (opt TxnRecord);
 ```
 #### subscribe
-Subscribes to the token's messages, giving the callback function and the types of messages as parameters. Subscribers will only receive messages that are related to them (the subscriber is transaction‘s _from, _to, _spender, or _decider).
+Subscribes to the token's messages, giving the `_callback` function and the `_msgTypes` as parameters. Message types are `onTransfer`, `onLock`, `onExecute`, and `onApprove`. Subscribers will only receive messages that are related to them (the subscriber is transaction‘s _from, _to, _spender, or _decider).
 The subscriber SHOULD be a canister, Implementing callback functions in the code.
 ``` candid
 subscribe: (_callback: Callback, _msgTypes: vec MsgType, _sa: opt vec nat8) -> bool;
@@ -343,7 +352,7 @@ Returns the amount which `_spender` is still allowed to withdraw from `_owner`.
 allowance: (_owner: Address, _spender: Address) -> (remaining: nat) query;
 ```
 #### approvals
-Returns all your approvals with a non-zero amount.  
+Returns all `_owner`s approvals with a non-zero amount.  
 OPTIONAL - This method can be used to improve usability, but the method may not be present.
 ``` candid
 approvals: (_owner: Address) -> (allowances: vec Allowance) query;
@@ -351,7 +360,7 @@ approvals: (_owner: Address) -> (allowances: vec Allowance) query;
 ### Subscriber's Callback
 #### tokenCallback (customizable)
 Token canister subscribers should implement a callback function for handling token published messages.
-Message types are: `onTransfer`, `onLock`, `onExecute`, and `onApprove`. The callback function is given as an argument by calling `subscribe()` of token.
+The callback function is given as an argument by calling `subscribe()` of token.
 ``` candid
 type Callback = func (txn: TxnRecord) -> ();
 ```

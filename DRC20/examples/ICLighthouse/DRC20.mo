@@ -196,18 +196,14 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         if(_v == 0){
             balances.delete(_a);
         } else {
+            balances.put(_a, _v);
             switch (gas_){
                 case(#token(fee)){
                     if (_v < fee/2){
                         ignore _burn(_a, _v, false);
-                        balances.delete(_a);
-                    } else{
-                        balances.put(_a, _v);
                     };
                 };
-                case(_){
-                    balances.put(_a, _v);
-                };
+                case(_){};
             }
         };
     };
@@ -273,11 +269,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         switch(lastTxns_.get(_a)){
             case(?(txidsQ)){
                 var l = List.append(txidsQ.0, List.reverse(txidsQ.1));
-                if (List.some(l, func (v: Txid): Bool { if (v == _txid) true  else false; })){
-                    return true;
-                } else {
-                    return false;
-                };
+                return List.some(l, func (v: Txid): Bool { v == _txid });
             };
             case(_){
                 return false;
@@ -350,23 +342,25 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         };
     };
     private func _pushLastTxn(_as: [AccountId], _txid: Txid): (){
-        for (_a in _as.vals()){
+        let len = _as.size();
+        if (len == 0){ return (); };
+        for (i in Iter.range(0, Nat.sub(len,1))){
             var count: Nat = 0;
-            for (_a2 in _as.vals()){
-                if (Blob.equal(_a, _a2)){ count += 1; };
+            for (j in Iter.range(i, Nat.sub(len,1))){
+                if (Blob.equal(_as[i], _as[j])){ count += 1; };
             };
             if (count == 1){
-                switch(lastTxns_.get(_a)){
+                switch(lastTxns_.get(_as[i])){
                     case(?(q)){
                         var txids: Deque.Deque<Txid> = q;
                         txids := Deque.pushFront(txids, _txid);
-                        lastTxns_.put(_a, txids);
-                        _cleanLastTxns(_a);
+                        lastTxns_.put(_as[i], txids);
+                        _cleanLastTxns(_as[i]);
                     };
                     case(_){
                         var new = Deque.empty<Txid>();
                         new := Deque.pushFront(new, _txid);
-                        lastTxns_.put(_a, new);
+                        lastTxns_.put(_as[i], new);
                     };
                 };
             };
@@ -375,7 +369,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private func _inLockedTxns(_txid: Txid, _a: AccountId): Bool{
         switch(lockedTxns_.get(_a)){
             case(?(txids)){
-                switch (Array.find(txids, func (v: Txid): Bool { if (v == _txid) true else false; })){
+                switch (Array.find(txids, func (v: Txid): Bool { v == _txid })){
                     case(?(v)){
                         return true;
                     };
@@ -415,10 +409,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         switch(lockedTxns_.get(_a)){
             case(?(arr)){
                 var txids: [Txid] = arr;
-                txids := Array.filter(txids, func (t: Txid): Bool {
-                    if (t == _txid){ return false; } 
-                    else { return true; };
-                });
+                txids := Array.filter(txids, func (t: Txid): Bool { t != _txid });
                 if (txids.size() == 0){
                     lockedTxns_.delete(_a);
                 };
@@ -487,13 +478,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         switch(subscriptions.get(_a)){
             case(?(sub)){
                 var msgTypes = sub.msgTypes;
-                var found = Array.find(msgTypes, func (mt: MsgType): Bool{
-                    if (mt == _mt){
-                        return true;
-                    } else { 
-                        return false; 
-                    };
-                });
+                var found = Array.find(msgTypes, func (mt: MsgType): Bool { mt == _mt });
                 switch(found){
                     case(?(v)){ return ?sub.callback; };
                     case(_){ return null; };
@@ -1080,11 +1065,15 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                         let expiration = v.expiration;
                         let decider = v.decider;
                         var fallback: Nat = 0;
-                        if (caller == decider and decider == to){
-                            switch(_to){
-                                case(?(newTo)){ to := _getAccountId(newTo); };
-                                case(_){};
+                        switch(_to){
+                            case(?(newTo)){ 
+                                if (caller == decider and decider == to){
+                                    to := _getAccountId(newTo); 
+                                } else {
+                                    return #err({ code=#UndefinedError; message="No permission to change the address `to`"; });
+                                };
                             };
+                            case(_){};
                         };
                         switch(_executeType){
                             case(#fallback){
