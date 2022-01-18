@@ -76,7 +76,7 @@ type BucketInfo = record {
    memory: nat;
    stableMemory: nat32;
 };
-type ProxyActor = service_proxy {
+type ProxyActor = service {
    bucket: (Token, Txid, nat, opt nat8) -> (opt Bucket) query;
    bucketInfo: (opt Bucket) -> (Bucket, BucketInfo);
    fee: () -> (nat) query;
@@ -97,16 +97,14 @@ type ProxyActor = service_proxy {
    storeBytes: (Txid, vec nat8) -> ();
    version: () -> (nat8) query;
 };
-service_proxy : () -> ProxyActor
 
-type BucketActor = service_bucket {
+type BucketActor = service {
    bucketInfo: () -> (BucketInfo) query;
    last: () -> (Sid, Time) query;
    txn: (Token, Txid) -> (opt record { TxnRecord; Time; }) query;
    txnBytes: (Token, Txid) -> (opt record { vec nat8; Time; }) query;
    txnBytes2: (Sid) -> (opt record { vec nat8; Time; }) query;
 };
-service_bucket : () -> BucketActor
 ```
 
 ### DRC202.ProxyActor
