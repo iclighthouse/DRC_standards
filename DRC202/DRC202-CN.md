@@ -147,7 +147,7 @@ store: (_txn: TxnRecord) -> ();
 
 #### storeBytes
 
-以二进制数据格式存储一条交易记录`_txn`。
+以二进制数据格式存储一条交易记录`_data`, 允许的最大数据128KB。
 
 ``` candid
 storeBytes: (_txid: Txid, _data: vec nat8) -> ();

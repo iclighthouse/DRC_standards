@@ -281,6 +281,7 @@ shared(installMsg) actor class ProxyActor() = this {
         await _execStorage();
     };
     public shared(msg) func storeBytes(_txid: Txid, _data: [Nat8]) : async (){
+        assert(_data.size() <= 128 * 1024); // 128 KB
         let amout = Cycles.available();
         assert(amout >= fee_ or _onlyOwner(msg.caller));
         let accepted = Cycles.accept(fee_);
