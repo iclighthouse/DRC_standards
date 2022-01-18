@@ -257,7 +257,7 @@ bucketInfo: () -> (BucketInfo) query;
 OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
 
 ``` candid
-last: () -> (record { Sid; Time; }) query;
+last: () -> (Sid, Time) query;
 ```
 
 #### txnBytes2
