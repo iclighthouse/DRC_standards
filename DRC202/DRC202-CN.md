@@ -139,7 +139,7 @@ fee: () -> (cycles: nat) query;
 
 #### store
 
-存储一条交易记录`_txn`。
+存储一条交易记录`_txn`，其中`_txn.transaction.data`的数据长度最大允许64KB，超出部分会被截取。
 
 ``` candid
 store: (_txn: TxnRecord) -> ();
