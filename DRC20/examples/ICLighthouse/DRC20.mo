@@ -129,7 +129,6 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                 var timestamp = record.timestamp;
                 if (not(_inLockedTxns(_txid, from))){ //Not in from's LockedTxns
                     if (Time.now() - timestamp > MAX_CACHE_TIME){ //Expired
-                        txnRecords.delete(_txid);
                         _cleanLastTxns(caller);
                         _cleanLastTxns(from);
                         _cleanLastTxns(to);
@@ -137,6 +136,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                             case(#lockTransfer(v)){ _cleanLastTxns(v.decider); };
                             case(_){};
                         };
+                        txnRecords.delete(_txid);
                     } else if (_isDeep and not(_inLastTxns(_txid, caller)) and 
                         not(_inLastTxns(_txid, from)) and not(_inLastTxns(_txid, to))) {
                         switch(record.transaction.operation){
@@ -320,14 +320,22 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                                             let txn_ = _getTxnRecord(txid);
                                             switch(txn_){
                                                 case(?(txn)){ timestamp := txn.timestamp; };
-                                                case(_){ timestamp := Time.now(); };
+                                                case(_){};
                                             };
                                         };
                                         case(_){ timestamp := Time.now(); };
                                     };
                                 };
                             };
-                            case(_){};
+                            case(_){
+                                switch (Deque.popBack(txids)){
+                                    case(?(q, v)){
+                                        txids := q;
+                                        size -= 1;
+                                    };
+                                    case(_){};
+                                };
+                            };
                         };
                     };
                     case(_){};
@@ -498,13 +506,15 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     };
     // pushMessages
     private func _pushMessages(_subs: [AccountId], _msgType: MsgType, _txid: Txid) : (){
-        for (a in _subs.vals()){
+        let len = _subs.size();
+        if (len == 0){ return (); };
+        for (i in Iter.range(0, Nat.sub(len,1))){
             var count: Nat = 0;
-            for (a2 in _subs.vals()){
-                if (Blob.equal(a, a2)){ count += 1; };
+            for (j in Iter.range(i, Nat.sub(len,1))){
+                if (Blob.equal(_subs[i], _subs[j])){ count += 1; };
             };
             if (count == 1){
-                publishMessages := List.push((a, _msgType, _txid, 0), publishMessages);
+                publishMessages := List.push((_subs[i], _msgType, _txid, 0), publishMessages);
             };
         };
     };
