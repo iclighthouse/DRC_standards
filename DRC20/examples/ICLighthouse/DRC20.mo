@@ -967,7 +967,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let to = _getAccountId(_to);
         let operation: Operation = #transfer({ action = #send; });
         // check fee
-        if(not(_checkFee(caller, 100, 0))){
+        if(not(_checkFee(from, 100, _value))){
             return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
         };
         // transfer
@@ -978,7 +978,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let store = _drc202Store();
         // charge fee
         switch(res){
-            case(#ok(v)){ ignore _chargeFee(caller, 100); return res; };
+            case(#ok(v)){ ignore _chargeFee(from, 100); return res; };
             case(#err(v)){ return res; };
         };
     };
@@ -1038,7 +1038,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let from = _getAccountId(_from);
         let to = _getAccountId(_to);
         // check fee
-        if(not(_checkFee(caller, 100, 0))){
+        if(not(_checkFee(from, 100, _value))){
             return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
         };
         // transfer
@@ -1049,7 +1049,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let store = _drc202Store();
         // charge fee
         switch(res){
-            case(#ok(v)){ ignore _chargeFee(caller, 100); return res; };
+            case(#ok(v)){ ignore _chargeFee(from, 100); return res; };
             case(#err(v)){ return res; };
         };
     };
@@ -1059,9 +1059,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let txid = _txid;
         let caller = _getAccountIdFromPrincipal(msg.caller, _sa);
         // check fee
-        if(not(_checkFee(caller, 100, 0))){
-            return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
-        };
+        // if(not(_checkFee(caller, 100, 0))){
+        //     return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
+        // };
         switch(_getTxnRecord(txid)){
             case(?(txn)){
                 let from = txn.transaction.from;
@@ -1125,10 +1125,11 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                         // records storage (DRC202 Standard)
                         let store = _drc202Store();
                         // charge fee
-                        switch(res){
-                            case(#ok(v)){ ignore _chargeFee(caller, 100); return res; };
-                            case(#err(v)){ return res; };
-                        };
+                        // switch(res){
+                        //     case(#ok(v)){ ignore _chargeFee(caller, 100); };
+                        //     case(#err(v)){ };
+                        // };
+                        return res;
                     };
                     case(_){
                         return #err({ code=#NoLockedTransfer; message="No Locked Transfer"; });

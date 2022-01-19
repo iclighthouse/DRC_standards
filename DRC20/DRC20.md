@@ -258,7 +258,8 @@ cyclesBalanceOf: (_owner: Address) -> (balance: nat) query;
 ```
 #### gas
 Returns the transaction fee of the token. E.g. `"variant { token=10000000 }"`.  
-*Note* Supports `cycles`, `token` as payment method for gas. If selected `token` as gas, it will be additionally charged from the balance of account `caller`, not be charged from the `_value` of the transfer.
+*Note* Supports `cycles`, `token` as payment method for gas. If selected `token` as gas, it will be additionally charged from the balance of the account, not be charged from the `_value` of the transfer. 
+transferFrom, lockTransferFrom charge gas from account `_from`, executeTransfer does not charge gas, all other update methods charge gas from account `caller`.
 ``` candid
 gas: () -> (Gas) query;
 ```

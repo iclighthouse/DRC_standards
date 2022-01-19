@@ -258,7 +258,7 @@ cyclesBalanceOf: (_owner: Address) -> (balance: nat) query;
 ```
 #### gas
 返回代币的交易费设置值。例如：`"variant { token=10000000 }"`。   
-*注意* 支持 "cycles"，"token"作为gas的支付方式。如果选择`token`作为gas，将从账户`caller`的余额中收取（而不是从转账的`_value`中收取）。
+*注意* 支持 "cycles"，"token"作为gas的支付方式。如果选择`token`作为gas，将从账户的余额中收取（而不是从转账的`_value`中收取）。transferFrom、lockTransferFrom从账户`_from`扣除gas，executeTransfer不收取gas，其他update方法都是从账户`caller`扣除gas。
 ``` candid
 gas: () -> (Gas) query;
 ```
