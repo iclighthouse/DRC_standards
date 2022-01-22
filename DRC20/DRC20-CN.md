@@ -9,7 +9,7 @@ Created: 2021-11-03
 
 ## 摘要
 
-DRC20是一个用于Dfinity代币的标准接口。该标准符合[ERC20](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md)的接口规范，并有一些改进以符合IC网络的特点。（注：下文中“token”、“代币”、“通证”、“代币”是指同一个意思。）
+DRC20是一个用于Dfinity代币的标准接口。该标准符合[ERC20](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md)的接口规范，并有一些改进以符合IC网络的特点。（注：下文中“token”、“代币”、“通证”、“令牌”是指同一个意思。）
 
 ## 解决什么问题
 
