@@ -29,21 +29,21 @@ Token developers can extend it as needed.
 
 * Using the pub/sub model to implement message notifications.
 
-    Dfinity does not have an established event notification mechanism and the usual practice is for dapp to actively query for events. In another scenario, the application canister needs to use the pub/sub model to subscribe to token canister messages and execute callback functions. Therefore, this standard adds the **subscribe()** method and subscribers need to implement callback functions for **onTransfer**, **onLock**, **onExecute** and **onApprove** messages.When a subscriber fails to receive a message (which rarely happens), the txnQuery() method can be used as a supplement.
+    Dfinity does not have an established event notification mechanism and the usual practice is for dapp to actively query for events. In some scenarios, the application canister needs to use the pub/sub model to subscribe to token canister messages and execute callback functions. Therefore, this standard adds the **subscribe()** method and subscribers need to implement callback function. When a subscriber fails to receive a message (which rarely happens), the txnQuery() method can be used as a supplement.
 
 * Transaction records storage and query.
 
-    Dfinity does not store smart contract transaction records in blocks like ethereum. Token canister needs to keep transaction record data by itself. The storage space of canister is limited and it is dangerous to store all transaction records in one canister. This standard provides the **txnQuery()** method to query the recent transaction records cached in token canister, more history can be stored in external scalable canisters.
+    Dfinity does not store smart contract transaction records in blocks like ethereum. Token canister needs to keep transaction record data by itself. The storage space of canister is limited and it is dangerous to store all transaction records in one canister. This standard specifies that recent transactions are cached in the token canister and historical records are stored in externally scalable canisters.
 
 * Lock/execute model improves atomicity.
 
-    Canister's asynchronous messaging model does not provide atomicity guarantees for cross-canister transfers. The non-atomicity of cross-canister transfers is one of the technical features of IC networks that cannot be solved at the system level and needs to consider designing for atomicity within the application logic. For example, creating logical locks, and escrowing token through a middleman.
+    Canister's asynchronous messaging model does not provide atomicity guarantees for cross-canister transfers. The non-atomicity of cross-canister transfers is one of the technical features of IC networks that cannot be solved at the system level and needs to consider designing for atomicity within the application logic. For example, Saga mode, 2PC mode.
     Creating a two-phase transfer structure can provide the underlying functionality to improve atomicity. Therefore, **lockTransfer()/lockTransferFrom()** and **executeTransfer()** methods are added to the standard. 
 
 * Preventing Duplicate Transaction.
 
    There are two possible risks when sending a transaction: the risk of sending duplicate transactions and the risk of not knowing the status of the transaction due to a network failure. 
-   This standard introduces two rules to solve this trouble: (1) the optional use of the nonce mechanism. The sender can be assured that the transaction will only be executed once (idempotency) and that the nonce mechanism will ensure that multiple transactions are executed in a specific order. (2) The transaction id (txid) can be calculated before it is sent. If the txid depends on the return of the transaction execution, you will not get the txid and the status of the transaction when an exception is thrown. This standard uses the DRC202 standard for txid calculation.
+   This standard introduces two rules to solve this trouble: (1) the optional use of the nonce mechanism. The sender can be assured that the transaction will only be executed once (idempotency). (2) The transaction id (txid) can be calculated before it is sent. If the txid depends on the return of the transaction execution, you will not get the txid and the status of the transaction when an exception is thrown. This standard uses the DRC202 standard for txid calculation.
 
 * Preventing canister cycles balance attack.
 
@@ -53,7 +53,7 @@ Token developers can extend it as needed.
 
     In order to prevent the abuse of the approval method and facilitate risk management, this standard adds **approvals()** method to facilitate holders to check their approvals.
 
-* Average daily balance and time weighted balance.
+* Time weighted balance.
 
     The length of time an account's balance is held is taken as an important consideration in a variety of usage scenarios such as mining and airdrops. Traditional token solutions such as snapshots and locking have resulted in complex business processes and security issues. This standard introduces the concept of "CoinSeconds", which is a time-weighted cumulative value of an account's balance. 1 CoinSeconds means 1 token held for 1 second. It can be used to calculate average daily balances, time-weighted balance ratios, etc.
 

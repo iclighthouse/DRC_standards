@@ -9,7 +9,7 @@ Created: 2021-11-03
 
 ## 摘要
 
-DRC20是一个用于Dfinity代币的标准接口。该标准符合[ERC20](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md)的接口规范，并有一些改进以符合IC网络的特点。（注：下文中“token”、“代币”、“通证”、“令牌”是指同一个意思。）
+DRC20是一个用于Dfinity代币的标准接口。该标准符合[ERC20](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md)的接口规范，并有一些改进以符合IC网络的特点。（注：下文中“token”、“代币”、“通证”、“代币”是指同一个意思。）
 
 ## 解决什么问题
 
@@ -29,30 +29,30 @@ DRC20是一个用于Dfinity代币的标准接口。该标准符合[ERC20](https:
 
 * 使用pub/sub模型来实现消息通知
 
-    Dfinity没有现成的事件通知机制，通常做法是应用主动去查询事件。在另一种场景下，应用Canister需要使用pub/sub模型来订阅Token Canister的消息并执行回调函数。因此，本标准增加了**subscribe()**方法，并且订阅者需要为**onTransfer**、**onLock**、**onExecute**和**onApprove**消息实现回调函数。订阅者未能成功处理消息时（这种情况很少发生），可以使用txnQuery()查询历史记录作为补充。
+    Dfinity没有现成的事件通知机制，通常做法是应用主动去查询事件。在有些场景下，应用Canister需要使用pub/sub模型来订阅Token Canister的消息并执行回调函数。因此，本标准增加了**subscribe()**方法，并且订阅者需要实现回调函数。订阅者未能收到消息（这种情况很少发生）或未成功处理消息时，可以使用txnQuery()查询历史记录作为补充。
 
 * 交易记录的存储和查询
 
-    Dfinity不像以太坊那样将智能合约的交易记录存储在区块中。代币Canister需要自己保存交易记录数据。Canister的存储空间是有限的，将所有交易记录存储在一个Canister里是危险的。本标准提供了**txnQuery()**方法来查询最近缓存在Token Canister的交易记录，更多的历史记录可以保存在外部可扩展的Canister中。
+    Dfinity不像以太坊那样将智能合约的交易记录存储在区块中，代币Canister需要自己保存交易记录数据。Canister的存储空间是有限的，将所有交易记录存储在一个Canister里是不合适的。本标准将最近交易记录缓存在Token Canister中，更多的历史记录保存在外部可扩展的Canister中。
 
 * Lock/execute模型提高原子性
 
-    Canister的异步消息传递模型并没有为跨容器调用提供原子性保证。跨容器调用的非原子性是IC网络的技术特征之一，需要开发者在应用逻辑中去应对。例如，创建逻辑锁，通过中间人托管令牌。
+    Canister的异步消息传递模型并没有为跨容器调用提供原子性保证。跨容器调用的非原子性是IC网络的技术特征之一，需要开发者在应用逻辑中去应对。例如，Saga模式，2PC模式。
     创建一个两阶段提交结构可以作为底层功能来提高原子性。因此，**lockTransfer()/lockTransferFrom()**和**executeTransfer()**方法被添加到标准中。
 
 * 防止重复交易
 
-    在发送交易时，可能存在两个风险：重复发送的风险；因遇上网络故障而无法知道交易状态的风险。本标准引入两个规则来解决这个麻烦：（1）可选使用nonce机制。发送者可以放心地重复发送交易，交易只会被执行一次（幂等性）。nonce机制还可以有效保障多个交易按照给定的顺序执行。（2）交易id（txid）可在发送前计算。如果txid依赖于交易执行的返回，当异常发生时你将得不到txid和交易状态。本标准采用DRC202标准的txid计算方式。
+    在发送交易时，可能存在两个风险：重复发送的风险；因遇上网络故障而无法知道交易状态的风险。本标准引入两个规则来解决：（1）可选使用nonce机制。发送者可以放心地重复发送交易，交易只会被执行一次（幂等性）。（2）交易id（txid）可在发送前计算。如果txid依赖于交易的返回结果，当异常发生时你将得不到txid和交易状态。本标准采用DRC202标准的txid计算方式。
 
 * 防止canister cycles余额不足攻击
 
-    根据IC网络规则，Canister的调用者不需要支付gas，而是由Canister支付Cycles。这可能会导致DDOS攻击。所以代币Canister应该要求caller支付gas。本标准增加了**gas()**方法，以帮助调用者查询gas成本。setGas方法不包括在标准中，由开发者决定，它可以是一个固定的费用，也可以通过外部治理设置。
+    根据IC网络规则，Canister的调用者不需要支付gas，而是由Canister支付gas，这可能会导致DDOS攻击。所以代币Canister应该要求caller支付gas，支持以cycles和token方式支付。本标准增加了**gas()**方法，以帮助调用者查询gas成本。setGas方法不包括在标准中，由开发者决定，它可以是一个固定的费用，也可以通过外部治理设置。
 
 * 解决恶意利用approve的问题
 
     为了防止approve的滥用，便于风险管理，本标准增加了**approvals()**方法，以方便持有人检查其approve情况。
 
-* 日均余额和时间加权余额
+* 时间加权余额
 
     在挖矿、空投等多种使用场景下，一个账户的余额持有时间被作为一项重要的考量因素。传统token需要通过快照、锁定等方式来解决，但也造成了复杂的业务流程和安全性问题。本标准引入“币秒”（CoinSeconds）概念，是账户余额的时间加权累计值，1 CoinSeconds表示1 token持有1秒钟时间，可被用于计算日均余额、时间加权余额比例等。
 
@@ -222,24 +222,24 @@ standard: () -> (text) query;
 ```
 #### name
 
-返回令牌的名称。例如：`"ICLighthouseToken"`。  
+返回代币的名称。例如：`"ICLighthouseToken"`。  
 OPTIONAL - 这个方法可以用来提高可用性，但值可能不存在。
 ``` candid
 name: () -> (text) query;
 ```
 #### symbol
-返回令牌的符号。例如：`"ICL"`。  
+返回代币的符号。例如：`"ICL"`。  
 OPTIONAL - 这个方法可以用来提高可用性，但值可能不存在。
 ``` candid
 symbol: () -> (text) query;
 ```
 #### decimals
-返回令牌使用的小数的位数。例如：`8`，意味着实际代币金额是用代币数量除以`100000000`。 
+返回代币使用的小数的位数。例如：`8`，意味着实际代币金额是用代币数量除以`100000000`。 
 ``` candid
 decimals: () -> (nat8) query;
 ```
 #### metadata
-返回令牌的扩展元数据信息，它是Metadata类型。 E.g. `'vec {record { name: "logo"; content: "data:img/jpg;base64,iVBOR....";}; }'`.    
+返回代币的扩展元数据信息，它是Metadata类型。 E.g. `'vec {record { name: "logo"; content: "data:img/jpg;base64,iVBOR....";}; }'`.    
 OPTIONAL - 这个方法可以用来提高可用性，但值可能不存在。
 ``` candid
 metadata: () -> (vec Metadata) query;
