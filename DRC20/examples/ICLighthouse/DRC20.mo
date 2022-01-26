@@ -65,7 +65,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private stable var MAX_CACHE_TIME: Int = 3 * 30 * 24 * 3600 * 1000000000; // 3 months
     private stable var MAX_CACHE_NUMBER_PER: Nat = 100; 
     private stable var FEE_TO: AccountId = AID.blackhole();  
-    private stable var STORAGE_CANISTER: Text = "y5a36-liaaa-aaaak-aacqa-cai";
+    private stable var STORAGE_CANISTER: Text = /* test */"iq2ev-rqaaa-aaaak-aagba-cai"; // /* main */"y5a36-liaaa-aaaak-aacqa-cai";
     private stable var MAX_PUBLICATION_TRIES: Nat = 2; 
     private stable var MAX_STORAGE_TRIES: Nat = 2; 
 

@@ -277,4 +277,5 @@ txnBytes2: (_sid: Sid) -> (opt record { vec nat8; Time; }) query;
 #### Example implementations
 
 - [ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/IClighthouse)
-    ICTokens DRC202: y5a36-liaaa-aaaak-aacqa-cai
+    ICTokens DRC202 (Main): y5a36-liaaa-aaaak-aacqa-cai  
+    ICTokens DRC202 (Test): iq2ev-rqaaa-aaaak-aagba-cai  

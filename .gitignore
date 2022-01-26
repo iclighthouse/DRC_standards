@@ -16,7 +16,6 @@ dist-ssr
 node_modules/
 dist/
 
-canister_ids.json
 .dfx/
 issues/
 docs/

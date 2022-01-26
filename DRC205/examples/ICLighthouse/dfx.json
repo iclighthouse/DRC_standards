@@ -3,6 +3,10 @@
     "DRC205": {
       "main": "./DRC205Proxy.mo",
       "type": "motoko"
+    },
+    "DRC205Test": {
+      "main": "./DRC205Proxy.mo",
+      "type": "motoko"
     }
   },
   "defaults": {
