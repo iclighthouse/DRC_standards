@@ -804,7 +804,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                 var as: [AccountId] = [from, to];
                 _pushLastTxn(as, txid);
                 _pushMessages(as, #onApprove, txid);
-                callerPrincipal := Principal.fromText("2vxsx-fae");  // [4] Anonymous principal
+                //callerPrincipal := Principal.fromText("2vxsx-fae");  // [4] Anonymous principal
             };
         };
         
@@ -836,8 +836,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private func _drc202Store() : async (){
         let drc202: DRC202.Self = actor(STORAGE_CANISTER);
         var _storeRecords = List.nil<(Txid, Nat)>();
-        var item = List.pop(storeRecords);
         let storageFee = await drc202.fee();
+        var item = List.pop(storeRecords);
         while (Option.isSome(item.0)){
             storeRecords := item.1;
             switch(item.0){
