@@ -294,7 +294,7 @@ The `transferFrom` method is used for allowing contracts to transfer tokens on y
 transferFrom: (_from:Address, _to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### lockTransfer
-Locks a transaction, specifies a `_decider` who can decide the execution of this transaction, and sets an expiration period `_timeout` seconds after which the locked transaction will be unlocked. The parameter _timeout SHOULD not be greater than 1000000 seconds.  
+Locks a transaction, specifies a `_decider` who can decide the execution of this transaction, and sets an expiration period `_timeout` seconds after which the locked transaction will be unlocked. The parameter _timeout SHOULD not be greater than 64,000,000 seconds.  
 Creating a two-phase transfer structure can improve atomicity. The process is that (1) the owner locks the transaction and (2) the decider executes the transaction or the owner fallback the transaction after it has expired.
 ``` candid
 lockTransfer: (_to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);

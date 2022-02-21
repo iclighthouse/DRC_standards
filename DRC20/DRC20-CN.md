@@ -293,7 +293,7 @@ transfer: (_to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data:
 transferFrom: (_from:Address, _to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### lockTransfer
-锁定一个交易，指定一个可以决定该交易最终是否执行的`_decider`，并设置一个过期时间`_timeout`秒，过期后锁定的交易将被解锁。参数_timeout不应该大于1000000秒。   
+锁定一个交易，指定一个可以决定该交易最终是否执行的`_decider`，并设置一个过期时间`_timeout`秒，过期后锁定的交易将被解锁。参数_timeout不应该大于64,000,000秒(约740天)。   
 创建一个两阶段交易结构可以提高原子性。这个过程是，（1）所有者锁定交易；（2）决定者执行交易或过期后所有者回退交易。
 ``` candid
 lockTransfer: (_to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);

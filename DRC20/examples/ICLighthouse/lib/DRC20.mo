@@ -123,7 +123,7 @@ module {
     metadata : shared query () -> async [Metadata];
     name : shared query () -> async Text;
     standard : shared query () -> async Text;
-    subscribe : shared (Callback, [MsgType], ?[Nat8]) -> async Bool;
+    subscribe : shared (Callback, [MsgType], ?Sa) -> async Bool;
     subscribed : shared query Address -> async ?Subscription;
     symbol : shared query () -> async Text;
     totalSupply : shared query () -> async Amount;

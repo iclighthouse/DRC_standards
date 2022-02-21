@@ -984,11 +984,11 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     };
     /// Locks a transaction, specifies a `_decider` who can decide the execution of this transaction, 
     /// and sets an expiration period `_timeout` seconds after which the locked transaction will be unlocked.
-    /// The parameter _timeout should not be greater than 1000000 seconds.
+    /// The parameter _timeout should not be greater than 64,000,000 seconds.
     public shared(msg) func lockTransfer(_to: To, _value: Amount, _timeout: Timeout, 
     _decider: ?Decider, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
-        if (_timeout > 1000000){
-            return #err({ code=#UndefinedError; message="_timeout should not be greater than 1000000 seconds."; });
+        if (_timeout > 64000000){
+            return #err({ code=#UndefinedError; message="Parameter _timeout should not be greater than 64,000,000 seconds."; });
         };
         var decider: AccountId = _getAccountIdFromPrincipal(msg.caller, _sa);
         switch(_decider){
@@ -1021,8 +1021,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     /// `spender` locks a transaction.
     public shared(msg) func lockTransferFrom(_from: From, _to: To, _value: Amount, 
     _timeout: Timeout, _decider: ?Decider, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
-        if (_timeout > 1000000){
-            return #err({ code=#UndefinedError; message="_timeout should not be greater than 1000000 seconds."; });
+        if (_timeout > 64000000){
+            return #err({ code=#UndefinedError; message="Parameter _timeout should not be greater than 64,000,000 seconds."; });
         };
         var decider: AccountId = _getAccountIdFromPrincipal(msg.caller, _sa);
         switch(_decider){
