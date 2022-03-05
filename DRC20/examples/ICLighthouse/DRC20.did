@@ -137,6 +137,7 @@ type Allowance =
 type Address = text;
 type AccountId = blob;
 type DRC20 = service {
+   standard: () -> (text) query;
    allowance: (Address, Spender) -> (Amount) query;
    approvals: (Address) -> (vec Allowance) query;
    approve: (Spender, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
@@ -144,25 +145,42 @@ type DRC20 = service {
    cyclesBalanceOf: (Address) -> (nat) query;
    cyclesReceive: (opt Address) -> (nat);
    decimals: () -> (nat8) query;
-   executeTransfer: (Txid, ExecuteType, opt To, opt Nonce, opt Sa,
-    opt Data) -> (TxnResult);
+   executeTransfer: (Txid, ExecuteType, opt To, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    gas: () -> (Gas) query;
-   lockTransfer: (To, Amount, Timeout, opt Decider, opt Nonce, opt Sa,
-    opt Data) -> (TxnResult);
-   lockTransferFrom: (From, To, Amount, Timeout, opt Decider, opt Nonce,
-    opt Sa, opt Data) -> (TxnResult);
+   lockTransfer: (To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   lockTransferFrom: (From, To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    metadata: () -> (vec Metadata) query;
    name: () -> (text) query;
-   standard: () -> (text) query;
    subscribe: (Callback, vec MsgType, opt Sa) -> (bool);
    subscribed: (Address) -> (opt Subscription) query;
    symbol: () -> (text) query;
    totalSupply: () -> (Amount) query;
    transfer: (To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
-   transferFrom: (From, To, Amount, opt Nonce, opt Sa, opt Data) ->
-    (TxnResult);
+   transferFrom: (From, To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
    txnRecord : (Txid) -> (opt TxnRecord);
    getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
+   drc20_allowance: (Address, Spender) -> (Amount) query;
+   drc20_approvals: (Address) -> (vec Allowance) query;
+   drc20_approve: (Spender, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   drc20_balanceOf: (Address) -> (Amount) query;
+   drc20_cyclesBalanceOf: (Address) -> (nat) query;
+   drc20_cyclesReceive: (opt Address) -> (nat);
+   drc20_decimals: () -> (nat8) query;
+   drc20_executeTransfer: (Txid, ExecuteType, opt To, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   drc20_gas: () -> (Gas) query;
+   drc20_lockTransfer: (To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   drc20_lockTransferFrom: (From, To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   drc20_metadata: () -> (vec Metadata) query;
+   drc20_name: () -> (text) query;
+   drc20_subscribe: (Callback, vec MsgType, opt Sa) -> (bool);
+   drc20_subscribed: (Address) -> (opt Subscription) query;
+   drc20_symbol: () -> (text) query;
+   drc20_totalSupply: () -> (Amount) query;
+   drc20_transfer: (To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   drc20_transferFrom: (From, To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   drc20_txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
+   drc20_txnRecord : (Txid) -> (opt TxnRecord);
+   drc20_getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
  };
 service : (InitArgs) -> DRC20

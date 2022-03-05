@@ -17,6 +17,8 @@ A standard interface for Dfinity tokens. The standard complies with ERC20 interf
 
 * Gas mechanism to preventing DDos attack (Supports Cycles and tokens charge mode)
 
+* Compatibility with different token standards using the [CTSNC](https://github.com/iclighthouse/DRC_standards/tree/main/CTSNC) specification
+
 ## Features
 
 * Immutability
@@ -28,6 +30,8 @@ A standard interface for Dfinity tokens. The standard complies with ERC20 interf
 * Idempotency
 
 * Governability
+
+* Compatibility
 
 
 ## Resources

@@ -92,6 +92,7 @@ module {
       founder: ?Address;
   };
   public type Self = actor {
+    standard : shared query () -> async Text;
     allowance : shared query (Address, Spender) -> async Amount;
     approvals : shared query Address -> async [Allowance];
     approve : shared (Spender, Amount, ?Nonce, ?Sa, ?Data) -> async TxnResult;
@@ -122,7 +123,6 @@ module {
       ) -> async TxnResult;
     metadata : shared query () -> async [Metadata];
     name : shared query () -> async Text;
-    standard : shared query () -> async Text;
     subscribe : shared (Callback, [MsgType], ?Sa) -> async Bool;
     subscribed : shared query Address -> async ?Subscription;
     symbol : shared query () -> async Text;
@@ -139,5 +139,51 @@ module {
     txnQuery : shared query TxnQueryRequest -> async TxnQueryResponse;
     txnRecord : shared (Txid) -> async ?TxnRecord;
     getCoinSeconds : shared query ?Address -> async (CoinSeconds, ?CoinSeconds);
+    drc20_allowance : shared query (Address, Spender) -> async Amount;
+    drc20_approvals : shared query Address -> async [Allowance];
+    drc20_approve : shared (Spender, Amount, ?Nonce, ?Sa, ?Data) -> async TxnResult;
+    drc20_balanceOf : shared query Address -> async Amount;
+    drc20_cyclesBalanceOf : shared query Address -> async Nat;
+    drc20_cyclesReceive : shared ?Address -> async Nat;
+    drc20_decimals : shared query () -> async Nat8;
+    drc20_executeTransfer : shared (Txid, ExecuteType, ?To, ?Nonce, ?Sa, ?Data) -> async TxnResult;
+    drc20_gas : shared query () -> async Gas;
+    drc20_lockTransfer : shared (
+        To,
+        Amount,
+        Timeout,
+        ?Decider, 
+        ?Nonce,
+        ?Sa,
+        ?Data,
+      ) -> async TxnResult;
+    drc20_lockTransferFrom : shared (
+        From,
+        To,
+        Amount,
+        Timeout,
+        ?Decider, 
+        ?Nonce,
+        ?Sa,
+        ?Data,
+      ) -> async TxnResult;
+    drc20_metadata : shared query () -> async [Metadata];
+    drc20_name : shared query () -> async Text;
+    drc20_subscribe : shared (Callback, [MsgType], ?Sa) -> async Bool;
+    drc20_subscribed : shared query Address -> async ?Subscription;
+    drc20_symbol : shared query () -> async Text;
+    drc20_totalSupply : shared query () -> async Amount;
+    drc20_transfer : shared (To, Amount, ?Nonce, ?Sa, ?Data) -> async TxnResult;
+    drc20_transferFrom : shared (
+        From,
+        To,
+        Amount, 
+        ?Nonce,
+        ?Sa,
+        ?Data,
+      ) -> async TxnResult;
+    drc20_txnQuery : shared query TxnQueryRequest -> async TxnQueryResponse;
+    drc20_txnRecord : shared (Txid) -> async ?TxnRecord;
+    drc20_getCoinSeconds : shared query ?Address -> async (CoinSeconds, ?CoinSeconds);
   }
 }

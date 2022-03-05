@@ -56,6 +56,10 @@ DRC20是一个用于Dfinity代币的标准接口。该标准符合[ERC20](https:
 
     在挖矿、空投等多种使用场景下，一个账户的余额持有时间被作为一项重要的考量因素。传统token需要通过快照、锁定等方式来解决，但也造成了复杂的业务流程和安全性问题。本标准引入“币秒”（CoinSeconds）概念，是账户余额的时间加权累计值，1 CoinSeconds表示1 token持有1秒钟时间，可被用于计算日均余额、时间加权余额比例等。
 
+* 与不同Token标准的兼容性
+
+   DRC20遵循[CTSNC](https://github.com/iclighthouse/DRC_standards/tree/main/CTSNC)，在与其他标准兼容时，所有方法提供了以命名空间“drc20_”前缀的方法别名。
+
 **更多问题：**
 
 * 不变性和去中心化
@@ -76,8 +80,6 @@ DRC20是一个用于Dfinity代币的标准接口。该标准符合[ERC20](https:
 ## 规范
 
 ## Token
-
-DRC20 Token Contract.
 
 ### Types
 
@@ -178,6 +180,7 @@ type Allowance = record { remaining: nat; spender: AccountId; };
 type Address = text;
 type AccountId = blob;
 type DRC20 = service {
+   standard: () -> (text) query;
    allowance: (Address, Spender) -> (Amount) query;
    approvals: (Address) -> (vec Allowance) query;
    approve: (Spender, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
@@ -191,7 +194,6 @@ type DRC20 = service {
    lockTransferFrom: (From, To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    metadata: () -> (vec Metadata) query;
    name: () -> (text) query;
-   standard: () -> (text) query;
    subscribe: (Callback, vec MsgType, opt Sa) -> (bool);
    subscribed: (Address) -> (opt Subscription) query;
    symbol: () -> (text) query;
@@ -201,6 +203,28 @@ type DRC20 = service {
    txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
    txnRecord : (Txid) -> (opt TxnRecord);
    getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
+   drc20_allowance: (Address, Spender) -> (Amount) query;
+   drc20_approvals: (Address) -> (vec Allowance) query;
+   drc20_approve: (Spender, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   drc20_balanceOf: (Address) -> (Amount) query;
+   drc20_cyclesBalanceOf: (Address) -> (nat) query;
+   drc20_cyclesReceive: (opt Address) -> (nat);
+   drc20_decimals: () -> (nat8) query;
+   drc20_executeTransfer: (Txid, ExecuteType, opt To, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   drc20_gas: () -> (Gas) query;
+   drc20_lockTransfer: (To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   drc20_lockTransferFrom: (From, To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   drc20_metadata: () -> (vec Metadata) query;
+   drc20_name: () -> (text) query;
+   drc20_subscribe: (Callback, vec MsgType, opt Sa) -> (bool);
+   drc20_subscribed: (Address) -> (opt Subscription) query;
+   drc20_symbol: () -> (text) query;
+   drc20_totalSupply: () -> (Amount) query;
+   drc20_transfer: (To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   drc20_transferFrom: (From, To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   drc20_txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
+   drc20_txnRecord : (Txid) -> (opt TxnRecord);
+   drc20_getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
  };
 service : (InitArgs) -> DRC20
 ```
@@ -212,10 +236,11 @@ service : (InitArgs) -> DRC20
  - 可选参数`_nonce`用于指定交易的nonce。每个AccountId的nonce值从0开始，并在每个特定交易成功时增加1。如果调用者指定了一个错误的nonce值，交易将被拒绝。特定交易包括：approve(), transfer(), transferFrom(), lockTransfer(), lockTransferFrom(), executeTransfer()。
  - 可选参数`_sa`是调用者的子账户，它是一个32字节的nat8数组。如果`_sa`的长度小于32字节，它将以[0]作为前缀来补足。
  - 可选参数`_data`是调用者提供的自定义数据，可用于calldata, memo等。`_data`的长度应小于65536字节（建议使用candid的编码格式，如4字节的方法名哈希+参数数据）。
+ - 为了具有更好的兼容性，建议使用"drc20_"前缀的方法名。
  
 #### standard
 
-返回标准名称。例如：`"DRC20 1.0"`。  
+返回标准名称，小写字母，如果兼容多个标准以“; ”分割。例如：`"drc20"`。  
 OPTIONAL - 这个方法可以用来提高可用性，但值可能不存在。
 ``` candid
 standard: () -> (text) query;
@@ -226,57 +251,67 @@ standard: () -> (text) query;
 OPTIONAL - 这个方法可以用来提高可用性，但值可能不存在。
 ``` candid
 name: () -> (text) query;
+drc20_name: () -> (text) query;
 ```
 #### symbol
 返回代币的符号。例如：`"ICL"`。  
 OPTIONAL - 这个方法可以用来提高可用性，但值可能不存在。
 ``` candid
 symbol: () -> (text) query;
+drc20_symbol: () -> (text) query;
 ```
 #### decimals
 返回代币使用的小数的位数。例如：`8`，意味着实际代币金额是用代币数量除以`100000000`。 
 ``` candid
 decimals: () -> (nat8) query;
+drc20_decimals: () -> (nat8) query;
 ```
 #### metadata
 返回代币的扩展元数据信息，它是Metadata类型。 E.g. `'vec {record { name: "logo"; content: "data:img/jpg;base64,iVBOR....";}; }'`.    
 OPTIONAL - 这个方法可以用来提高可用性，但值可能不存在。
 ``` candid
 metadata: () -> (vec Metadata) query;
+drc20_metadata: () -> (vec Metadata) query;
 ```
 #### cyclesReceive
 以`_account`名义向token canister发送/捐赠cycles，并返回该账户的cycles余额。如果参数`_account`为空，则意味着捐赠。  
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 ``` candid
 cyclesReceive: (_account: opt Address) -> (balance: nat);
+drc20_cyclesReceive: (_account: opt Address) -> (balance: nat);
 ```
 #### cyclesBalanceOf
 返回给定账户`_owner`的cycles余额。 如果Token采用cycles作为gas支付方式，该方法可以方便用户查询其cycles余额。  
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 ``` candid
 cyclesBalanceOf: (_owner: Address) -> (balance: nat) query;
+drc20_cyclesBalanceOf: (_owner: Address) -> (balance: nat) query;
 ```
 #### gas
 返回代币的交易费设置值。例如：`"variant { token=10000000 }"`。   
 *注意* 支持 "cycles"，"token"作为gas的支付方式。如果选择`token`作为gas，将从账户的余额中收取（而不是从转账的`_value`中收取）。transferFrom、lockTransferFrom从账户`_from`扣除gas，executeTransfer不收取gas，其他update方法都是从账户`caller`扣除gas。
 ``` candid
 gas: () -> (Gas) query;
+drc20_gas: () -> (Gas) query;
 ```
 #### totalSupply
 返回总的代币供应量。
 ``` candid
 totalSupply: () -> (nat) query;
+drc20_totalSupply: () -> (nat) query;
 ```
 #### balanceOf
 返回给定账户`_owner`的账户余额，不包括处于交易锁定状态的余额。
 ``` candid
 balanceOf: (_owner: Address) -> (balance: nat) query;
+drc20_balanceOf: (_owner: Address) -> (balance: nat) query;
 ```
 #### getCoinSeconds
 返回总币秒和给定账户`_owner`的币秒。币秒（CoinSeconds）是账户余额的时间加权累积值。CoinSeconds = Σ（balance_i * period_i）。  
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。 
 ``` candid
 getCoinSeconds: (opt Address) -> (totalCoinSeconds: CoinSeconds, accountCoinSeconds: opt CoinSeconds) query;
+drc20_getCoinSeconds: (opt Address) -> (totalCoinSeconds: CoinSeconds, accountCoinSeconds: opt CoinSeconds) query;
 ```
 #### transfer
 将`_value`数量的代币从调用者的账户转移到`_to`账户，返回`TxnResult`类型。  
@@ -284,6 +319,7 @@ getCoinSeconds: (opt Address) -> (totalCoinSeconds: CoinSeconds, accountCoinSeco
 *注意* 0值的转移须被视为正常转移。允许账户向自己转账。
 ``` candid
 transfer: (_to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
+drc20_transfer: (_to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### transferFrom
 从账户`_from`向账户`_to`转移`value`数量的代币，返回类型`TxnResult`。  
@@ -291,22 +327,26 @@ transfer: (_to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data:
 *注意* 0值的转账必须被视为正常转账。`_from`账户向自己转账是被允许的。
 ``` candid
 transferFrom: (_from:Address, _to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
+drc20_transferFrom: (_from:Address, _to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### lockTransfer
 锁定一个交易，指定一个可以决定该交易最终是否执行的`_decider`，并设置一个过期时间`_timeout`秒，过期后锁定的交易将被解锁。参数_timeout不应该大于64,000,000秒(约740天)。   
 创建一个两阶段交易结构可以提高原子性。这个过程是，（1）所有者锁定交易；（2）决定者执行交易或过期后所有者回退交易。
 ``` candid
 lockTransfer: (_to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
+drc20_lockTransfer: (_to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### lockTransferFrom
 `spender`锁定一个交易。
 ``` candid
 lockTransferFrom: (_from: Address, _to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
+drc20_lockTransferFrom: (_from: Address, _to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### executeTransfer
 `decider`执行被锁定的交易`_txid`，或者`owner`在锁过期后回退被锁定的交易。如果锁定交易的接收者`_to`是decider自己，decider可以指定一个新的接收者`_to`。
 ``` candid
 executeTransfer: (_txid: Txid, _executeType: ExecuteType, _to: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
+drc20_executeTransfer: (_txid: Txid, _executeType: ExecuteType, _to: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### txnQuery
 查询交易计数，以及查询缓存在Token Canister里的最近交易记录。  
@@ -326,18 +366,21 @@ txnQuery: (_request: TxnQueryRequest) -> (response: TxnQueryResponse) query;
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 ``` candid
 txnRecord : (Txid) -> (opt TxnRecord);
+drc20_txnRecord : (Txid) -> (opt TxnRecord);
 ```
 #### subscribe
 订阅token的消息，输入回调函数`_callback`和消息类型`_msgTypes`作为参数。消息类型有：`onTransfer`, `onLock`, `onExecute`, 和`onApprove`。订阅者只能接收与他们自己有关的消息（如订阅者是交易的_from, _to, _spender, 或_decider）。  
 订阅者应该是一个Canister，要求其在代码中实现回调函数。
 ``` candid
 subscribe: (_callback: Callback, _msgTypes: vec MsgType, _sa: opt vec nat8) -> bool;
+drc20_subscribe: (_callback: Callback, _msgTypes: vec MsgType, _sa: opt vec nat8) -> bool;
 ```
 #### subscribed
 返回订阅者`_owner`的订阅状态。   
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 ``` candid
 subscribed: (_owner: Address) -> (result: opt Subscription) query;
+drc20_subscribed: (_owner: Address) -> (result: opt Subscription) query;
 ```
 #### approve
 允许`_spender`从你的账户中多次转移代币，最多到`_value`的金额。  
@@ -345,17 +388,20 @@ subscribed: (_owner: Address) -> (result: opt Subscription) query;
 **注意**。当你执行`approve()`授权给spender，可能会引起安全问题，你可以执行`approve(_spender, 0, ...)`来取消授权。
 ``` candid
 approve: (_spender: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
+drc20_approve: (_spender: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### allowance
 返回仍然允许`_spender`可以从`_owner`转账的金额。 
 ``` candid
 allowance: (_owner: Address, _spender: Address) -> (remaining: nat) query;
+drc20_allowance: (_owner: Address, _spender: Address) -> (remaining: nat) query;
 ```
 #### approvals
 返回`_owner`的所有非零金额的对外授权（approval）。   
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 ``` candid
 approvals: (_owner: Address) -> (allowances: vec Allowance) query;
+drc20_approvals: (_owner: Address) -> (allowances: vec Allowance) query;
 ```
 ### 订阅者回调函数实现
 #### tokenCallback (customizable)
@@ -368,7 +414,8 @@ type Callback = func (txn: TxnRecord) -> ();
 ## DRC20例子实现
 注：不同的团队正在编写不同的实施方案。
 #### Example implementations
-- [ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse/)
+- [ICLighthouse DRC20](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse/)
+- [DIP20 Added DRC20 Extension](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/dip20-drc20)  
 
 ## 参考
 - [EIP-20 Token Standard](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md)
