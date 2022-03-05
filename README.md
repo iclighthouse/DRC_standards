@@ -1,10 +1,15 @@
 
 # DRC_standards
 Dfinity Request for Comments
+
+## Compatibility Token Standard Namespace Convention
+2022-3-2: Drafted.
+Specification: https://github.com/iclighthouse/DRC_standards/tree/main/CTSNC
  
 ## DRC20: Fungible Token Standard 
 2021-11-13: Drafted standard.  
 2021-11-23: Implemented the example with motoko.  
+2022-3-2: Improved compatibility, implemented DIP20 compatible example; added upgrade function.
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse)  
 Comments: [https://github.com/iclighthouse/DRC_standards/issues/1](https://github.com/iclighthouse/DRC_standards/issues/1);  
