@@ -1,0 +1,20 @@
+{
+  "canisters": {
+    "TokenTest": {
+      "main": "./DRC20.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    }
+    
+  },
+  "networks": {
+    "ic": {
+      "providers": ["https://ic0.app"],
+      "type": "persistent"
+    },
+    "local": {
+      "bind": "0.0.0.0:8000",
+      "type": "ephemeral"
+    }
+  }
+}
