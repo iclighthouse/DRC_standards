@@ -970,8 +970,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         };
     };
     /// returns txn record. It's an query method that will try to find txn record in token canister cache.
-    public shared func drc202_txn(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
-        return await drc202.get2(Principal.fromActor(this), _txid);
+    public query func drc202_txn(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
+        return drc202.get(_txid);
     };
     /// returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in this canister.
     public shared func drc202_txn2(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){

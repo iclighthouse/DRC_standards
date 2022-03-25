@@ -70,7 +70,7 @@ module {
     drc202_canisterId : shared query () -> async Principal;
     drc202_events : shared query (_account: ?Address) -> async [TxnRecord];
     drc202_txn : shared query (_txid: Txid) -> async (txn: ?TxnRecord);
-    drc202_txn2 : shared query (_txid: Txid) -> async (txn: ?TxnRecord);
+    drc202_txn2 : shared (_txid: Txid) -> async (txn: ?TxnRecord);
   };
   public func generateTxid(_canister: Principal, _caller: AccountId, _nonce: Nat): Txid{
     let canister: [Nat8] = Blob.toArray(Principal.toBlob(_canister));
