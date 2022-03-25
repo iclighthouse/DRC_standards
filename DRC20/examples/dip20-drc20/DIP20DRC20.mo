@@ -1,12 +1,12 @@
 /**
- * Module     : DIP20DRC20.mo
+ * Module     : DRC20.mo
  * Author     : ICLighthouse Team
  * License    : Apache License 2.0
  * Stability  : Experimental
  * Github     : https://github.com/iclighthouse/DRC_standards/
  */
 
-import HashMap "mo:base/HashMap";
+import Trie "mo:base/Trie";
 import Principal "mo:base/Principal";
 import Array "mo:base/Array";
 import Option "mo:base/Option";
@@ -26,10 +26,11 @@ import Hex "./lib/Hex";
 import Binary "./lib/Binary";
 import SHA224 "./lib/SHA224";
 import DRC202 "./lib/DRC202";
+import ICPubSub "./lib/ICPubSub";
 import DIP20 "./lib/DIP20";
 
 //record { totalSupply=1000000000000; decimals=8; gas=variant{token=10}; name=opt "TokenTest"; symbol=opt "TTT"; metadata=null; founder=null;} 
-shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
+shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     /*
     * Types 
     */
@@ -63,12 +64,7 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
     /*
     * Config 
     */
-    private stable var MAX_CACHE_TIME: Int = 3 * 30 * 24 * 3600 * 1000000000; // 3 months
-    private stable var MAX_CACHE_NUMBER_PER: Nat = 100; 
-    private stable var FEE_TO: AccountId = AID.blackhole();  
-    private stable var STORAGE_CANISTER: Text = /* test */"iq2ev-rqaaa-aaaak-aagba-cai"; // /* main */"y5a36-liaaa-aaaak-aacqa-cai";
-    private stable var MAX_PUBLICATION_TRIES: Nat = 2; 
-    private stable var MAX_STORAGE_TRIES: Nat = 2; 
+    private stable var FEE_TO: AccountId = AID.blackhole(); 
 
     /* 
     * State Variables 
@@ -82,30 +78,15 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
     private stable var totalCoinSeconds: CoinSeconds = {coinSeconds = 0; updateTime = Time.now()};
     private stable var gas_: Gas = initArgs.gas;
     private stable var metadata_: [Metadata] = Option.get(initArgs.metadata, []);
-    private var txnRecords = HashMap.HashMap<Txid, TxnRecord>(1, Blob.equal, Blob.hash);
-    private stable var globalTxns = Deque.empty<(Txid, Time.Time)>();
-    private stable var globalLastTxns = Deque.empty<Txid>();
     private stable var index: Nat = 0;
-    private var balances = HashMap.HashMap<AccountId, Nat>(1, Blob.equal, Blob.hash);
-    private var coinSeconds = HashMap.HashMap<AccountId, CoinSeconds>(1, Blob.equal, Blob.hash);
-    private var nonces = HashMap.HashMap<AccountId, Nat>(1, Blob.equal, Blob.hash);
-    private var lastTxns_ = HashMap.HashMap<AccountId, Deque.Deque<Txid>>(1, Blob.equal, Blob.hash); //from to caller
-    private var lockedTxns_ = HashMap.HashMap<AccountId, [Txid]>(1, Blob.equal, Blob.hash); //from
-    private var allowances = HashMap.HashMap<AccountId, HashMap.HashMap<AccountId, Nat>>(1, Blob.equal, Blob.hash);
-    private var subscriptions = HashMap.HashMap<AccountId, Subscription>(1, Blob.equal, Blob.hash);
-    private var cyclesBalances = HashMap.HashMap<AccountId, Nat>(1, Blob.equal, Blob.hash);
-    private stable var storeRecords = List.nil<(Txid, Nat)>();
-    private stable var publishMessages = List.nil<(AccountId, MsgType, Txid, Nat)>();
-    // only for upgrade
-    private stable var txnRecordsEntries : [(Txid, TxnRecord)] = [];
-    private stable var balancesEntries : [(AccountId, Nat)] = [];
-    private stable var coinSecondsEntries : [(AccountId, CoinSeconds)] = [];
-    private stable var noncesEntries : [(AccountId, Nat)] = [];
-    private stable var lastTxns_Entries : [(AccountId, Deque.Deque<Txid>)] = [];
-    private stable var lockedTxns_Entries : [(AccountId, [Txid])] = [];
-    private stable var allowancesEntries : [(AccountId, [(AccountId, Nat)])] = [];
-    private stable var subscriptionsEntries : [(AccountId, Subscription)] = [];
-    private stable var cyclesBalancesEntries : [(AccountId, Nat)] = [];
+    private stable var balances: Trie.Trie<AccountId, Nat> = Trie.empty();
+    private stable var coinSeconds: Trie.Trie<AccountId, CoinSeconds> = Trie.empty();
+    private stable var nonces: Trie.Trie<AccountId, Nat> = Trie.empty();
+    private stable var allowances: Trie.Trie2D<AccountId, AccountId, Nat> = Trie.empty(); 
+    private stable var cyclesBalances: Trie.Trie<AccountId, Nat> = Trie.empty();
+    // Set EN_DEBUG=false in the production environment.
+    private var drc202 = DRC202.DRC202({EN_DEBUG = true; MAX_CACHE_TIME = 3 * 30 * 24 * 3600 * 1000000000; MAX_CACHE_NUMBER_PER = 100; MAX_STORAGE_TRIES = 2; }, "dip20; drc20");
+    private var pubsub = ICPubSub.ICPubSub<MsgType>({ MAX_PUBLICATION_TRIES = 2 }, func (t1:MsgType, t2:MsgType): Bool{ t1 == t2 });
     
     /* 
     * Local Functions
@@ -113,49 +94,7 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
     // private func _onlyOwner(_caller: Principal) : Bool { 
     //     return _caller == owner;
     // };  // assert(_onlyOwner(msg.caller));
-    private func _getTxnRecord(_txid: Txid): ?TxnRecord{
-        return txnRecords.get(_txid);
-    };
-    private func _insertTxnRecord(_txn: TxnRecord): (){
-        var txid = _txn.txid;
-        txnRecords.put(txid, _txn);
-        _pushGlobalTxns(txid);
-    };
-    private func _deleteTxnRecord(_txid: Txid, _isDeep: Bool): (){
-        switch(txnRecords.get(_txid)){
-            case(?(record)){ //Existence record
-                var caller = record.caller;
-                var from = record.transaction.from;
-                var to = record.transaction.to;
-                var timestamp = record.timestamp;
-                if (not(_inLockedTxns(_txid, from))){ //Not in from's LockedTxns
-                    if (Time.now() - timestamp > MAX_CACHE_TIME){ //Expired
-                        _cleanLastTxns(caller);
-                        _cleanLastTxns(from);
-                        _cleanLastTxns(to);
-                        switch(record.transaction.operation){
-                            case(#lockTransfer(v)){ _cleanLastTxns(v.decider); };
-                            case(_){};
-                        };
-                        txnRecords.delete(_txid);
-                    } else if (_isDeep and not(_inLastTxns(_txid, caller)) and 
-                        not(_inLastTxns(_txid, from)) and not(_inLastTxns(_txid, to))) {
-                        switch(record.transaction.operation){
-                            case(#lockTransfer(v)){ 
-                                if (not(_inLastTxns(_txid, v.decider))){
-                                    txnRecords.delete(_txid);
-                                };
-                            };
-                            case(_){
-                                txnRecords.delete(_txid);
-                            };
-                        };
-                    };
-                };
-            };
-            case(_){};
-        };
-    };
+    private func keyb(t: Blob) : Trie.Key<Blob> { return { key = t; hash = Blob.hash(t) }; };
     private func _getAccountId(_address: Address): AccountId{
         switch (AID.accountHexToAccountBlob(_address)){
             case(?(a)){
@@ -171,14 +110,14 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
     private func _getAccountIdFromPrincipal(_p: Principal, _sa: ?[Nat8]): AccountId{
         var a = AID.principalToAccountBlob(_p, _sa);
         return a;
-    }; // AccountIdToPrincipal: accountMaps.get(_a)
+    }; 
     private stable let founder_: AccountId = _getAccountId(Option.get(initArgs.founder, Principal.toText(installMsg.caller)));
-    private func _getTxid(_caller: AccountId): Txid{
+    private func _getTxid(_caller: AccountId): Txid{ 
         var _nonce: Nat = _getNonce(_caller);
-        return DRC202.generateTxid(Principal.fromActor(this), _caller, _nonce);
+        return drc202.generateTxid(Principal.fromActor(this), _caller, _nonce);
     };
     private func _getBalance(_a: AccountId): Nat{
-        switch(balances.get(_a)){
+        switch(Trie.get(balances, keyb(_a), Blob.equal)){
             case(?(balance)){
                 return balance;
             };
@@ -191,13 +130,13 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
         let originalValue = _getBalance(_a);
         // CoinSeconds
         let now = Time.now();
-        let coinSecondsItem = Option.get(coinSeconds.get(_a), {coinSeconds = 0; updateTime = now });
+        let coinSecondsItem = Option.get(Trie.get(coinSeconds, keyb(_a), Blob.equal), {coinSeconds = 0; updateTime = now });
         let newCoinSeconds = coinSecondsItem.coinSeconds + originalValue * (Int.abs(now - coinSecondsItem.updateTime) / 1000000000);
-        coinSeconds.put(_a, {coinSeconds = newCoinSeconds; updateTime = now});
+        coinSeconds := Trie.put(coinSeconds, keyb(_a), Blob.equal, {coinSeconds = newCoinSeconds; updateTime = now}).0;
         if(_v == 0){
-            balances.delete(_a);
+            balances := Trie.remove(balances, keyb(_a), Blob.equal).0;
         } else {
-            balances.put(_a, _v);
+            balances := Trie.put(balances, keyb(_a), Blob.equal, _v).0;
             switch (gas_){
                 case(#token(fee)){
                     if (_v < fee/2){
@@ -209,7 +148,7 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
         };
     };
     private func _getNonce(_a: AccountId): Nat{
-        switch(nonces.get(_a)){
+        switch(Trie.get(nonces, keyb(_a), Blob.equal)){
             case(?(nonce)){
                 return nonce;
             };
@@ -220,218 +159,13 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
     };
     private func _addNonce(_a: AccountId): (){
         var n = _getNonce(_a);
-        nonces.put(_a, n+1);
+        nonces := Trie.put(nonces, keyb(_a), Blob.equal, n+1).0;
         index += 1;
     };
-    private func _pushGlobalTxns(_txid: Txid): (){
-        // push new txid.
-        globalTxns := Deque.pushFront(globalTxns, (_txid, Time.now()));
-        globalLastTxns := Deque.pushFront(globalLastTxns, _txid);
-        var size = List.size(globalLastTxns.0) + List.size(globalLastTxns.1);
-        while (size > MAX_CACHE_NUMBER_PER){
-            size -= 1;
-            switch (Deque.popBack(globalLastTxns)){
-                case(?(q, v)){
-                    globalLastTxns := q;
-                };
-                case(_){};
-            };
-        };
-        // pop expired txids, and delete their records.
-        switch(Deque.peekBack(globalTxns)){
-            case (?(txid, ts)){
-                var timestamp: Time.Time = ts;
-                while (Time.now() - timestamp > MAX_CACHE_TIME){
-                    switch (Deque.popBack(globalTxns)){
-                        case(?(q, v)){
-                            globalTxns := q;
-                            _deleteTxnRecord(v.0, false); // delete the record.
-                        };
-                        case(_){};
-                    };
-                    switch(Deque.peekBack(globalTxns)){
-                        case(?(txid_,ts_)){
-                            timestamp := ts_;
-                        };
-                        case(_){
-                            timestamp := Time.now();
-                        };
-                    };
-                };
-            };
-            case(_){};
-        };
-    };
-    private func _getGlobalLastTxns(): [Txid]{
-        var l = List.append(globalLastTxns.0, List.reverse(globalLastTxns.1));
-        return List.toArray(l);
-    };
-    private func _inLastTxns(_txid: Txid, _a: AccountId): Bool{
-        switch(lastTxns_.get(_a)){
-            case(?(txidsQ)){
-                var l = List.append(txidsQ.0, List.reverse(txidsQ.1));
-                return List.some(l, func (v: Txid): Bool { v == _txid });
-            };
-            case(_){
-                return false;
-            };
-        };
-    };
-    private func _getLastTxns(_a: AccountId): [Txid]{
-        switch(lastTxns_.get(_a)){
-            case(?(txidsQ)){
-                var l = List.append(txidsQ.0, List.reverse(txidsQ.1));
-                return List.toArray(l);
-            };
-            case(_){
-                return [];
-            };
-        };
-    };
-    private func _cleanLastTxns(_a: AccountId): (){
-        switch(lastTxns_.get(_a)){
-            case(?(q)){  
-                var txids: Deque.Deque<Txid> = q;
-                var size = List.size(txids.0) + List.size(txids.1);
-                while (size > MAX_CACHE_NUMBER_PER){
-                    size -= 1;
-                    switch (Deque.popBack(txids)){
-                        case(?(q, v)){
-                            txids := q;
-                        };
-                        case(_){};
-                    };
-                };
-                switch(Deque.peekBack(txids)){
-                    case (?(txid)){
-                        let txn_ = _getTxnRecord(txid);
-                        switch(txn_){
-                            case(?(txn)){
-                                var timestamp = txn.timestamp;
-                                while (Time.now() - timestamp > MAX_CACHE_TIME and size > 0){
-                                    switch (Deque.popBack(txids)){
-                                        case(?(q, v)){
-                                            txids := q;
-					                        size -= 1;
-                                        };
-                                        case(_){};
-                                    };
-                                    switch(Deque.peekBack(txids)){
-                                        case(?(txid)){
-                                            let txn_ = _getTxnRecord(txid);
-                                            switch(txn_){
-                                                case(?(txn)){ timestamp := txn.timestamp; };
-                                                case(_){};
-                                            };
-                                        };
-                                        case(_){ timestamp := Time.now(); };
-                                    };
-                                };
-                            };
-                            case(_){
-                                switch (Deque.popBack(txids)){
-                                    case(?(q, v)){
-                                        txids := q;
-                                        size -= 1;
-                                    };
-                                    case(_){};
-                                };
-                            };
-                        };
-                    };
-                    case(_){};
-                };
-                if (size == 0){
-                    lastTxns_.delete(_a);
-                }else{
-                    lastTxns_.put(_a, txids);
-                };
-            };
-            case(_){};
-        };
-    };
-    private func _pushLastTxn(_as: [AccountId], _txid: Txid): (){
-        let len = _as.size();
-        if (len == 0){ return (); };
-        for (i in Iter.range(0, Nat.sub(len,1))){
-            var count: Nat = 0;
-            for (j in Iter.range(i, Nat.sub(len,1))){
-                if (Blob.equal(_as[i], _as[j])){ count += 1; };
-            };
-            if (count == 1){
-                switch(lastTxns_.get(_as[i])){
-                    case(?(q)){
-                        var txids: Deque.Deque<Txid> = q;
-                        txids := Deque.pushFront(txids, _txid);
-                        lastTxns_.put(_as[i], txids);
-                        _cleanLastTxns(_as[i]);
-                    };
-                    case(_){
-                        var new = Deque.empty<Txid>();
-                        new := Deque.pushFront(new, _txid);
-                        lastTxns_.put(_as[i], new);
-                    };
-                };
-            };
-        };
-    };
-    private func _inLockedTxns(_txid: Txid, _a: AccountId): Bool{
-        switch(lockedTxns_.get(_a)){
-            case(?(txids)){
-                switch (Array.find(txids, func (v: Txid): Bool { v == _txid })){
-                    case(?(v)){
-                        return true;
-                    };
-                    case(_){
-                        return false;
-                    };
-                };
-            };
-            case(_){
-                return false;
-            };
-        };
-    };
-    private func _getLockedTxns(_a: AccountId): [Txid]{
-        switch(lockedTxns_.get(_a)){
-            case(?(txids)){
-                return txids;
-            };
-            case(_){
-                return [];
-            };
-        };
-    };
-    private func _appendLockedTxn(_a: AccountId, _txid: Txid): (){
-        switch(lockedTxns_.get(_a)){
-            case(?(arr)){
-                var txids: [Txid] = arr;
-                txids := Array.append([_txid], txids);
-                lockedTxns_.put(_a, txids);
-            };
-            case(_){
-                lockedTxns_.put(_a, [_txid]);
-            };
-        };
-    };
-    private func _dropLockedTxn(_a: AccountId, _txid: Txid): (){
-        switch(lockedTxns_.get(_a)){
-            case(?(arr)){
-                var txids: [Txid] = arr;
-                txids := Array.filter(txids, func (t: Txid): Bool { t != _txid });
-                if (txids.size() == 0){
-                    lockedTxns_.delete(_a);
-                };
-                lockedTxns_.put(_a, txids);
-                _deleteTxnRecord(_txid, true);
-            };
-            case(_){};
-        };
-    };
     private func _getAllowances(_a: AccountId): [Allowance]{
-        switch(allowances.get(_a)){
-            case(?(allowHashMap)){
-                var a = Iter.map(allowHashMap.entries(), func (entry: (AccountId, Nat)): Allowance{
+        switch(Trie.get(allowances, keyb(_a), Blob.equal)){ 
+            case(?(allowTrie)){
+                var a = Iter.map(Trie.iter(allowTrie), func (entry: (AccountId, Nat)): Allowance{
                     return { spender = entry.0; remaining = entry.1; };
                 });
                 return Iter.toArray(a);
@@ -442,9 +176,9 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
         };
     };
     private func _getAllowance(_a: AccountId, _s: AccountId): Nat{
-        switch(allowances.get(_a)){
-            case(?(hm)){
-                switch(hm.get(_s)){
+        switch(Trie.get(allowances, keyb(_a), Blob.equal)){
+            case(?(allowTrie)){
+                switch(Trie.get(allowTrie, keyb(_s), Blob.equal)){
                     case(?(v)){
                         return v;
                     };
@@ -459,118 +193,32 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
         };
     };
     private func _setAllowance(_a: AccountId, _s: AccountId, _v: Nat): (){
-        switch(allowances.get(_a)){
-            case(?(hm)){
-                if (_v > 0){
-                    hm.put(_s, _v);
-                } else {
-                    hm.delete(_s);
-                };
-                //allowances.put(_a, hm);
-                if (hm.size() == 0){
-                    allowances.delete(_a);
-                };
-            };
-            case(_){
-                if (_v > 0){
-                    var new = HashMap.HashMap<AccountId, Nat>(1, Blob.equal, Blob.hash);
-                    new.put(_s, _v);
-                    allowances.put(_a, new);
-                };
-            };
+        if (_v > 0){
+            allowances := Trie.put2D(allowances, keyb(_a), Blob.equal, keyb(_s), Blob.equal, _v);
+        }else{
+            allowances := Trie.remove2D(allowances, keyb(_a), Blob.equal, keyb(_s), Blob.equal).0;
         };
-    };
-    private func _getSubscription(_a: AccountId): ?Subscription{
-        return subscriptions.get(_a);
-    };
-    private func _getSubCallback(_a: AccountId, _mt: MsgType): ?Callback{
-        switch(subscriptions.get(_a)){
-            case(?(sub)){
-                var msgTypes = sub.msgTypes;
-                var found = Array.find(msgTypes, func (mt: MsgType): Bool { mt == _mt });
-                switch(found){
-                    case(?(v)){ return ?sub.callback; };
-                    case(_){ return null; };
-                };
-            };
-            case(_){
-                return null;
-            };
-        };
-    };
-    private func _setSubscription(_a: AccountId, _sub: Subscription): (){
-        if (_sub.msgTypes.size() == 0){
-            subscriptions.delete(_a);
-        } else{
-            subscriptions.put(_a, _sub);
-        };
-    };
-    // pushMessages
-    private func _pushMessages(_subs: [AccountId], _msgType: MsgType, _txid: Txid) : (){
-        let len = _subs.size();
-        if (len == 0){ return (); };
-        for (i in Iter.range(0, Nat.sub(len,1))){
-            var count: Nat = 0;
-            for (j in Iter.range(i, Nat.sub(len,1))){
-                if (Blob.equal(_subs[i], _subs[j])){ count += 1; };
-            };
-            if (count == 1){
-                publishMessages := List.push((_subs[i], _msgType, _txid, 0), publishMessages);
-            };
-        };
-    };
-    // publish
-    private func _publish() : async (){
-        var _publishMessages = List.nil<(AccountId, MsgType, Txid, Nat)>();
-        var item = List.pop(publishMessages);
-        while (Option.isSome(item.0)){
-            publishMessages := item.1;
-            switch(item.0){
-                case(?(account, msgType, txid, callCount)){
-                    switch(_getSubCallback(account, msgType)){
-                        case(?(callback)){
-                            if (callCount < MAX_PUBLICATION_TRIES){
-                                switch(_getTxnRecord(txid)){
-                                    case(?(txn)){
-                                        try{
-                                            await callback(txn);
-                                        } catch(e){ //push
-                                            _publishMessages := List.push((account, msgType, txid, callCount+1), _publishMessages);
-                                        };
-                                    };
-                                    case(_){};
-                                };
-                            };
-                        };
-                        case(_){};
-                    };
-                };
-                case(_){};
-            };
-            item := List.pop(publishMessages);
-        };
-        publishMessages := _publishMessages;
     };
     private func _getCyclesBalances(_a: AccountId) : Nat{
-        switch(cyclesBalances.get(_a)){
+        switch(Trie.get(cyclesBalances, keyb(_a), Blob.equal)){
             case(?(balance)){ return balance; };
             case(_){ return 0; };
         };
     };
     private func _setCyclesBalances(_a: AccountId, _v: Nat) : (){
         if(_v == 0){
-            cyclesBalances.delete(_a);
+            cyclesBalances := Trie.remove(cyclesBalances, keyb(_a), Blob.equal).0;
         } else {
             switch (gas_){
                 case(#cycles(fee)){
                     if (_v < fee/2){
-                        cyclesBalances.delete(_a);
+                        cyclesBalances := Trie.remove(cyclesBalances, keyb(_a), Blob.equal).0;
                     } else{
-                        cyclesBalances.put(_a, _v);
+                        cyclesBalances := Trie.put(cyclesBalances, keyb(_a), Blob.equal, _v).0;
                     };
                 };
                 case(_){
-                    cyclesBalances.put(_a, _v);
+                    cyclesBalances := Trie.put(cyclesBalances, keyb(_a), Blob.equal, _v).0;
                 };
             }
         };
@@ -719,6 +367,7 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
         let from = _from;
         let to = _to;
         let value = _value; 
+        var gas = gas_;
         var allowed: Nat = 0; // *
         var spendValue = _value; // *
         if (_isAllowance){
@@ -730,6 +379,32 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
         };
         if (Option.isSome(_nonce) and _getNonce(caller) != Option.get(_nonce,0)){
             return #err({ code=#NonceError; message="Wrong nonce! The nonce value should be "#Nat.toText(_getNonce(caller)); });
+        };
+        switch(_operation){
+            case(#transfer(operation)){
+                switch(operation.action){
+                    case(#mint){ gas := #noFee;};
+                    case(_){};
+                };
+            };
+            case(#executeTransfer(operation)){ gas := #noFee; };
+            case(_){};
+        };
+        var txn: TxnRecord = {
+            txid = txid;
+            msgCaller = null; // If you want to maintain anonymity, you can hide the principal of the caller
+            caller = caller;
+            timestamp = Time.now();
+            index = index;
+            nonce = _getNonce(caller);
+            gas = gas_;
+            transaction = {
+                from = from;
+                to = to;
+                value = value; 
+                operation = _operation;
+                data = _data;
+            };
         };
         // check and operate
         switch(_operation){
@@ -747,15 +422,15 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
                             _setAllowance(from, caller, allowed - spendValue);
                             as := Array.append(as, [caller]);
                         };
-                        _pushLastTxn(as, txid); 
-                        _pushMessages(as, #onTransfer, txid);
+                        drc202.pushLastTxn(as, txid); 
+                        pubsub.put(as, #onTransfer, txn);
                     };
                     case(#mint){
                         ignore _mint(to, value);
                         var as: [AccountId] = [to];
-                        _pushLastTxn(as, txid); 
+                        drc202.pushLastTxn(as, txid); 
                         as := Array.append(as, [caller]);
-                        _pushMessages(as, #onTransfer, txid);
+                        pubsub.put(as, #onTransfer, txn);
                     };
                     case(#burn){
                         if (not(_burn(from, value, true))){
@@ -769,8 +444,8 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
                             _setAllowance(from, caller, allowed - spendValue);
                             as := Array.append(as, [caller]);
                         };
-                        _pushLastTxn(as, txid); 
-                        _pushMessages(as, #onTransfer, txid);
+                        drc202.pushLastTxn(as, txid); 
+                        pubsub.put(as, #onTransfer, txn);
                     };
                 };
             };
@@ -787,83 +462,301 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
                     _setAllowance(from, caller, allowed - spendValue);
                     as := Array.append(as, [caller]);
                 };
-                _pushLastTxn(as, txid);
-                _pushMessages(as, #onLock, txid);
-                _appendLockedTxn(from, txid);
+                drc202.pushLastTxn(as, txid);
+                pubsub.put(as, #onLock, txn);
+                drc202.appendLockedTxn(from, txid);
             };
             case(#executeTransfer(operation)){
                 spendValue := 0;
                 ignore _execute(from, to, value, operation.fallback);
                 var as: [AccountId] = [from, to, caller];
-                _pushLastTxn(as, txid);
-                _pushMessages(as, #onExecute, txid);
-                _dropLockedTxn(from, operation.lockedTxid);
+                drc202.pushLastTxn(as, txid);
+                pubsub.put(as, #onExecute, txn);
+                drc202.dropLockedTxn(from, operation.lockedTxid);
             };
             case(#approve(operation)){
                 spendValue := 0;
                 _setAllowance(from, to, operation.allowance); 
                 var as: [AccountId] = [from, to];
-                _pushLastTxn(as, txid);
-                _pushMessages(as, #onApprove, txid);
+                drc202.pushLastTxn(as, txid);
+                pubsub.put(as, #onApprove, txn);
                 //callerPrincipal := Principal.fromText("2vxsx-fae");  // [4] Anonymous principal
             };
         };
-        
         // insert record
-        var txn: TxnRecord = {
-            txid = txid;
-            msgCaller = null; // If you want to maintain anonymity, you can hide the principal of the caller
-            caller = caller;
-            timestamp = Time.now();
-            index = index;
-            nonce = _getNonce(caller);
-            gas = gas_;
-            transaction = {
-                from = from;
-                to = to;
-                value = value; 
-                operation = _operation;
-                data = _data;
-            };
-        };
-        _insertTxnRecord(txn); 
+        drc202.put(txn); 
         // update nonce
         _addNonce(caller); 
-        // push storeRecords
-        storeRecords := List.push((txid, 0), storeRecords);
         return #ok(txid);
     };
-    // records storage (DRC202 Standard)
-    private func _drc202Store() : async (){
-        let drc202: DRC202.Self = actor(STORAGE_CANISTER);
-        var _storeRecords = List.nil<(Txid, Nat)>();
-        let storageFee = await drc202.fee();
-        var item = List.pop(storeRecords);
-        while (Option.isSome(item.0)){
-            storeRecords := item.1;
-            switch(item.0){
-                case(?(txid, callCount)){
-                    if (callCount < MAX_STORAGE_TRIES){
-                        switch(_getTxnRecord(txid)){
-                            case(?(txn)){
-                                try{
-                                    Cycles.add(storageFee);
-                                    await drc202.store(txn);
-                                } catch(e){ //push
-                                    _storeRecords := List.push((txid, callCount+1), _storeRecords);
+
+    //--------------
+    private func __cyclesReceive(__caller: Principal, _account: ?Address) : (balance: Nat){
+        let amount = Cycles.available(); 
+        assert(amount >= 100000000);
+        let accepted = Cycles.accept(amount); 
+        var account = FEE_TO; //_getAccountIdFromPrincipal(Principal.fromActor(this));
+        switch(_account){
+            case(?(a)){
+                account := _getAccountId(a);
+            };
+            case(_){};
+        };
+        let balance = _getCyclesBalances(account);
+        _setCyclesBalances(account, balance + accepted);
+        return balance + accepted;
+    };
+    private func __getCoinSeconds(_owner: ?Address) : (totalCoinSeconds: CoinSeconds, accountCoinSeconds: ?CoinSeconds){
+        let now = Time.now();
+        let newTotalCoinSeconds = { coinSeconds = totalCoinSeconds.coinSeconds + totalSupply_ * (Int.abs(now - totalCoinSeconds.updateTime) / 1000000000); updateTime = now; };
+        switch(_owner){
+            case(?(owner)){ 
+                let account = _getAccountId(owner);
+                switch(Trie.get(coinSeconds, keyb(account), Blob.equal)){
+                    case(?(coinSecondsItem)){
+                        let newAccountCoinSeconds = { coinSeconds = coinSecondsItem.coinSeconds + _getBalance(account) * (Int.abs(now - coinSecondsItem.updateTime) / 1000000000); updateTime = now; };
+                        return (newTotalCoinSeconds, ?newAccountCoinSeconds);
+                    };
+                    case(_){ return (newTotalCoinSeconds, null); };
+                };
+            };
+            case(_){ return (newTotalCoinSeconds, null); };
+        };
+    };
+    private func __transferFrom(__caller: Principal, _from: AccountId, _to: AccountId, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data, _isSpender: Bool) : 
+    async (result: TxnResult) {
+        let from = _from;
+        let to = _to;
+        let operation: Operation = #transfer({ action = #send; });
+        // check fee
+        if(not(_checkFee(from, 100, _value))){
+            return #err({ code=#InsufficientBalance; message="Insufficient Balance"; });
+        };
+        // transfer
+        let res = _transfer(__caller, _sa, from, to, _value, _nonce, _data, operation, _isSpender);
+        // publish
+        let pub = pubsub.pub();
+        // records storage (DRC202 Standard)
+        let store = drc202.store();
+        // charge fee
+        switch(res){
+            case(#ok(v)){ ignore _chargeFee(from, 100); return res; };
+            case(#err(v)){ return res; };
+        };
+    };
+    private func __lockTransferFrom(__caller: Principal, _from: AccountId, _to: AccountId, _value: Amount, 
+    _timeout: Timeout, _decider: ?Decider, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data, _isSpender: Bool) : async (result: TxnResult) {
+        if (_timeout > 64000000){
+            return #err({ code=#UndefinedError; message="Parameter _timeout should not be greater than 64,000,000 seconds."; });
+        };
+        var decider: AccountId = _getAccountIdFromPrincipal(__caller, _sa);
+        switch(_decider){
+            case(?(v)){ decider := _getAccountId(v); };
+            case(_){};
+        };
+        let operation: Operation = #lockTransfer({ 
+            locked = _value;  // be locked for the amount
+            expiration = Time.now() + Int32.toInt(Int32.fromNat32(_timeout)) * 1000000000;  
+            decider = decider;
+        });
+        let from = _from;
+        let to = _to;
+        // check fee
+        if(not(_checkFee(from, 100, _value))){
+            return #err({ code=#InsufficientBalance; message="Insufficient Balance"; });
+        };
+        // transfer
+        let res = _transfer(__caller, _sa, from, to, 0, _nonce, _data, operation, _isSpender);
+        // publish
+        let pub = pubsub.pub();
+        // records storage (DRC202 Standard)
+        let store = drc202.store();
+        // charge fee
+        switch(res){
+            case(#ok(v)){ ignore _chargeFee(from, 100); return res; };
+            case(#err(v)){ return res; };
+        };
+    };
+    private func __executeTransfer(__caller: Principal, _txid: Txid, _executeType: ExecuteType, _to: ?To, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
+        let txid = _txid;
+        let caller = _getAccountIdFromPrincipal(__caller, _sa);
+        // check fee
+        // if(not(_checkFee(caller, 100, 0))){
+        //     return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
+        // };
+        switch(drc202.get(txid)){
+            case(?(txn)){
+                let from = txn.transaction.from;
+                var to = txn.transaction.to;
+                switch(txn.transaction.operation){
+                    case(#lockTransfer(v)){
+                        if (not(drc202.inLockedTxns(txid, from))){
+                            return #err({ code=#DuplicateExecutedTransfer; message="The transaction has already been executed"; });
+                        };
+                        let locked = v.locked;
+                        let expiration = v.expiration;
+                        let decider = v.decider;
+                        var fallback: Nat = 0;
+                        switch(_to){
+                            case(?(newTo)){ 
+                                if (caller == decider and decider == to){
+                                    to := _getAccountId(newTo); 
+                                } else {
+                                    return #err({ code=#UndefinedError; message="No permission to change the address `to`"; });
                                 };
                             };
                             case(_){};
                         };
+                        switch(_executeType){
+                            case(#fallback){
+                                if (not( caller == decider or (Time.now() > expiration and caller == from) )) {
+                                    return #err({ code=#UndefinedError; message="No Permission"; });
+                                };
+                                fallback := locked;
+                            };
+                            case(#sendAll){
+                                if (Time.now() > expiration){
+                                    return #err({ code=#LockedTransferExpired; message="Locked Transfer Expired"; });
+                                };
+                                if (caller != decider){
+                                    return #err({ code=#UndefinedError; message="No Permission"; });
+                                };
+                                fallback := 0;
+                            };
+                            case(#send(v)){
+                                if (Time.now() > expiration){
+                                    return #err({ code=#LockedTransferExpired; message="Locked Transfer Expired"; });
+                                };
+                                if (caller != decider){
+                                    return #err({ code=#UndefinedError; message="No Permission"; });
+                                };
+                                fallback := locked - v;
+                            };
+                        };
+                        var value: Nat = 0;
+                        if (locked > fallback){
+                            value := locked - fallback;
+                        };
+                        let operation: Operation = #executeTransfer({ 
+                            lockedTxid = txid;  
+                            fallback = fallback;
+                        });
+                        let res = _transfer(__caller, _sa, from, to, value, _nonce, _data, operation, false);
+                        // publish
+                        let pub = pubsub.pub();
+                        // records storage (DRC202 Standard)
+                        let store = drc202.store();
+                        // charge fee
+                        // switch(res){
+                        //     case(#ok(v)){ ignore _chargeFee(caller, 100); };
+                        //     case(#err(v)){ };
+                        // };
+                        return res;
+                    };
+                    case(_){
+                        return #err({ code=#NoLockedTransfer; message="No Locked Transfer"; });
                     };
                 };
-                case(_){};
             };
-            item := List.pop(storeRecords);
+            case(_){
+                return #err({ code=#NoLockedTransfer; message="No Locked Transfer"; });
+            };
         };
-        storeRecords := _storeRecords;
     };
-
+    private func __approve(__caller: Principal, _spender: Spender, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult){
+        let from = _getAccountIdFromPrincipal(__caller, _sa);
+        let to = _getAccountId(_spender);
+        let operation: Operation = #approve({ allowance = _value; });
+        // check fee
+        if(not(_checkFee(from, 100, 0))){
+            return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
+        };
+        // transfer
+        let res = _transfer(__caller, _sa, from, to, 0, _nonce, _data, operation, false);
+        // publish
+        let pub = pubsub.pub();
+        // records storage (DRC202 Standard)
+        let store = drc202.store();
+        // charge fee
+        switch(res){
+            case(#ok(v)){ ignore _chargeFee(from, 100); return res; };
+            case(#err(v)){ return res; };
+        };
+    };
+    private func __subscribe(__caller: Principal, _callback: Callback, _msgTypes: [MsgType], _sa: ?Sa) : Bool{
+        let caller = _getAccountIdFromPrincipal(__caller, _sa);
+        assert(_chargeFee(caller, 100));
+        let sub: Subscription = {
+            callback = _callback;
+            msgTypes = _msgTypes;
+        };
+        pubsub.sub(caller, sub);
+        return true;
+    };
+    private func __txnQuery(_request: TxnQueryRequest) : (response: TxnQueryResponse){
+        switch(_request){
+            case(#txnCountGlobal){
+                return #txnCountGlobal(index);
+            };
+            case(#txnCount(args)){
+                var account = _getAccountId(args.owner);
+                return #txnCount(_getNonce(account));
+            };
+            case(#getTxn(args)){
+                return #getTxn(drc202.get(args.txid));
+            };
+            case(#lastTxidsGlobal){
+                return #lastTxidsGlobal(drc202.getLastTxns(null));
+            };
+            case(#lastTxids(args)){
+                return #lastTxids(drc202.getLastTxns(?_getAccountId(args.owner)));
+            };
+            case(#lockedTxns(args)){
+                var txids = drc202.getLockedTxns(_getAccountId(args.owner));
+                var lockedBalance: Nat = 0;
+                var txns: [TxnRecord] = [];
+                for (txid in txids.vals()){
+                    switch(drc202.get(txid)){
+                        case(?(record)){
+                            switch(record.transaction.operation){
+                                case(#lockTransfer(v)){
+                                    lockedBalance += v.locked;
+                                };
+                                case(_){};
+                            };
+                            txns := Array.append(txns, [record]);
+                        };
+                        case(_){};
+                    };
+                };
+                return #lockedTxns({ lockedBalance = lockedBalance; txns = txns; });   
+            };
+            case(#getEvents(args)){
+                switch(args.owner) {
+                    case(null){
+                        var i: Nat = 0;
+                        return #getEvents(Array.chain(drc202.getLastTxns(null), func (value:Txid): [TxnRecord]{
+                            if (i < drc202.getConfig().MAX_CACHE_NUMBER_PER){
+                                i += 1;
+                                switch(drc202.get(value)){
+                                    case(?(r)){ return [r]; };
+                                    case(_){ return []; };
+                                };
+                            }else{ return []; };
+                        }));
+                    };
+                    case(?(address)){
+                        return #getEvents(Array.chain(drc202.getLastTxns(?_getAccountId(address)), func (value:Txid): [TxnRecord]{
+                            switch(drc202.get(value)){
+                                case(?(r)){ return [r]; };
+                                case(_){ return []; };
+                            };
+                        }));
+                    };
+                };
+            };
+        };
+    };
 
     /* 
     * Shared Functions
@@ -874,12 +767,11 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
         return standard_;
     };
 
-
     // dip20 standard (main interface).
     private func _receipt(_result: TxnResult) : DIP20.TxReceipt{
         switch(_result){
             case(#ok(txid)){
-                switch(_getTxnRecord(txid)){
+                switch(drc202.get(txid)){
                     case(?(txn)){ return #Ok(txn.index) };
                     case(_){ return #Ok(0) };
                 };
@@ -981,410 +873,127 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
             feeTo = Principal.fromText("aaaaa-aa"); // It indicates the blackhole address
             historySize = index;
             deployTime = 0; // No deployTime
-            holderNumber = balances.size();
+            holderNumber = Trie.size(balances);
             cycles = Cycles.balance();
         };
     };
 
 
-    // drc20 standard (extending compatibility interface).
-    /// Returns the name of the token.
+    // drc20 standard (Compatibility aliases).
     public query func drc20_name() : async Text{
         return name_;
     };
-    /// Returns the symbol of the token.
     public query func drc20_symbol() : async Text{
         return symbol_;
     };
-    /// Returns the number of decimals the token uses.
     public query func drc20_decimals() : async Nat8{
         return decimals_;
     };
-    /// Returns the extend metadata info of the token.
     public query func drc20_metadata() : async [Metadata]{
         return metadata_;
     };
-    /// Sends/donates cycles to the token canister in _account's name, and return cycles balance of the account/token.
-    /// If the parameter `_account` is null, it means donation.
     public shared(msg) func drc20_cyclesReceive(_account: ?Address) : async (balance: Nat){
         return __cyclesReceive(msg.caller, _account);
     };
-    private func __cyclesReceive(__caller: Principal, _account: ?Address) : (balance: Nat){
-        let amount = Cycles.available(); 
-        assert(amount >= 100000000);
-        let accepted = Cycles.accept(amount); 
-        var account = FEE_TO; //_getAccountIdFromPrincipal(Principal.fromActor(this));
-        switch(_account){
-            case(?(a)){
-                account := _getAccountId(a);
-            };
-            case(_){};
-        };
-        let balance = _getCyclesBalances(account);
-        _setCyclesBalances(account, balance + accepted);
-        return balance + accepted;
-    };
-    /// Returns the cycles balance of the given account _owner in the token.
     public query func drc20_cyclesBalanceOf(_owner: Address) : async (balance: Nat){
         return _getCyclesBalances(_getAccountId(_owner));
     };
-    /// Returns the transaction fee of the token.
     public query func drc20_gas() : async Gas{
         return gas_;
     };
-    /// Returns the total token supply.
     public query func drc20_totalSupply() : async Amount{
         return totalSupply_;
     };
-    /// Returns coinSeconds value
     public query func drc20_getCoinSeconds(_owner: ?Address) : async (totalCoinSeconds: CoinSeconds, accountCoinSeconds: ?CoinSeconds){
         return __getCoinSeconds(_owner);
     };
-    private func __getCoinSeconds(_owner: ?Address) : (totalCoinSeconds: CoinSeconds, accountCoinSeconds: ?CoinSeconds){
-        let now = Time.now();
-        let newTotalCoinSeconds = { coinSeconds = totalCoinSeconds.coinSeconds + totalSupply_ * (Int.abs(now - totalCoinSeconds.updateTime) / 1000000000); updateTime = now; };
-        switch(_owner){
-            case(?(owner)){ 
-                let account = _getAccountId(owner);
-                switch(coinSeconds.get(account)){
-                    case(?(coinSecondsItem)){
-                        let newAccountCoinSeconds = { coinSeconds = coinSecondsItem.coinSeconds + _getBalance(account) * (Int.abs(now - coinSecondsItem.updateTime) / 1000000000); updateTime = now; };
-                        return (newTotalCoinSeconds, ?newAccountCoinSeconds);
-                    };
-                    case(_){ return (newTotalCoinSeconds, null); };
-                };
-            };
-            case(_){ return (newTotalCoinSeconds, null); };
-        };
-    };
-    /// Returns the account balance of the given account _owner, not including the locked balance.
     public query func drc20_balanceOf(_owner: Address) : async (balance: Amount){
         return _getBalance(_getAccountId(_owner));
     };
-    /// Transfers _value amount of tokens from caller's account to address _to, returns type TxnResult.
     public shared(msg) func drc20_transfer(_to: To, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
         return await __transferFrom(msg.caller, _getAccountIdFromPrincipal(msg.caller, _sa), _getAccountId(_to), _value, _nonce, _sa, _data, false);
     };
-    /// Transfers _value amount of tokens from address _from to address _to, returns type TxnResult.
     public shared(msg) func drc20_transferFrom(_from: From, _to: To, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : 
     async (result: TxnResult) {
         return await __transferFrom(msg.caller, _getAccountId(_from), _getAccountId(_to), _value, _nonce, _sa, _data, true);
     };
-    private func __transferFrom(__caller: Principal, _from: AccountId, _to: AccountId, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data, _isSpender: Bool) : 
-    async (result: TxnResult) {
-        let from = _from;
-        let to = _to;
-        let operation: Operation = #transfer({ action = #send; });
-        // check fee
-        if(not(_checkFee(from, 100, _value))){
-            return #err({ code=#InsufficientBalance; message="Insufficient Balance"; });
-        };
-        // transfer
-        let res = _transfer(__caller, _sa, from, to, _value, _nonce, _data, operation, _isSpender);
-        // publish
-        let pub = _publish();
-        // records storage (DRC202 Standard)
-        let store = _drc202Store();
-        // charge fee
-        switch(res){
-            case(#ok(v)){ ignore _chargeFee(from, 100); return res; };
-            case(#err(v)){ return res; };
-        };
-    };
-    /// Locks a transaction, specifies a `_decider` who can decide the execution of this transaction, 
-    /// and sets an expiration period `_timeout` seconds after which the locked transaction will be unlocked.
-    /// The parameter _timeout should not be greater than 64,000,000 seconds.
     public shared(msg) func drc20_lockTransfer(_to: To, _value: Amount, _timeout: Timeout, 
     _decider: ?Decider, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
         return await __lockTransferFrom(msg.caller, _getAccountIdFromPrincipal(msg.caller, _sa), _getAccountId(_to), _value, _timeout, _decider, _nonce, _sa, _data, false);
     };
-    /// `spender` locks a transaction.
     public shared(msg) func drc20_lockTransferFrom(_from: From, _to: To, _value: Amount, 
     _timeout: Timeout, _decider: ?Decider, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
         return await __lockTransferFrom(msg.caller, _getAccountId(_from), _getAccountId(_to), _value, _timeout, _decider, _nonce, _sa, _data, true);
     };
-    private func __lockTransferFrom(__caller: Principal, _from: AccountId, _to: AccountId, _value: Amount, 
-    _timeout: Timeout, _decider: ?Decider, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data, _isSpender: Bool) : async (result: TxnResult) {
-        if (_timeout > 64000000){
-            return #err({ code=#UndefinedError; message="Parameter _timeout should not be greater than 64,000,000 seconds."; });
-        };
-        var decider: AccountId = _getAccountIdFromPrincipal(__caller, _sa);
-        switch(_decider){
-            case(?(v)){ decider := _getAccountId(v); };
-            case(_){};
-        };
-        let operation: Operation = #lockTransfer({ 
-            locked = _value;  // be locked for the amount
-            expiration = Time.now() + Int32.toInt(Int32.fromNat32(_timeout)) * 1000000000;  
-            decider = decider;
-        });
-        let from = _from;
-        let to = _to;
-        // check fee
-        if(not(_checkFee(from, 100, _value))){
-            return #err({ code=#InsufficientBalance; message="Insufficient Balance"; });
-        };
-        // transfer
-        let res = _transfer(__caller, _sa, from, to, 0, _nonce, _data, operation, _isSpender);
-        // publish
-        let pub = _publish();
-        // records storage (DRC202 Standard)
-        let store = _drc202Store();
-        // charge fee
-        switch(res){
-            case(#ok(v)){ ignore _chargeFee(from, 100); return res; };
-            case(#err(v)){ return res; };
-        };
-    };
-    /// The `decider` executes the locked transaction `_txid`, or the `owner` can fallback the locked transaction after the lock has expired.
-    /// If the recipient of the locked transaction `_to` is decider, the decider can specify a new recipient `_to`.
     public shared(msg) func drc20_executeTransfer(_txid: Txid, _executeType: ExecuteType, _to: ?To, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
         return await __executeTransfer(msg.caller, _txid, _executeType, _to, _nonce, _sa, _data);
     };
-    private func __executeTransfer(__caller: Principal, _txid: Txid, _executeType: ExecuteType, _to: ?To, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
-        let txid = _txid;
-        let caller = _getAccountIdFromPrincipal(__caller, _sa);
-        // check fee
-        // if(not(_checkFee(caller, 100, 0))){
-        //     return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
-        // };
-        switch(_getTxnRecord(txid)){
-            case(?(txn)){
-                let from = txn.transaction.from;
-                var to = txn.transaction.to;
-                switch(txn.transaction.operation){
-                    case(#lockTransfer(v)){
-                        if (not(_inLockedTxns(txid, from))){
-                            return #err({ code=#DuplicateExecutedTransfer; message="The transaction has already been executed"; });
-                        };
-                        let locked = v.locked;
-                        let expiration = v.expiration;
-                        let decider = v.decider;
-                        var fallback: Nat = 0;
-                        switch(_to){
-                            case(?(newTo)){ 
-                                if (caller == decider and decider == to){
-                                    to := _getAccountId(newTo); 
-                                } else {
-                                    return #err({ code=#UndefinedError; message="No permission to change the address `to`"; });
-                                };
-                            };
-                            case(_){};
-                        };
-                        switch(_executeType){
-                            case(#fallback){
-                                if (not( caller == decider or (Time.now() > expiration and caller == from) )) {
-                                    return #err({ code=#UndefinedError; message="No Permission"; });
-                                };
-                                fallback := locked;
-                            };
-                            case(#sendAll){
-                                if (Time.now() > expiration){
-                                    return #err({ code=#LockedTransferExpired; message="Locked Transfer Expired"; });
-                                };
-                                if (caller != decider){
-                                    return #err({ code=#UndefinedError; message="No Permission"; });
-                                };
-                                fallback := 0;
-                            };
-                            case(#send(v)){
-                                if (Time.now() > expiration){
-                                    return #err({ code=#LockedTransferExpired; message="Locked Transfer Expired"; });
-                                };
-                                if (caller != decider){
-                                    return #err({ code=#UndefinedError; message="No Permission"; });
-                                };
-                                fallback := locked - v;
-                            };
-                        };
-                        var value: Nat = 0;
-                        if (locked > fallback){
-                            value := locked - fallback;
-                        };
-                        let operation: Operation = #executeTransfer({ 
-                            lockedTxid = txid;  
-                            fallback = fallback;
-                        });
-                        let res = _transfer(__caller, _sa, from, to, value, _nonce, _data, operation, false);
-                        // publish
-                        let pub = _publish();
-                        // records storage (DRC202 Standard)
-                        let store = _drc202Store();
-                        // charge fee
-                        // switch(res){
-                        //     case(#ok(v)){ ignore _chargeFee(caller, 100); };
-                        //     case(#err(v)){ };
-                        // };
-                        return res;
-                    };
-                    case(_){
-                        return #err({ code=#NoLockedTransfer; message="No Locked Transfer"; });
-                    };
-                };
-            };
-            case(_){
-                return #err({ code=#NoLockedTransfer; message="No Locked Transfer"; });
-            };
-        };
-    };
-    /// Queries the transaction records information.
     public query func drc20_txnQuery(_request: TxnQueryRequest) : async (response: TxnQueryResponse){
         return __txnQuery(_request);
     };
-    private func __txnQuery(_request: TxnQueryRequest) : (response: TxnQueryResponse){
-        switch(_request){
-            case(#txnCountGlobal){
-                return #txnCountGlobal(index);
-            };
-            case(#txnCount(args)){
-                var account = _getAccountId(args.owner);
-                return #txnCount(_getNonce(account));
-            };
-            case(#getTxn(args)){
-                return #getTxn(_getTxnRecord(args.txid));
-            };
-            case(#lastTxidsGlobal){
-                return #lastTxidsGlobal(_getGlobalLastTxns());
-            };
-            case(#lastTxids(args)){
-                return #lastTxids(_getLastTxns(_getAccountId(args.owner)));
-            };
-            case(#lockedTxns(args)){
-                var txids = _getLockedTxns(_getAccountId(args.owner));
-                var lockedBalance: Nat = 0;
-                var txns: [TxnRecord] = [];
-                for (txid in txids.vals()){
-                    switch(_getTxnRecord(txid)){
-                        case(?(record)){
-                            switch(record.transaction.operation){
-                                case(#lockTransfer(v)){
-                                    lockedBalance += v.locked;
-                                };
-                                case(_){};
-                            };
-                            txns := Array.append(txns, [record]);
-                        };
-                        case(_){};
-                    };
-                };
-                return #lockedTxns({ lockedBalance = lockedBalance; txns = txns; });   
-            };
-            case(#getEvents(args)){
-                switch(args.owner) {
-                    case(null){
-                        var i: Nat = 0;
-                        return #getEvents(Array.chain(_getGlobalLastTxns(), func (value:Txid): [TxnRecord]{
-                            if (i < MAX_CACHE_NUMBER_PER){
-                                i += 1;
-                                switch(_getTxnRecord(value)){
-                                    case(?(r)){ return [r]; };
-                                    case(_){ return []; };
-                                };
-                            }else{ return []; };
-                        }));
-                    };
-                    case(?(address)){
-                        return #getEvents(Array.chain(_getLastTxns(_getAccountId(address)), func (value:Txid): [TxnRecord]{
-                            switch(_getTxnRecord(value)){
-                                case(?(r)){ return [r]; };
-                                case(_){ return []; };
-                            };
-                        }));
-                    };
-                };
-            };
-        };
-    };
-
-    /// returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in the token canister.
     public shared func drc20_txnRecord(_txid: Txid) : async ?TxnRecord{
-        return await __txnRecord(_txid);
+        return await drc202.get2(Principal.fromActor(this), _txid);
     };
-    private func __txnRecord(_txid: Txid) : async ?TxnRecord{
-        let drc202: DRC202.Self = actor(STORAGE_CANISTER);
-        var step: Nat = 0;
-        func _getTxn(_token: Principal, _txid: Txid) : async ?TxnRecord{
-            switch(await drc202.bucket(_token, _txid, step, null)){
-                case(?(bucketId)){
-                    let bucket: DRC202.Bucket = actor(Principal.toText(bucketId));
-                    switch(await bucket.txn(_token, _txid)){
-                        case(?(txn, time)){ return ?txn; };
-                        case(_){
-                            step += 1;
-                            return await _getTxn(_token, _txid);
-                        };
-                    };
-                };
-                case(_){ return null; };
-            };
-        };
-        switch(_getTxnRecord(_txid)){
-            case(?(txn)){ return ?txn; };
-            case(_){
-                return await _getTxn(Principal.fromActor(this), _txid);
-            };
-        };
-    };
-
-    /// Subscribes to the token's messages, giving the callback function and the types of messages as parameters.
     public shared(msg) func drc20_subscribe(_callback: Callback, _msgTypes: [MsgType], _sa: ?Sa) : async Bool{
         return __subscribe(msg.caller, _callback, _msgTypes, _sa);
     };
-    private func __subscribe(__caller: Principal, _callback: Callback, _msgTypes: [MsgType], _sa: ?Sa) : Bool{
-        let caller = _getAccountIdFromPrincipal(__caller, _sa);
-        assert(_chargeFee(caller, 100));
-        let sub: Subscription = {
-            callback = _callback;
-            msgTypes = _msgTypes;
-        };
-        _setSubscription(caller, sub);
-        return true;
-    };
-    /// Returns the subscription status of the subscriber `_owner`. 
     public query func drc20_subscribed(_owner: Address) : async (result: ?Subscription){
-        return _getSubscription(_getAccountId(_owner));
+        return pubsub.getSub(_getAccountId(_owner));
     };
-    /// Allows `_spender` to withdraw from your account multiple times, up to the `_value` amount.
-    /// If this function is called again it overwrites the current allowance with `_value`. 
     public shared(msg) func drc20_approve(_spender: Spender, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult){
         return await __approve(msg.caller, _spender, _value, _nonce, _sa, _data);
     };
-    private func __approve(__caller: Principal, _spender: Spender, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult){
-        let from = _getAccountIdFromPrincipal(__caller, _sa);
-        let to = _getAccountId(_spender);
-        let operation: Operation = #approve({ allowance = _value; });
-        // check fee
-        if(not(_checkFee(from, 100, 0))){
-            return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
-        };
-        // transfer
-        let res = _transfer(__caller, _sa, from, to, 0, _nonce, _data, operation, false);
-        // publish
-        let pub = _publish();
-        // records storage (DRC202 Standard)
-        let store = _drc202Store();
-        // charge fee
-        switch(res){
-            case(#ok(v)){ ignore _chargeFee(from, 100); return res; };
-            case(#err(v)){ return res; };
-        };
-    };
-    /// Returns the amount which `_spender` is still allowed to withdraw from `_owner`.
     public query func drc20_allowance(_owner: Address, _spender: Spender) : async (remaining: Amount) {
         return _getAllowance(_getAccountId(_owner), _getAccountId(_spender));
     };
-    /// Returns all your approvals with a non-zero amount.
     public query func drc20_approvals(_owner: Address) : async (allowances: [Allowance]) {
         return _getAllowances(_getAccountId(_owner));
     };
+
+    // drc202
+    public query func drc202_getConfig() : async DRC202.Setting{
+        return drc202.getConfig();
+    };
+    public query func drc202_canisterId() : async Principal{
+        return drc202.drc202CanisterId();
+    };
+    /// config
+    // public shared(msg) func drc202_config(config: DRC202.Config) : async Bool{ 
+    //     assert(msg.caller == owner);
+    //     return drc202.config(config);
+    // };
+    /// returns events
+    public query func drc202_events(_account: ?DRC202.Address) : async [DRC202.TxnRecord]{
+        switch(_account){
+            case(?(account)){ return drc202.getEvents(?_getAccountId(account)); };
+            case(_){return drc202.getEvents(null);}
+        };
+    };
+    /// returns txn record. It's an query method that will try to find txn record in token canister cache.
+    public shared func drc202_txn(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
+        return await drc202.get2(Principal.fromActor(this), _txid);
+    };
+    /// returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in this canister.
+    public shared func drc202_txn2(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
+        return await drc202.get2(Principal.fromActor(this), _txid);
+    };
+
+    // ICPubSub
+    public query func icpubsub_getConfig() : async ICPubSub.Setting{
+        return pubsub.getConfig();
+    };
+    // public shared(msg) func icpubsub_config(config: ICPubSub.Config) : async Bool{ 
+    //     assert(msg.caller == owner);
+    //     return pubsub.config(config);
+    // };
 
     /* 
     * Genesis
     */
     private stable var genesisCreated: Bool = false;
     if (not(genesisCreated)){
-        balances.put(founder_, totalSupply_);
-        coinSeconds.put(founder_, {coinSeconds = 0; updateTime = Time.now()});
+        balances := Trie.put(balances, keyb(founder_), Blob.equal, totalSupply_).0;
+        coinSeconds := Trie.put(coinSeconds, keyb(founder_), Blob.equal, {coinSeconds = 0; updateTime = Time.now()}).0;
         var txn: TxnRecord = {
             txid = Blob.fromArray([0:Nat8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]);
             msgCaller = ?installMsg.caller;
@@ -1402,61 +1011,28 @@ shared(installMsg) actor class DIP20DRC20(initArgs: Types.InitArgs) = this {
             };
         };
         index += 1;
-        nonces.put(AID.principalToAccountBlob(installMsg.caller, null), 1);
-        txnRecords.put(txn.txid, txn);
-        globalTxns := Deque.pushFront(globalTxns, (txn.txid, Time.now()));
-        globalLastTxns := Deque.pushFront(globalLastTxns, txn.txid);
-        lastTxns_.put(founder_, Deque.pushFront(Deque.empty<Txid>(), txn.txid));
+        nonces := Trie.put(nonces, keyb(AID.principalToAccountBlob(installMsg.caller, null)), Blob.equal, 1).0;
+        drc202.put(txn);
+        drc202.pushLastTxn([founder_], txn.txid);
         genesisCreated := true;
-        // push storeRecords
-        storeRecords := List.push((txn.txid, 0), storeRecords);
     };
 
-
-    /*
-    * upgrade functions
-    */
+    // upgrade
+    private stable var __drc202Data: [DRC202.DataTemp] = [];
+    private stable var __pubsubData: [ICPubSub.DataTemp<MsgType>] = [];
     system func preupgrade() {
-        txnRecordsEntries := Iter.toArray(txnRecords.entries());
-        balancesEntries := Iter.toArray(balances.entries());
-        coinSecondsEntries := Iter.toArray(coinSeconds.entries());
-        noncesEntries := Iter.toArray(nonces.entries());
-        lastTxns_Entries := Iter.toArray(lastTxns_.entries());
-        lockedTxns_Entries := Iter.toArray(lockedTxns_.entries());
-        subscriptionsEntries := Iter.toArray(subscriptions.entries());
-        cyclesBalancesEntries := Iter.toArray(cyclesBalances.entries());
-        var size : Nat = allowances.size();
-        var temp : [var (AccountId, [(AccountId, Nat)])] = Array.init<(AccountId, [(AccountId, Nat)])>(size, (Blob.fromArray([]), []));
-        size := 0;
-        for ((k, v) in allowances.entries()) {
-            temp[size] := (k, Iter.toArray(v.entries()));
-            size += 1;
-        };
-        allowancesEntries := Array.freeze(temp);
+        __drc202Data := Array.append(__drc202Data, [drc202.getData()]);
+        __pubsubData := Array.append(__pubsubData, [pubsub.getData()]);
     };
-
     system func postupgrade() {
-        txnRecords := HashMap.fromIter<Txid, TxnRecord>(txnRecordsEntries.vals(), 1, Blob.equal, Blob.hash);
-        txnRecordsEntries := [];
-        balances := HashMap.fromIter<AccountId, Nat>(balancesEntries.vals(), 1, Blob.equal, Blob.hash);
-        balancesEntries := [];
-        coinSeconds := HashMap.fromIter<AccountId, CoinSeconds>(coinSecondsEntries.vals(), 1, Blob.equal, Blob.hash);
-        coinSecondsEntries := [];
-        nonces := HashMap.fromIter<AccountId, Nat>(noncesEntries.vals(), 1, Blob.equal, Blob.hash);
-        noncesEntries := [];
-        lastTxns_ := HashMap.fromIter<AccountId, Deque.Deque<Txid>>(lastTxns_Entries.vals(), 1, Blob.equal, Blob.hash);
-        lastTxns_Entries := [];
-        lockedTxns_ := HashMap.fromIter<AccountId, [Txid]>(lockedTxns_Entries.vals(), 1, Blob.equal, Blob.hash);
-        lockedTxns_Entries := [];
-        subscriptions := HashMap.fromIter<AccountId, Subscription>(subscriptionsEntries.vals(), 1, Blob.equal, Blob.hash);
-        subscriptionsEntries := [];
-        cyclesBalances := HashMap.fromIter<AccountId, Nat>(cyclesBalancesEntries.vals(), 1, Blob.equal, Blob.hash);
-        cyclesBalancesEntries := [];
-        for ((k, v) in allowancesEntries.vals()) {
-            let allowed_temp = HashMap.fromIter<AccountId, Nat>(v.vals(), 1, Blob.equal, Blob.hash);
-            allowances.put(k, allowed_temp);
+        if (__drc202Data.size() > 0){
+            drc202.setData(__drc202Data[0]);
+            __drc202Data := [];
         };
-        allowancesEntries := [];
+        if (__pubsubData.size() > 0){
+            pubsub.setData(__pubsubData[0]);
+            __pubsubData := [];
+        };
     };
 
 };
