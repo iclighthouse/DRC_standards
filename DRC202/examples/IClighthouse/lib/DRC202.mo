@@ -40,6 +40,18 @@ module {
     caller : AccountId;
     index : Nat;
   };
+  public type Setting = {
+      EN_DEBUG: Bool;
+      MAX_CACHE_TIME: Nat;
+      MAX_CACHE_NUMBER_PER: Nat;
+      MAX_STORAGE_TRIES: Nat;
+  };
+  public type Config = {
+      EN_DEBUG: ?Bool;
+      MAX_CACHE_TIME: ?Nat;
+      MAX_CACHE_NUMBER_PER: ?Nat;
+      MAX_STORAGE_TRIES: ?Nat;
+  };
   public type Self = actor {
     version: shared query () -> async Nat8;
     fee : shared query () -> async (cycles: Nat); //cycles
@@ -50,6 +62,13 @@ module {
   public type Bucket = actor {
     txnBytes: shared query (_token: Token, _txid: Txid) -> async ?([Nat8], Time.Time);
     txn: shared query (_token: Token, _txid: Txid) -> async ?(TxnRecord, Time.Time);
+  };
+  public type Impl = actor {
+    drc202_getConfig : shared query () -> async Setting;
+    drc202_canisterId : shared query () -> async Principal;
+    drc202_events : shared query (_account: ?Address) -> async [TxnRecord];
+    drc202_txn : shared query (_txid: Txid) -> async (txn: ?TxnRecord);
+    drc202_txn2 : shared query (_txid: Txid) -> async (txn: ?TxnRecord);
   };
   public func generateTxid(_canister: Principal, _caller: AccountId, _nonce: Nat): Txid{
     let canister: [Nat8] = Blob.toArray(Principal.toBlob(_canister));

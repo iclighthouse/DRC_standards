@@ -45,11 +45,11 @@ shared(installMsg) actor class ProxyActor() = this {
     };
     
     private var version_: Nat8 = 1;
-    private var bucketCyclesInit: Nat = 200000000000;
+    private var bucketCyclesInit: Nat = 1000000000000;
     private var maxStorageTries: Nat = 3;
-    private stable var standard_: Text = "DRC202 1.0"; 
+    private var standard_: Text = "drc202"; 
+    private stable var fee_: Nat = 1000000;  //cycles
     private stable var owner: Principal = installMsg.caller;
-    private stable var fee_: Nat = 100000000;  //cycles
     private stable var maxMemory: Nat = 3900 * 1024 * 1024; //3.8GB
     private stable var bucketCount: Nat = 0;
     private stable var tokenCount: Nat = 0;
@@ -58,11 +58,13 @@ shared(installMsg) actor class ProxyActor() = this {
     private stable var lastTxns = Deque.empty<(index: Nat, token: Token, indexInToken: Nat, txid: Txid)>();
     private stable var currentBucket: [(Bucket, BucketInfo)] = [];
     private stable var buckets: [Bucket] = [];
+    private stable var lastCheckCyclesTime: Time.Time = 0;
     private var blooms = TrieMap.TrieMap<Bucket, BloomFilter>(Principal.equal, Principal.hash);
     private stable var bloomsEntries : [(Bucket, [[Nat8]])] = []; // for upgrade
     private stable var tokens: Trie.Trie<Token, TokenInfo> = Trie.empty(); 
     private stable var storeTxns = List.nil<(Token, DataType, Nat)>();
     private stable var storeErrPool = List.nil<(Token, DataType, Nat)>();
+    private stable var tokenStd: Trie.Trie<Token, Text> = Trie.empty(); 
     // TODO private stable var certifications: Trie.Trie<Token, [TokenCertification]> = Trie.empty(); 
 
     private func _onlyOwner(_caller: Principal) : Bool {
@@ -81,17 +83,33 @@ shared(installMsg) actor class ProxyActor() = this {
         bucketCount += 1;
         return bucket;
     };
+    private func _topup(_bucket: Bucket) : async (){
+        let bucketActor: DRC202Bucket.BucketActor = actor(Principal.toText(_bucket));
+        let bucketInfo: BucketInfo = await bucketActor.bucketInfo();
+        if (_bucket == currentBucket[0].0){
+            currentBucket := [(_bucket, bucketInfo)];
+        };
+        if (bucketInfo.cycles < bucketCyclesInit/2){
+            Cycles.add(bucketCyclesInit);
+            let res = await bucketActor.wallet_receive();
+        };
+    };
+    private func _monitor() : async (){
+        for (bucket in buckets.vals()){
+            let f = _topup(bucket);
+        };
+    };
     private func _getBucket() : async Bucket{
         if (currentBucket.size() > 0){
             var bucket: Bucket = currentBucket[0].0;
-            let bucketActor: DRC202Bucket.BucketActor = actor(Principal.toText(bucket));
-            let bucketInfo: BucketInfo = await bucketActor.bucketInfo();
-            currentBucket := [(bucket, bucketInfo)];
-            if (bucketInfo.cycles < bucketCyclesInit/2){
-                Cycles.add(bucketCyclesInit);
-                await bucketActor.wallet_receive();
+            if (Time.now() > lastCheckCyclesTime + 20*60*1000000000){ 
+                await _topup(bucket); 
             };
-            if (bucketInfo.memory >= maxMemory){
+            if (Time.now() > lastCheckCyclesTime + 4*3600*1000000000){ 
+                let f = _monitor();
+                lastCheckCyclesTime := Time.now();
+            };
+            if (currentBucket[0].1.memory >= maxMemory){
                 bucket := await _newBucket();
             };
             return bucket;
@@ -265,12 +283,17 @@ shared(installMsg) actor class ProxyActor() = this {
             };
         };
     };
-    public query func tokenInfo(_token: Token) : async ?TokenInfo{
-        return Trie.get(tokens, keyp(_token), Principal.equal);
+    public query func tokenInfo(_token: Token) : async (?Text, ?TokenInfo){
+        return (Trie.get(tokenStd, keyp(_token), Principal.equal),
+            Trie.get(tokens, keyp(_token), Principal.equal));
     };
     public query func getLastTxns() : async [(index: Nat, token: Token, indexInToken: Nat, txid: Txid)]{
         var l = List.append(lastTxns.0, List.reverse(lastTxns.1));
         return List.toArray(l);
+    };
+    public shared(msg) func setStd(_std: Text) : async (){
+        let token: Token = msg.caller;
+        tokenStd := Trie.put(tokenStd, keyp(token), Principal.equal, _std).0;
     };
     public shared(msg) func store(_txn: TxnRecord) : async (){
         let amout = Cycles.available();

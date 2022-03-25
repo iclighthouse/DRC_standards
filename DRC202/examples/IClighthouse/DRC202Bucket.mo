@@ -112,7 +112,7 @@ shared(installMsg) actor class BucketActor() = this {
             monitorable_by_self = true;
             monitorable_by_blackhole = { allowed = true; canister_id = ?Principal.fromText("7hdtw-jqaaa-aaaak-aaccq-cai"); };
             cycles_receivable = true;
-            timer = { enable = false; interval_seconds = null; }; 
+            timer = { enable = false; interval_seconds = null; };  
         };
     };
     /// canister_status
