@@ -491,7 +491,7 @@ private var drc202 = DRC202.DRC202({EN_DEBUG = true; MAX_CACHE_TIME = 3 * 30 * 2
 
 #### Example implementations
 
-- Storage Canister: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/IClighthouse  
+- Storage Canister: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse  
     ICTokens DRC202 (Main): y5a36-liaaa-aaaak-aacqa-cai  
     ICTokens DRC202 (Test): iq2ev-rqaaa-aaaak-aagba-cai  
     Notes: Use y5a36-liaaa-aaaak-aacqa-cai to store token records that can be queried through the ICHouse blockchain explorer (http://ic.house).
