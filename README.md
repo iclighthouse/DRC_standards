@@ -11,6 +11,8 @@ Specification: https://github.com/iclighthouse/DRC_standards/tree/main/CTSNC
 2021-11-23: Implemented the example with motoko.  
 2022-3-2: Improved compatibility, implemented DIP20 compatible example; added upgrade function.  
 2022-3-25: Refactoring example code; Using Trie instead of HashMap; Implementing DRC202. (Notes: This version is not compatible with the previous version and upgrading will result in data loss.)
+2022-8-11: Examples are compatible with [ICRC-1 standard](https://github.com/dfinity/ICRC-1).
+
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse)  
 Comments: [https://github.com/iclighthouse/DRC_standards/issues/1](https://github.com/iclighthouse/DRC_standards/issues/1);  
@@ -24,6 +26,8 @@ TODO: Standard drafting and motoko example implementation
 2022-1-3: Drafted standard.   
 2022-1-17: Implemented the example with motoko.   
 2022-3-25: Improved some features; provided Motoko module; wrote sample code; improved documentation.   
+2022-8-11: Upgrade examples.
+
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC202](https://github.com/iclighthouse/DRC_standards/tree/main/DRC202)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse)  
 Comments: [https://github.com/iclighthouse/DRC_standards/issues/4](https://github.com/iclighthouse/DRC_standards/issues/4);  
@@ -38,7 +42,13 @@ TODO: Standard drafting and motoko example implementation
 
 ## DRC205: Swap Transaction Records Storage Standard
 
-TODO: Standard drafting and motoko example implementation
+2022-3-10: Drafted standard.   
+2022-3-25: Implemented the example with motoko.  
+2022-8-11: Upgrade examples.
+
+Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC205](https://github.com/iclighthouse/DRC_standards/tree/main/DRC205)  
+Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/examples/ICLighthouse)  
+
 
 
 ## DRC207: Monitorable Canister standards
