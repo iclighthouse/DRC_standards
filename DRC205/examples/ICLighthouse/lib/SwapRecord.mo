@@ -15,8 +15,9 @@ import Option "mo:base/Option";
 import Prim "mo:⛔";
 import Principal "mo:base/Principal";
 import Text "mo:base/Text";
-import Types "DRC205";
+import Types "DRC205Types";
 import SHA224 "SHA224";
+import Buffer "mo:base/Buffer";
 
 module {
     public type Address = Types.Address;
@@ -57,6 +58,16 @@ module {
     */
 
     public let Nat64Max: Nat = 0xFFFFFFFFFFFFFFFF;  //2**64 - 1;
+    public func arrayAppend<T>(a: [T], b: [T]) : [T]{
+        let buffer = Buffer.Buffer<T>(1);
+        for (t in a.vals()){
+            buffer.add(t);
+        };
+        for (t in b.vals()){
+            buffer.add(t);
+        };
+        return buffer.toArray();
+    };
     public func slice<T>(a: [T], from: Nat, to: ?Nat): [T]{
         let len = a.size();
         if (len == 0) { return []; };
@@ -65,7 +76,7 @@ module {
         var na: [T] = [];
         var i: Nat = from;
         while ( i <= to_ ){
-            na := Array.append(na, Array.make(a[i]));
+            na := arrayAppend(na, Array.make(a[i]));
             i += 1;
         };
         return na;
@@ -80,7 +91,7 @@ module {
             value /= 10;
             decimals += 1;
         };
-        return Array.append(Binary.BigEndian.fromNat64(Nat64.fromNat(value)), [decimals]);
+        return arrayAppend(Binary.BigEndian.fromNat64(Nat64.fromNat(value)), [decimals]);
     };
     private func _amountDecode(_bytes: [Nat8]) : Nat{
         if (_bytes.size() == 0) { return 0; };
@@ -100,7 +111,7 @@ module {
     };
 
     public func generateSid(app: AppId, txid: Txid) : Blob{
-        let h224 = SHA224.sha224(Array.append(Blob.toArray(Principal.toBlob(app)), Blob.toArray(txid)));
+        let h224 = SHA224.sha224(arrayAppend(Blob.toArray(Principal.toBlob(app)), Blob.toArray(txid)));
         return Blob.fromArray(h224);
     };
 

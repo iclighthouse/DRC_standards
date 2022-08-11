@@ -7,6 +7,8 @@
 import Prim "mo:⛔";
 import Principal "mo:base/Principal";
 import Blob "mo:base/Blob";
+import Nat32 "mo:base/Nat32";
+import Nat64 "mo:base/Nat64";
 import Time "mo:base/Time";
 import Trie "mo:base/Trie";
 import Cycles "mo:base/ExperimentalCycles";
@@ -78,7 +80,7 @@ shared(installMsg) actor class BucketActor() = this {
             cycles = Cycles.balance();
             memory = Prim.rts_memory_size();
             heap = Prim.rts_heap_size();
-            stableMemory = Prim.stableMemorySize();
+            stableMemory = Nat32.fromNat(Nat64.toNat(Prim.stableMemorySize() / 1024 /1024)); //M
             count = count;
         };
     };
@@ -104,6 +106,7 @@ shared(installMsg) actor class BucketActor() = this {
         await cyclesWallet.wallet_receive();
         //Cycles.refunded();
     };
+    
     
     // DRC207 ICMonitor
     /// DRC207 support

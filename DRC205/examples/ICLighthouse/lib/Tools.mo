@@ -26,6 +26,7 @@ import Hex "./Hex";
 import Nat16 "mo:base/Nat16";
 import Nat64 "mo:base/Nat64";
 import Binary "Binary";
+import Buffer "mo:base/Buffer";
 //for test
 import Time "mo:base/Time";
 import Int "mo:base/Int";
@@ -39,6 +40,16 @@ module {
         #AnonymousId;  //04
         #NoneId;  //trap
     };
+    public func arrayAppend<T>(a: [T], b: [T]) : [T]{
+        let buffer = Buffer.Buffer<T>(1);
+        for (t in a.vals()){
+            buffer.add(t);
+        };
+        for (t in b.vals()){
+            buffer.add(t);
+        };
+        return buffer.toArray();
+    };
     public func slice<T>(a: [T], from: Nat, to: ?Nat): [T]{
         let len = a.size();
         if (len == 0) { return []; };
@@ -47,7 +58,7 @@ module {
         var na: [T] = [];
         var i: Nat = from;
         while ( i <= to_ ){
-            na := Array.append(na, Array.make(a[i]));
+            na := arrayAppend(na, Array.make(a[i]));
             i += 1;
         };
         return na;
@@ -55,8 +66,8 @@ module {
     // principalArr to principalText
     public func principalArrToText(pa: [Nat8]) : Text{
         var res: [Nat8] = [];
-        res := Array.append(res, CRC32.crc32(pa));
-        res := Array.append(res, pa);
+        res := arrayAppend(res, CRC32.crc32(pa));
+        res := arrayAppend(res, pa);
         let s = BASE32.encode(#RFC4648 {padding=false}, res);
         let lowercase_s = Text.map(s , Prim.charToLower);
         let len = lowercase_s.size();
@@ -85,7 +96,7 @@ module {
     };
     public func subAccount(pa: [Nat8], val: Nat64) : [Nat8]{
         let len = pa.size();
-        var res = Array.append([Nat8.fromNat(len)], pa);
+        var res = arrayAppend([Nat8.fromNat(len)], pa);
         let subLength = Nat.sub(31, len);
         assert(subLength >= 2);
         var suba = Array.init<Nat8>(subLength, 0);
@@ -108,7 +119,7 @@ module {
                 };
             };
         };
-        res := Array.append(res, Array.freeze(suba));
+        res := arrayAppend(res, Array.freeze(suba));
         assert(res.size() == 32);
         return res;
     };
@@ -168,12 +179,12 @@ module {
         if (Option.isSome(sa)) {
             _sa := Option.get(sa, _sa);
             while (_sa.size() < 32){
-                _sa := Array.append([0:Nat8], _sa);
+                _sa := arrayAppend([0:Nat8], _sa);
             };
         };
-        var hash : [Nat8] = SHA224.sha224(Array.append(Array.append(ads, data), _sa));
+        var hash : [Nat8] = SHA224.sha224(arrayAppend(arrayAppend(ads, data), _sa));
         var crc : [Nat8] = CRC32.crc32(hash);
-        return Array.append(crc, hash);                     
+        return arrayAppend(crc, hash);                     
     };
     // To Account Blob
     public func principalTextToAccountBlob(t : Text, sa : ?[Nat8]) : Blob {
@@ -186,14 +197,14 @@ module {
         return Blob.fromArray(principalBlobToAccount(b, sa));
     };
     // To Account Hex
-    public func principalTextToAccountHex(t : Text, sa : ?[Nat8]) : Hex.Hex {
-        return Hex.encode(principalTextToAccount(t, sa));
+    public func principalTextToAccountHex(t : Text) : Hex.Hex {
+        return Hex.encode(principalTextToAccount(t, null));
     };
-    public func principalToAccountHex(p : Principal, sa : ?[Nat8]) : Hex.Hex {
-        return Hex.encode(principalToAccount(p, sa));
+    public func principalToAccountHex(p : Principal) : Hex.Hex {
+        return Hex.encode(principalToAccount(p, null));
     };
-    public func principalBlobToAccountHex(b : Blob, sa : ?[Nat8]) : Hex.Hex {
-        return Hex.encode(principalBlobToAccount(b, sa));
+    public func principalBlobToAccountHex(b : Blob) : Hex.Hex {
+        return Hex.encode(principalBlobToAccount(b, null));
     };
     // Account Hex to Account blob
     public func accountHexToAccountBlob(h: Hex.Hex) : ?Blob {
@@ -240,32 +251,40 @@ module {
     public func blackhole(): Blob{
         var hash = Array.init<Nat8>(28, 0);
         var crc : [Nat8] = CRC32.crc32(Array.freeze(hash));
-        return Blob.fromArray(Array.append(crc, Array.freeze(hash)));   
+        return Blob.fromArray(arrayAppend(crc, Array.freeze(hash)));   
     };
-    // get DRC calldata
-    public func getDrcCalldata(_data: ?Blob): [Nat8]{
+    public func anonymous(): Principal{ // 2vxsx-fae
+        principalBlobToPrincipal(Blob.fromArray([4:Nat8]));
+    };
+    // get DRC20 calldata
+    public func getCalldata(_data: ?Blob): [Nat8]{
         var data = Blob.toArray(Option.get(_data, Blob.fromArray([])));
-        if (data.size() >= 4){
+        if (data.size() > 9){
             let protocol = slice(data, 0, ?2);
             let version: Nat8 = data[3];
             if (protocol[0] == 68 and protocol[1] == 82 and protocol[2] == 67){
-                data := slice(data, 4, null);
+                data := slice(data, 9, null);
             };
         };
         return data;
     };
-    // set DRC calldata
-    public func setDrcCalldata(_data: [Nat8]): Blob{
-        let protocol: [Nat8] = [68,82,67]; //DRC
+    // set DRC20 calldata
+    public func setCalldata(_nonce: ?Nat32, _data: [Nat8]): Blob{
+        let protocol: [Nat8] = [68,82,67];
         let version: [Nat8] = [1];
-        let data = Array.append(Array.append(protocol, version), _data);
+        var nonce: [Nat8] = [];
+        switch(_nonce){
+            case(?(n)){ nonce := arrayAppend([1:Nat8], Binary.BigEndian.fromNat32(n)); };
+            case(_){ nonce := [0,0,0,0,0]; };
+        };
+        let data = arrayAppend(arrayAppend(arrayAppend(protocol, version), nonce), _data);
         return Blob.fromArray(data);
     };
     //for test
     public func generateFromNat(n: Nat): Blob{
         var hash = SHA224.sha224(Blob.toArray(Text.encodeUtf8(Nat.toText(n)#Int.toText(Time.now()))));
         var crc : [Nat8] = CRC32.crc32(hash);
-        return Blob.fromArray(Array.append(crc, hash));   
+        return Blob.fromArray(arrayAppend(crc, hash));   
     };
 
 };

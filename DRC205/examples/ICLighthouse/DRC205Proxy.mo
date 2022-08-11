@@ -2,10 +2,10 @@
  * Module     : DRC205Proxy.mo
  * Author     : ICLighthouse Team
  * Stability  : Experimental
- * CanisterId : 6ylab-kiaaa-aaaak-aacga-cai
+ * Canister   : 6ylab-kiaaa-aaaak-aacga-cai
  * Github     : https://github.com/iclighthouse/DRC_standards/
  */
-import Prim "mo:⛔";
+
 import Principal "mo:base/Principal";
 import Array "mo:base/Array";
 import Nat32 "mo:base/Nat32";
@@ -24,9 +24,10 @@ import TrieMap "mo:base/TrieMap";
 import Cycles "mo:base/ExperimentalCycles";
 import CyclesWallet "./sys/CyclesWallet";
 import SwapRecord "./lib/SwapRecord";
-import DRC205 "./lib/DRC205";
+import DRC205 "./lib/DRC205Types";
 import DRC205Bucket "DRC205Bucket";
 import DRC207 "./lib/DRC207";
+import IC "sys/IC";
 
 shared(installMsg) actor class ProxyActor() = this {
     type Bucket = SwapRecord.Bucket;
@@ -45,10 +46,11 @@ shared(installMsg) actor class ProxyActor() = this {
     };
 
     private var version_: Nat8 = 1;
-    private var bucketCyclesInit: Nat = 200000000000;
+    private var bucketCyclesInit: Nat = 1000000000000;
     private var maxStorageTries: Nat = 3;
+    private var standard_: Text = "drc205"; 
+    private stable var fee_: Nat = 1000000;  //cycles
     private stable var owner: Principal = installMsg.caller;
-    private stable var fee_: Nat = 100000000;  //cycles
     private stable var maxMemory: Nat = 3900 * 1024 * 1024; //3.8GB
     private stable var bucketCount: Nat = 0;
     private stable var appCount: Nat = 0;
@@ -57,6 +59,7 @@ shared(installMsg) actor class ProxyActor() = this {
     private stable var lastTxns = Deque.empty<(index: Nat, app: AppId, indexInApp: Nat, txid: Txid)>();
     private stable var currentBucket: [(Bucket, BucketInfo)] = [];
     private stable var buckets: [Bucket] = [];
+    private stable var lastCheckCyclesTime: Time.Time = 0;
     private var blooms = TrieMap.TrieMap<Bucket, BloomFilter>(Principal.equal, Principal.hash);
     private stable var bloomsEntries : [(Bucket, [[Nat8]])] = []; // for upgrade
     private stable var apps: Trie.Trie<AppId, AppInfo> = Trie.empty(); 
@@ -74,23 +77,49 @@ shared(installMsg) actor class ProxyActor() = this {
         let bucketActor = await DRC205Bucket.BucketActor();
         let bucket: Bucket = Principal.fromActor(bucketActor);
         let bucketInfo: BucketInfo = await bucketActor.bucketInfo();
-        buckets := Array.append(buckets, [bucket]);
+        buckets := Tools.arrayAppend(buckets, [bucket]);
         currentBucket := [(bucket, bucketInfo)];
         blooms.put(bucket, Bloom.AutoScalingBloomFilter<Blob>(100000, 0.002, Bloom.blobHash));
         bucketCount += 1;
+        let ic: IC.Self = actor("aaaaa-aa");
+        let settings = await ic.update_settings({
+            canister_id = bucket; 
+            settings={ 
+                compute_allocation = null;
+                controllers = ?[bucket, Principal.fromText("7hdtw-jqaaa-aaaak-aaccq-cai"), Principal.fromActor(this)]; 
+                freezing_threshold = null;
+                memory_allocation = null;
+            };
+        });
         return bucket;
+    };
+    private func _topup(_bucket: Bucket) : async (){
+        let bucketActor: DRC205Bucket.BucketActor = actor(Principal.toText(_bucket));
+        let bucketInfo: BucketInfo = await bucketActor.bucketInfo();
+        if (_bucket == currentBucket[0].0){
+            currentBucket := [(_bucket, bucketInfo)];
+        };
+        if (bucketInfo.cycles < bucketCyclesInit/2){
+            Cycles.add(bucketCyclesInit);
+            let res = await bucketActor.wallet_receive();
+        };
+    };
+    private func _monitor() : async (){
+        for (bucket in buckets.vals()){
+            let f = _topup(bucket);
+        };
     };
     private func _getBucket() : async Bucket{
         if (currentBucket.size() > 0){
             var bucket: Bucket = currentBucket[0].0;
-            let bucketActor: DRC205Bucket.BucketActor = actor(Principal.toText(bucket));
-            let bucketInfo: BucketInfo = await bucketActor.bucketInfo();
-            currentBucket := [(bucket, bucketInfo)];
-            if (bucketInfo.cycles < bucketCyclesInit/2){
-                Cycles.add(bucketCyclesInit);
-                let res = /*await*/ bucketActor.wallet_receive();
+            if (Time.now() > lastCheckCyclesTime + 20*60*1000000000){ 
+                await _topup(bucket); 
             };
-            if (bucketInfo.memory >= maxMemory){
+            if (Time.now() > lastCheckCyclesTime + 4*3600*1000000000){ 
+                let f = _monitor();
+                lastCheckCyclesTime := Time.now();
+            };
+            if (currentBucket[0].1.memory >= maxMemory){
                 bucket := await _newBucket();
             };
             return bucket;
@@ -176,6 +205,7 @@ shared(installMsg) actor class ProxyActor() = this {
         var _storeTxns = List.nil<(AppId, DataType, Nat)>();
         var item = List.pop(storeTxns);
         while (Option.isSome(item.0)){
+            storeTxns := item.1;
             switch(item.0){
                 case(?(app, dataType, callCount)){
                     if (callCount < maxStorageTries){
@@ -205,7 +235,7 @@ shared(installMsg) actor class ProxyActor() = this {
                 };
                 case(_){};
             };
-            item := List.pop(item.1);
+            item := List.pop(storeTxns);
         };
         storeTxns := _storeTxns;
     };
@@ -223,11 +253,13 @@ shared(installMsg) actor class ProxyActor() = this {
         await _execStorage();
     };
 
-    public query func generateTxid(_app: Principal, _caller: AccountId, _nonce: Nat): async Txid{
+    public query func generateTxid(_app: AppId, _caller: AccountId, _nonce: Nat): async Txid{
         return DRC205.generateTxid(_app, _caller, _nonce);
     };
 
-
+    public query func standard() : async Text{
+        return standard_;
+    };
     public query func version() : async Nat8{
         return version_;
     };
@@ -273,6 +305,7 @@ shared(installMsg) actor class ProxyActor() = this {
         await _execStorage();
     };
     public shared(msg) func storeBytes(_txid: Txid, _data: [Nat8]) : async (){
+        assert(_data.size() <= 128 * 1024); // 128 KB
         let amout = Cycles.available();
         assert(amout >= fee_ or _onlyOwner(msg.caller));
         let accepted = Cycles.accept(fee_);
@@ -280,7 +313,7 @@ shared(installMsg) actor class ProxyActor() = this {
         storeTxns := List.push((_app, #Bytes({txid = _txid; data = _data;}), 0), storeTxns);
         await _execStorage();
     };
-    public query func bucket(_app: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) : async (bucket: ?Principal){
+    public query func bucket(_app: AppId, _txid: Txid, _step: Nat, _version: ?Nat8) : async (bucket: ?Principal){
         let _sid = SwapRecord.generateSid(_app, _txid);
         return _checkBloom(_sid, _step);
     };
@@ -331,10 +364,6 @@ shared(installMsg) actor class ProxyActor() = this {
         Cycles.add(value);
         await cyclesWallet.wallet_receive();
         //Cycles.refunded();
-    };
-    /// canister memory
-    public query func getMemory() : async (Nat,Nat,Nat,Nat32){
-        return (Prim.rts_memory_size(), Prim.rts_heap_size(), Prim.rts_total_allocation(),Prim.stableMemorySize());
     };
     /// canister cycles
     public query func getCycles() : async Nat{
