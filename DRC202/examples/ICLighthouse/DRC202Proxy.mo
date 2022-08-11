@@ -6,7 +6,7 @@
  * CanisterId : y5a36-liaaa-aaaak-aacqa-cai
  * Github     : https://github.com/iclighthouse/DRC_standards/
  */
-import Prim "mo:⛔";
+ 
 import Principal "mo:base/Principal";
 import Array "mo:base/Array";
 import Nat32 "mo:base/Nat32";
@@ -27,6 +27,7 @@ import CyclesWallet "./sys/CyclesWallet";
 import TokenRecord "./lib/TokenRecord";
 import DRC202Bucket "DRC202Bucket";
 import DRC207 "./lib/DRC207";
+import IC "sys/IC";
 
 shared(installMsg) actor class ProxyActor() = this {
     type Bucket = TokenRecord.Bucket;
@@ -77,10 +78,20 @@ shared(installMsg) actor class ProxyActor() = this {
         let bucketActor = await DRC202Bucket.BucketActor();
         let bucket: Bucket = Principal.fromActor(bucketActor);
         let bucketInfo: BucketInfo = await bucketActor.bucketInfo();
-        buckets := Array.append(buckets, [bucket]);
+        buckets := Tools.arrayAppend(buckets, [bucket]);
         currentBucket := [(bucket, bucketInfo)];
         blooms.put(bucket, Bloom.AutoScalingBloomFilter<Blob>(100000, 0.002, Bloom.blobHash));
         bucketCount += 1;
+        let ic: IC.Self = actor("aaaaa-aa");
+        let settings = await ic.update_settings({
+            canister_id = bucket; 
+            settings={ 
+                compute_allocation = null;
+                controllers = ?[bucket, Principal.fromText("7hdtw-jqaaa-aaaak-aaccq-cai"), Principal.fromActor(this)]; 
+                freezing_threshold = null;
+                memory_allocation = null;
+            };
+        });
         return bucket;
     };
     private func _topup(_bucket: Bucket) : async (){
@@ -195,6 +206,7 @@ shared(installMsg) actor class ProxyActor() = this {
         var _storeTxns = List.nil<(Token, DataType, Nat)>();
         var item = List.pop(storeTxns);
         while (Option.isSome(item.0)){
+            storeTxns := item.1;
             switch(item.0){
                 case(?(token, dataType, callCount)){
                     if (callCount < maxStorageTries){
@@ -224,7 +236,7 @@ shared(installMsg) actor class ProxyActor() = this {
                 };
                 case(_){};
             };
-            item := List.pop(item.1);
+            item := List.pop(storeTxns);
         };
         storeTxns := _storeTxns;
     };
@@ -246,9 +258,9 @@ shared(installMsg) actor class ProxyActor() = this {
         let canister: [Nat8] = Blob.toArray(Principal.toBlob(_token));
         let caller: [Nat8] = Blob.toArray(_caller);
         let nonce: [Nat8] = Binary.BigEndian.fromNat32(Nat32.fromNat(_nonce));
-        let txInfo = Array.append(Array.append(canister, caller), nonce);
+        let txInfo = Tools.arrayAppend(Tools.arrayAppend(canister, caller), nonce);
         let h224: [Nat8] = SHA224.sha224(txInfo);
-        return Blob.fromArray(Array.append(nonce, h224));
+        return Blob.fromArray(Tools.arrayAppend(nonce, h224));
     };
 
     public query func standard() : async Text{
@@ -363,10 +375,6 @@ shared(installMsg) actor class ProxyActor() = this {
         Cycles.add(value);
         await cyclesWallet.wallet_receive();
         //Cycles.refunded();
-    };
-    /// canister memory
-    public query func getMemory() : async (Nat,Nat,Nat,Nat32){
-        return (Prim.rts_memory_size(), Prim.rts_heap_size(), Prim.rts_total_allocation(),Prim.stableMemorySize());
     };
     /// canister cycles
     public query func getCycles() : async Nat{

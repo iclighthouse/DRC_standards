@@ -2,6 +2,7 @@ import Array "mo:base/Array";
 import Principal "mo:base/Principal";
 import Time "mo:base/Time";
 import DRC202 "lib/DRC202";
+import T "lib/DRC202Types";
 
 shared actor class Example() = this {
     // DRC202: Records Storage for Token Canister
@@ -75,7 +76,7 @@ shared actor class Example() = this {
     // upgrade
     private stable var __drc202Data: [DRC202.DataTemp] = [];
     system func preupgrade() {
-        __drc202Data := Array.append(__drc202Data, [drc202.getData()]);
+        __drc202Data := T.arrayAppend(__drc202Data, [drc202.getData()]);
     };
     system func postupgrade() {
         if (__drc202Data.size() > 0){

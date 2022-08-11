@@ -16,6 +16,7 @@ import Nat32 "mo:base/Nat32";
 import Nat8 "mo:base/Nat8";
 import Principal "mo:base/Principal";
 import SHA224 "SHA224";
+import Buffer "mo:base/Buffer";
 
 module {
 
@@ -25,6 +26,16 @@ module {
     private func nat8to32 (n : Nat8) : Nat32{ 
         Nat32.fromIntWrap(Nat8.toNat(n)); 
     };
+    public func arrayAppend<T>(a: [T], b: [T]) : [T]{
+        let buffer = Buffer.Buffer<T>(1);
+        for (t in a.vals()){
+            buffer.add(t);
+        };
+        for (t in b.vals()){
+            buffer.add(t);
+        };
+        return buffer.toArray();
+    };
     public func blobHash(b: Blob, k: Nat32) : [Hash]{
         if (k == 0){ return [] };
         var s: [Nat8] = Blob.toArray(b);
@@ -32,7 +43,7 @@ module {
         for (i in Iter.range(1, Nat32.toNat(k))){
             s := SHA224.sha224(s);
             let h = nat8to32(s[3])  | nat8to32(s[2]) << 8  | nat8to32(s[1]) << 16 | nat8to32(s[0]) << 24;
-            res := Array.append(res, [h]);
+            res := arrayAppend(res, [h]);
         };
         return res;
     };
@@ -84,7 +95,7 @@ module {
             filter.add(item);
             numItems += 1;
             if (newFilter) {
-                filters := Array.append<BloomFilter<S>>(filters, [filter]);
+                filters := arrayAppend<BloomFilter<S>>(filters, [filter]);
             };
         };
 

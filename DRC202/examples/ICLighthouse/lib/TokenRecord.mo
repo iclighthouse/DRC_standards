@@ -16,7 +16,7 @@ import Option "mo:base/Option";
 import Prim "mo:⛔";
 import Principal "mo:base/Principal";
 import Text "mo:base/Text";
-import Types "DRC202";
+import Types "DRC202Types";
 import SHA224 "SHA224";
 import Tools "Tools";
 
@@ -33,7 +33,7 @@ module {
         cycles: Nat;
         memory: Nat;
         heap: Nat;
-        stableMemory: Nat32;
+        stableMemory: Nat32; // M
         count: Nat;
     };
     public type Token = Principal;
@@ -65,7 +65,7 @@ module {
         var na: [T] = [];
         var i: Nat = from;
         while ( i <= to_ ){
-            na := Array.append(na, Array.make(a[i]));
+            na := Tools.arrayAppend(na, Array.make(a[i]));
             i += 1;
         };
         return na;
@@ -80,7 +80,7 @@ module {
             value /= 10;
             decimals += 1;
         };
-        return Array.append(Binary.BigEndian.fromNat64(Nat64.fromNat(value)), [decimals]);
+        return Tools.arrayAppend(Binary.BigEndian.fromNat64(Nat64.fromNat(value)), [decimals]);
     };
     private func _amountDecode(_bytes: [Nat8]) : Nat{
         if (_bytes.size() == 0) { return 0; };
@@ -90,96 +90,96 @@ module {
     };
 
     public func generateSid(token: Token, txid: Txid) : Blob{
-        let h224 = SHA224.sha224(Array.append(Blob.toArray(Principal.toBlob(token)), Blob.toArray(txid)));
+        let h224 = SHA224.sha224(Tools.arrayAppend(Blob.toArray(Principal.toBlob(token)), Blob.toArray(txid)));
         return Blob.fromArray(h224);
     };
     public func encode(txn: TxnRecord) : [Nat8]{
         //version: 1bytes
         var data: [Nat8] = _data;
         //txid: 32bytes
-        data := Array.append(data, Blob.toArray(txn.txid));
+        data := Tools.arrayAppend(data, Blob.toArray(txn.txid));
         //msgCaller: option 1byte + 1byte length + Up to 32bytes Content
         switch(txn.msgCaller){
             case(?(_msgCaller)){ // 1
-                data := Array.append(data, [1: Nat8]);
+                data := Tools.arrayAppend(data, [1: Nat8]);
                 //var msgCallerText = Text.replace(Principal.toText(_msgCaller), #char('-'), "");
-                //data := Array.append(data, [Nat8.fromNat(msgCallerText.size())]);
-                //data := Array.append(data, Blob.toArray(Text.encodeUtf8(msgCallerText)));
+                //data := Tools.arrayAppend(data, [Nat8.fromNat(msgCallerText.size())]);
+                //data := Tools.arrayAppend(data, Blob.toArray(Text.encodeUtf8(msgCallerText)));
                 let principal = Blob.toArray(Principal.toBlob(_msgCaller)); 
-                data := Array.append(data, [Nat8.fromNat(principal.size())]);
-                data := Array.append(data, principal);
+                data := Tools.arrayAppend(data, [Nat8.fromNat(principal.size())]);
+                data := Tools.arrayAppend(data, principal);
             };
             case(null){ // 0
-                data := Array.append(data, [0: Nat8]);
+                data := Tools.arrayAppend(data, [0: Nat8]);
             };
         };
         //caller: 32bytes
-        data := Array.append(data, Blob.toArray(txn.caller));
+        data := Tools.arrayAppend(data, Blob.toArray(txn.caller));
         //timestamp: 8bytes
-        data := Array.append(data, Binary.BigEndian.fromNat64(Nat64.fromIntWrap(txn.timestamp)));
+        data := Tools.arrayAppend(data, Binary.BigEndian.fromNat64(Nat64.fromIntWrap(txn.timestamp)));
         //index: 8bytes
-        data := Array.append(data, Binary.BigEndian.fromNat64(Nat64.fromNat(txn.index)));
+        data := Tools.arrayAppend(data, Binary.BigEndian.fromNat64(Nat64.fromNat(txn.index)));
         //nonce: 4bytes
-        data := Array.append(data, Binary.BigEndian.fromNat32(Nat32.fromNat(txn.nonce)));
+        data := Tools.arrayAppend(data, Binary.BigEndian.fromNat32(Nat32.fromNat(txn.nonce)));
         //gas: option 1byte  + value[amount 9bytes | 0byte]
         switch(txn.gas){
             case(#noFee){
-                data := Array.append(data, [0: Nat8]);
+                data := Tools.arrayAppend(data, [0: Nat8]);
             };
             case(#cycles(v)){
-                data := Array.append(data, [1: Nat8]);
-                data := Array.append(data, _amountEncode(v));
+                data := Tools.arrayAppend(data, [1: Nat8]);
+                data := Tools.arrayAppend(data, _amountEncode(v));
             };
             case(#token(v)){
-                data := Array.append(data, [2: Nat8]);
-                data := Array.append(data, _amountEncode(v));
+                data := Tools.arrayAppend(data, [2: Nat8]);
+                data := Tools.arrayAppend(data, _amountEncode(v));
             };
         };
         //from: 32bytes
-        data := Array.append(data, Blob.toArray(txn.transaction.from));
+        data := Tools.arrayAppend(data, Blob.toArray(txn.transaction.from));
         //to: 32bytes
-        data := Array.append(data, Blob.toArray(txn.transaction.to));
+        data := Tools.arrayAppend(data, Blob.toArray(txn.transaction.to));
         //value: amount 9bytes
-        data := Array.append(data, _amountEncode(txn.transaction.value));
+        data := Tools.arrayAppend(data, _amountEncode(txn.transaction.value));
         //operation: option 1byte
         switch(txn.transaction.operation){
             case(#transfer(v)){
-                data := Array.append(data, [0: Nat8]);
+                data := Tools.arrayAppend(data, [0: Nat8]);
                 switch(v.action){ //action: option 1byte
-                    case(#send){ data := Array.append(data, [0: Nat8]); };
-                    case(#mint){ data := Array.append(data, [1: Nat8]); };
-                    case(#burn){ data := Array.append(data, [2: Nat8]); };
+                    case(#send){ data := Tools.arrayAppend(data, [0: Nat8]); };
+                    case(#mint){ data := Tools.arrayAppend(data, [1: Nat8]); };
+                    case(#burn){ data := Tools.arrayAppend(data, [2: Nat8]); };
                 };
             };
             case(#lockTransfer(v)){
-                data := Array.append(data, [1: Nat8]);
+                data := Tools.arrayAppend(data, [1: Nat8]);
                 //locked: amount 9bytes
-                data := Array.append(data, _amountEncode(v.locked));
+                data := Tools.arrayAppend(data, _amountEncode(v.locked));
                 //expiration: 8bytes
-                data := Array.append(data, Binary.BigEndian.fromNat64(Nat64.fromIntWrap(v.expiration)));
+                data := Tools.arrayAppend(data, Binary.BigEndian.fromNat64(Nat64.fromIntWrap(v.expiration)));
                 //decider: 32bytes
-                data := Array.append(data, Blob.toArray(v.decider));
+                data := Tools.arrayAppend(data, Blob.toArray(v.decider));
             };
             case(#executeTransfer(v)){
-                data := Array.append(data, [2: Nat8]);
+                data := Tools.arrayAppend(data, [2: Nat8]);
                 //lockedTxid: 32bytes
-                data := Array.append(data, Blob.toArray(v.lockedTxid));
+                data := Tools.arrayAppend(data, Blob.toArray(v.lockedTxid));
                 //fallback: amount 9bytes
-                data := Array.append(data, _amountEncode(v.fallback));
+                data := Tools.arrayAppend(data, _amountEncode(v.fallback));
             };
             case(#approve(v)){
-                data := Array.append(data, [3: Nat8]);
+                data := Tools.arrayAppend(data, [3: Nat8]);
                 //allowance: amount 9bytes
-                data := Array.append(data, _amountEncode(v.allowance));
+                data := Tools.arrayAppend(data, _amountEncode(v.allowance));
             };
         };
         //data: 0~64K bytes
         switch(txn.transaction.data){
             case(?(v)){ 
                 if (v.size() > 64*1024){
-                    data := Array.append(data, slice<Nat8>(Blob.toArray(v), 0, ?(64*1024-1))); 
+                    data := Tools.arrayAppend(data, slice<Nat8>(Blob.toArray(v), 0, ?(64*1024-1))); 
                 }else{
-                    data := Array.append(data, Blob.toArray(v)); 
+                    data := Tools.arrayAppend(data, Blob.toArray(v)); 
                 };
             };
             case(_){};

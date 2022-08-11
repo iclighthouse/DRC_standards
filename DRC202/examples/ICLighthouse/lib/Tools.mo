@@ -26,6 +26,7 @@ import Hex "./Hex";
 import Nat16 "mo:base/Nat16";
 import Nat64 "mo:base/Nat64";
 import Binary "Binary";
+import Buffer "mo:base/Buffer";
 //for test
 import Time "mo:base/Time";
 import Int "mo:base/Int";
@@ -39,6 +40,16 @@ module {
         #AnonymousId;  //04
         #NoneId;  //trap
     };
+    public func arrayAppend<T>(a: [T], b: [T]) : [T]{
+        let buffer = Buffer.Buffer<T>(1);
+        for (t in a.vals()){
+            buffer.add(t);
+        };
+        for (t in b.vals()){
+            buffer.add(t);
+        };
+        return buffer.toArray();
+    };
     public func slice<T>(a: [T], from: Nat, to: ?Nat): [T]{
         let len = a.size();
         if (len == 0) { return []; };
@@ -47,7 +58,7 @@ module {
         var na: [T] = [];
         var i: Nat = from;
         while ( i <= to_ ){
-            na := Array.append(na, Array.make(a[i]));
+            na := arrayAppend(na, Array.make(a[i]));
             i += 1;
         };
         return na;
@@ -55,8 +66,8 @@ module {
     // principalArr to principalText
     public func principalArrToText(pa: [Nat8]) : Text{
         var res: [Nat8] = [];
-        res := Array.append(res, CRC32.crc32(pa));
-        res := Array.append(res, pa);
+        res := arrayAppend(res, CRC32.crc32(pa));
+        res := arrayAppend(res, pa);
         let s = BASE32.encode(#RFC4648 {padding=false}, res);
         let lowercase_s = Text.map(s , Prim.charToLower);
         let len = lowercase_s.size();
@@ -85,7 +96,7 @@ module {
     };
     public func subAccount(pa: [Nat8], val: Nat64) : [Nat8]{
         let len = pa.size();
-        var res = Array.append([Nat8.fromNat(len)], pa);
+        var res = arrayAppend([Nat8.fromNat(len)], pa);
         let subLength = Nat.sub(31, len);
         assert(subLength >= 2);
         var suba = Array.init<Nat8>(subLength, 0);
@@ -108,7 +119,7 @@ module {
                 };
             };
         };
-        res := Array.append(res, Array.freeze(suba));
+        res := arrayAppend(res, Array.freeze(suba));
         assert(res.size() == 32);
         return res;
     };
@@ -168,12 +179,12 @@ module {
         if (Option.isSome(sa)) {
             _sa := Option.get(sa, _sa);
             while (_sa.size() < 32){
-                _sa := Array.append([0:Nat8], _sa);
+                _sa := arrayAppend([0:Nat8], _sa);
             };
         };
-        var hash : [Nat8] = SHA224.sha224(Array.append(Array.append(ads, data), _sa));
+        var hash : [Nat8] = SHA224.sha224(arrayAppend(arrayAppend(ads, data), _sa));
         var crc : [Nat8] = CRC32.crc32(hash);
-        return Array.append(crc, hash);                     
+        return arrayAppend(crc, hash);                     
     };
     // To Account Blob
     public func principalTextToAccountBlob(t : Text, sa : ?[Nat8]) : Blob {
@@ -240,7 +251,7 @@ module {
     public func blackhole(): Blob{
         var hash = Array.init<Nat8>(28, 0);
         var crc : [Nat8] = CRC32.crc32(Array.freeze(hash));
-        return Blob.fromArray(Array.append(crc, Array.freeze(hash)));   
+        return Blob.fromArray(arrayAppend(crc, Array.freeze(hash)));   
     };
     public func anonymous(): Principal{ // 2vxsx-fae
         principalBlobToPrincipal(Blob.fromArray([4:Nat8]));
@@ -263,17 +274,17 @@ module {
         let version: [Nat8] = [1];
         var nonce: [Nat8] = [];
         switch(_nonce){
-            case(?(n)){ nonce := Array.append([1:Nat8], Binary.BigEndian.fromNat32(n)); };
+            case(?(n)){ nonce := arrayAppend([1:Nat8], Binary.BigEndian.fromNat32(n)); };
             case(_){ nonce := [0,0,0,0,0]; };
         };
-        let data = Array.append(Array.append(Array.append(protocol, version), nonce), _data);
+        let data = arrayAppend(arrayAppend(arrayAppend(protocol, version), nonce), _data);
         return Blob.fromArray(data);
     };
     //for test
     public func generateFromNat(n: Nat): Blob{
         var hash = SHA224.sha224(Blob.toArray(Text.encodeUtf8(Nat.toText(n)#Int.toText(Time.now()))));
         var crc : [Nat8] = CRC32.crc32(hash);
-        return Blob.fromArray(Array.append(crc, hash));   
+        return Blob.fromArray(arrayAppend(crc, hash));   
     };
 
 };

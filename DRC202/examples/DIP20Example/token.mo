@@ -21,6 +21,7 @@ import Text "mo:base/Text";
 import ExperimentalCycles "mo:base/ExperimentalCycles";
 import Cap "./cap/Cap";
 import Root "./cap/Root";
+import Buffer "mo:base/Buffer";
 // DRC202
 import DRC202 "lib/DRC202";
 
@@ -85,6 +86,17 @@ shared(msg) actor class Token(
         fee = 0;
         timestamp = Time.now();
         status = #succeeded;
+    };
+
+    private func arrayAppend<T>(a: [T], b: [T]) : [T]{
+        let buffer = Buffer.Buffer<T>(1);
+        for (t in a.vals()){
+            buffer.add(t);
+        };
+        for (t in b.vals()){
+            buffer.add(t);
+        };
+        return buffer.toArray();
     };
 
     // DRC202: Records Storage for Token Canister
@@ -513,7 +525,7 @@ shared(msg) actor class Token(
         };
         allowanceEntries := Array.freeze(temp);
         /// DRC202
-        __drc202Data := Array.append(__drc202Data, [drc202.getData()]);
+        __drc202Data := arrayAppend(__drc202Data, [drc202.getData()]);
     };
 
     system func postupgrade() {
