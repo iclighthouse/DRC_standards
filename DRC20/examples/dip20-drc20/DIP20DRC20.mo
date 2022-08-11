@@ -1009,7 +1009,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         ];
     };
     public query func icrc1_minting_account() : async Account{
-        return {owner = Principal.fromText(MINING_CANISTER); subaccount = null;};
+        return {owner = installMsg.caller; subaccount = null;};
     };
     public query func icrc1_name() : async Text{
         return name_;
