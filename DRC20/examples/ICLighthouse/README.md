@@ -2,6 +2,10 @@
 
 DRC20 Token Factory: http://ictokens.com  
 
+## Update:
+
+[2022-8-11] Compatible with [ICRC-1 standard](https://github.com/dfinity/ICRC-1).
+
 ## Introduction
 
 A standard interface for Dfinity tokens. The standard complies with [ERC20](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md) interface specification, and has some improvements to match IC network features.

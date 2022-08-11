@@ -54,6 +54,8 @@ module {
         var lastTxns_: Trie.Trie<AccountId, Deque.Deque<Txid>> = Trie.empty();
         var lockedTxns_: Trie.Trie<AccountId, [Txid]> = Trie.empty();
         var storeRecords = List.nil<(Txid, Nat)>(); 
+        var errCount: Nat = 0;
+        public func getErrCount() : Nat{ errCount };
 
         private func keyp(t: Principal) : Trie.Key<Principal> { return { key = t; hash = Principal.hash(t) }; };
         private func keyn(t: Nat) : Trie.Key<Nat> { return { key = t; hash = Hash.hash(t) }; };
@@ -248,9 +250,9 @@ module {
             let ads : [Nat8] = [10, 97, 99, 99, 111, 117, 110, 116, 45, 105, 100]; //b"\x0Aaccount-id"
             var _sa : [Nat8] = [0:Nat8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
             _sa := Option.get(sa, _sa);
-            var hash : [Nat8] = SHA224.sha224(Array.append(Array.append(ads, data), _sa));
+            var hash : [Nat8] = SHA224.sha224(T.arrayAppend(T.arrayAppend(ads, data), _sa));
             var crc : [Nat8] = CRC32.crc32(hash);
-            return Blob.fromArray(Array.append(crc, hash));                     
+            return Blob.fromArray(T.arrayAppend(crc, hash));                     
         };
 
         // public methods
@@ -310,7 +312,7 @@ module {
             switch(Trie.get(lockedTxns_, keyb(_a), Blob.equal)){
                 case(?(arr)){
                     var txids: [Txid] = arr;
-                    txids := Array.append([_txid], txids);
+                    txids := T.arrayAppend([_txid], txids);
                     lockedTxns_ := Trie.put(lockedTxns_, keyb(_a), Blob.equal, txids).0;
                 };
                 case(_){
@@ -434,6 +436,7 @@ module {
                                         Cycles.add(storageFee);
                                         await drc202().store(txn);
                                     } catch(e){ //push
+                                        errCount += 1;
                                         _storeRecords := List.push((txid, callCount+1), _storeRecords);
                                     };
                                 };
@@ -445,7 +448,14 @@ module {
                 };
                 item := List.pop(storeRecords);
             };
-            storeRecords := _storeRecords;
+            //storeRecords := _storeRecords;
+            _rePush(_storeRecords);
+        };
+        private func _rePush(_store: List.List<(Txid, Nat)>) : (){
+            var _storeRecords = _store;
+            List.iterate(_store, func (t: (Txid, Nat)){
+                storeRecords := List.push(t, storeRecords);
+            });
         };
 
         // for updating

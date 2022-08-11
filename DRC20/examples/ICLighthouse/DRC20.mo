@@ -6,27 +6,30 @@
  * Github     : https://github.com/iclighthouse/DRC_standards/
  */
 
-import Trie "mo:base/Trie";
-import Principal "mo:base/Principal";
+import AID "./lib/AID";
 import Array "mo:base/Array";
-import Option "mo:base/Option";
+import Binary "./lib/Binary";
 import Blob "mo:base/Blob";
-import Nat "mo:base/Nat";
-import Nat32 "mo:base/Nat32";
+import Cycles "mo:base/ExperimentalCycles";
+import DRC202 "./lib/DRC202";
+import Deque "mo:base/Deque";
+import Hex "./lib/Hex";
+import ICPubSub "./lib/ICPubSub";
 import Int "mo:base/Int";
 import Int32 "mo:base/Int32";
 import Iter "mo:base/Iter";
 import List "mo:base/List";
-import Time "mo:base/Time";
-import Deque "mo:base/Deque";
-import Cycles "mo:base/ExperimentalCycles";
-import Types "./lib/DRC20";
-import AID "./lib/AID";
-import Hex "./lib/Hex";
-import Binary "./lib/Binary";
+import Nat "mo:base/Nat";
+import Nat64 "mo:base/Nat64";
+import Nat32 "mo:base/Nat32";
+import Nat8 "mo:base/Nat8";
+import Option "mo:base/Option";
+import Principal "mo:base/Principal";
 import SHA224 "./lib/SHA224";
-import DRC202 "./lib/DRC202";
-import ICPubSub "./lib/ICPubSub";
+import Time "mo:base/Time";
+import Trie "mo:base/Trie";
+import Types "./lib/DRC20";
+import ICRC1 "./lib/ICRC1";
 
 //record { totalSupply=1000000000000; decimals=8; gas=variant{token=10}; name=opt "TokenTest"; symbol=opt "TTT"; metadata=null; founder=null;} 
 shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
@@ -68,7 +71,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     /* 
     * State Variables 
     */
-    private stable var standard_: Text = "drc20"; 
+    private stable var standard_: Text = "drc20; icrc1"; 
     //private stable var owner: Principal = installMsg.caller; 
     private stable var name_: Text = Option.get(initArgs.name, "");
     private stable var symbol_: Text = Option.get(initArgs.symbol, "");
@@ -139,7 +142,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             switch (gas_){
                 case(#token(fee)){
                     if (_v < fee/2){
-                        ignore _burn(_a, _v, false);
+                        //ignore _burn(_a, _v, false);
+                        balances := Trie.remove(balances, keyb(_a), Blob.equal).0;
                     };
                 };
                 case(_){};
@@ -419,7 +423,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                         var as: [AccountId] = [from, to];
                         if (_isAllowance and spendValue > 0){
                             _setAllowance(from, caller, allowed - spendValue);
-                            as := Array.append(as, [caller]);
+                            as := AID.arrayAppend(as, [caller]);
                         };
                         drc202.pushLastTxn(as, txid); 
                         pubsub.put(as, #onTransfer, txn);
@@ -428,7 +432,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                         ignore _mint(to, value);
                         var as: [AccountId] = [to];
                         drc202.pushLastTxn(as, txid); 
-                        as := Array.append(as, [caller]);
+                        as := AID.arrayAppend(as, [caller]);
                         pubsub.put(as, #onTransfer, txn);
                     };
                     case(#burn){
@@ -441,7 +445,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                         var as: [AccountId] = [from];
                         if (_isAllowance and spendValue > 0){
                             _setAllowance(from, caller, allowed - spendValue);
-                            as := Array.append(as, [caller]);
+                            as := AID.arrayAppend(as, [caller]);
                         };
                         drc202.pushLastTxn(as, txid); 
                         pubsub.put(as, #onTransfer, txn);
@@ -459,7 +463,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                 var as: [AccountId] = [from, to, operation.decider];
                 if (_isAllowance and spendValue > 0){
                     _setAllowance(from, caller, allowed - spendValue);
-                    as := Array.append(as, [caller]);
+                    as := AID.arrayAppend(as, [caller]);
                 };
                 drc202.pushLastTxn(as, txid);
                 pubsub.put(as, #onLock, txn);
@@ -723,7 +727,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                                 };
                                 case(_){};
                             };
-                            txns := Array.append(txns, [record]);
+                            txns := AID.arrayAppend(txns, [record]);
                         };
                         case(_){};
                     };
@@ -938,6 +942,92 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         return _getAllowances(_getAccountId(_owner));
     };
 
+    // icrc1 standard (https://github.com/dfinity/ICRC-1)
+    type Value = ICRC1.Value;
+    type Subaccount = ICRC1.Subaccount;
+    type Account = ICRC1.Account;
+    type TransferArgs = ICRC1.TransferArgs;
+    type TransferError = ICRC1.TransferError;
+    private func _icrc1_get_account(_a: Account) : Blob{
+        var sub: ?[Nat8] = null;
+        switch(_a.subaccount){
+            case(?(_sub)){ sub := ?(Blob.toArray(_sub)) };
+            case(_){};
+        };
+        return _getAccountIdFromPrincipal(_a.owner, sub);
+    };
+    private func _icrc1_getFee() : Nat{
+        switch(gas_){
+            case(#token(v)){ return v; };
+            case(_){ return 0; };  // When Cycles is used as gas, it is not represented properly.
+        };
+    };
+    private func _icrc1_receipt(_result: TxnResult, _a: AccountId) : { #Ok: Nat; #Err: TransferError; }{
+        switch(_result){
+            case(#ok(txid)){
+                switch(drc202.get(txid)){
+                    case(?(txn)){ return #Ok(txn.index) };
+                    case(_){ return #Ok(0) };
+                };
+            };
+            case(#err(err)){
+                var fee = { expected_fee: Nat = 0 };
+                switch(gas_){
+                    case(#cycles(v)){ fee := { expected_fee =  v } };
+                    case(#token(v)){ fee := { expected_fee =  v } };
+                    case(_){};
+                };
+                switch(err.code){
+                    case(#InsufficientGas) { return #Err(#BadFee(fee)) };
+                    case(#InsufficientAllowance) { return #Err(#GenericError({ error_code = 101; message = err.message })) };
+                    case(#UndefinedError) { return #Err(#GenericError({ error_code = 999; message = err.message })) };
+                    case(#InsufficientBalance) { return #Err(#InsufficientFunds({ balance = _getBalance(_a); })) };
+                    case(#NonceError) { return #Err(#GenericError({ error_code = 102; message = err.message })) };
+                    case(#NoLockedTransfer) { return #Err(#GenericError({ error_code = 103; message = err.message })) };
+                    case(#DuplicateExecutedTransfer) { return #Err(#GenericError({ error_code = 104; message = err.message })) };
+                    case(#LockedTransferExpired) { return #Err(#GenericError({ error_code = 105; message = err.message })) };
+                };
+            };
+        };
+    };
+    public query func icrc1_supported_standards() : async [{ name : Text; url : Text }]{
+        return [
+            {name = "DRC20"; url = "https://github.com/iclighthouse/DRC_standards/blob/main/DRC20/DRC20.md"},
+            {name = "ICRC-1"; url = "https://github.com/dfinity/ICRC-1"}
+        ];
+    };
+    public query func icrc1_minting_account() : async Account{
+        return {owner = Principal.fromText(MINING_CANISTER); subaccount = null;};
+    };
+    public query func icrc1_name() : async Text{
+        return name_;
+    };
+    public query func icrc1_symbol() : async Text{
+        return symbol_;
+    };
+    public query func icrc1_decimals() : async Nat8{
+        return decimals_;
+    };
+    public query func icrc1_metadata() : async [(Text, Value)]{
+        let md1: [(Text, Value)] = [("icrc1:symbol", #Text(symbol_)), ("icrc1:name", #Text(name_)), ("icrc1:decimals", #Nat(Nat8.toNat(decimals_))), ("icrc1:fee", #Nat(_icrc1_getFee()))];
+        let md2: [(Text, Value)] = Array.map<Metadata, (Text, Value)>(metadata_, func (item: Metadata) : (Text, Value) { ("icrc1:"#item.name, #Text(item.content)) });
+        return AID.arrayAppend(md1, md2);
+    };
+    public query func icrc1_total_supply() : async Nat{
+        return totalSupply_;
+    };
+    public query func icrc1_balance_of(_owner: Account) : async (balance: Nat){
+        return _getBalance(_icrc1_get_account(_owner));
+    };
+    public shared(msg) func icrc1_transfer(_args: TransferArgs) : async ({ #Ok: Nat; #Err: TransferError; }) {
+        let from = _icrc1_get_account({ owner = msg.caller; subaccount = _args.from_subaccount; });
+        let sub = ?Blob.toArray(Option.get(_args.from_subaccount, Blob.fromArray([])));
+        let to = _icrc1_get_account(_args.to);
+        let data = _args.memo;
+        let res = await __transferFrom(msg.caller, from, to, _args.amount, null, sub, data, false);
+        return _icrc1_receipt(res, from);
+    };
+
     // drc202
     public query func drc202_getConfig() : async DRC202.Setting{
         return drc202.getConfig();
@@ -1009,8 +1099,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private stable var __drc202Data: [DRC202.DataTemp] = [];
     private stable var __pubsubData: [ICPubSub.DataTemp<MsgType>] = [];
     system func preupgrade() {
-        __drc202Data := Array.append(__drc202Data, [drc202.getData()]);
-        __pubsubData := Array.append(__pubsubData, [pubsub.getData()]);
+        __drc202Data := AID.arrayAppend(__drc202Data, [drc202.getData()]);
+        __pubsubData := AID.arrayAppend(__pubsubData, [pubsub.getData()]);
     };
     system func postupgrade() {
         if (__drc202Data.size() > 0){
