@@ -185,5 +185,7 @@ module {
     drc20_txnQuery : shared query TxnQueryRequest -> async TxnQueryResponse;
     drc20_txnRecord : shared (Txid) -> async ?TxnRecord;
     drc20_getCoinSeconds : shared query ?Address -> async (CoinSeconds, ?CoinSeconds);
+    drc20_dropAccount : shared (?Sa) -> async Bool;
+    drc20_holdersCount : shared query () -> async (balances: Nat, nonces: Nat, dropedAccounts: Nat);
   }
 }

@@ -225,6 +225,8 @@ type DRC20 = service {
    drc20_txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
    drc20_txnRecord : (Txid) -> (opt TxnRecord);
    drc20_getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
+   drc20_dropAccount : (opt Sa) -> bool;
+   drc20_holdersCount : () -> (nat, nat, nat) query;
  };
 service : (InitArgs) -> DRC20
 ```
@@ -307,7 +309,8 @@ balanceOf: (_owner: Address) -> (balance: nat) query;
 drc20_balanceOf: (_owner: Address) -> (balance: nat) query;
 ```
 #### getCoinSeconds
-返回总币秒和给定账户`_owner`的币秒。币秒（CoinSeconds）是账户余额的时间加权累积值。CoinSeconds = Σ（balance_i * period_i）。  
+返回总币秒和给定账户`_owner`的币秒。币秒（CoinSeconds）是账户余额的时间加权累积值。CoinSeconds = Σ（balance_i * period_i）。   
+在存储节约模式下，该功能将被关闭而无法查询CoinSeconds。  
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。 
 ``` candid
 getCoinSeconds: (opt Address) -> (totalCoinSeconds: CoinSeconds, accountCoinSeconds: opt CoinSeconds) query;
@@ -383,8 +386,8 @@ subscribed: (_owner: Address) -> (result: opt Subscription) query;
 drc20_subscribed: (_owner: Address) -> (result: opt Subscription) query;
 ```
 #### approve
-允许`_spender`从你的账户中多次转移代币，最多到`_value`的金额。  
-如果这个函数被再次调用，它将用`_value`覆盖当前的值。   
+允许`_spender`从你的账户中多次转移代币，最多到`_value`的金额。 如果这个函数被再次调用，它将用`_value`覆盖当前的值。   
+每个账户最多可以存在50个授权（approval）记录。  
 **注意**。当你执行`approve()`授权给spender，可能会引起安全问题，你可以执行`approve(_spender, 0, ...)`来取消授权。
 ``` candid
 approve: (_spender: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
@@ -403,6 +406,30 @@ OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 approvals: (_owner: Address) -> (allowances: vec Allowance) query;
 drc20_approvals: (_owner: Address) -> (allowances: vec Allowance) query;
 ```
+#### dropAccount
+注销账户。仅在该账户余额不大于gas费的时候才可注销。   
+OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
+``` candid
+dropAccount : (opt Sa) -> bool;
+drc20_dropAccount : (opt Sa) -> bool;
+```
+#### holdersCount
+返回余额不为0的账户数量、存在交易的账户数量、已注销的账户数量。   
+OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
+``` candid
+holdersCount : () -> (balances: nat, nonces: nat, dropedAccounts: nat) query;
+drc20_holdersCount : () -> (balances: nat, nonces: nat, dropedAccounts: nat) query;
+```
+
+### 关于存储节约模式
+
+当账户数量超过指定数量（如100万个）或者canister存储空间接近存满时，Token合约将启用存储节约模式，它将实现如下操作： 
+- 减少交易记录缓存时间；
+- 关闭CoinSeconds功能，删除所有CoinSeconds记录；
+- 删除所有nonce记录，账户的nonce重新从一个新值开始（如10000000）；
+- 删除所有已注销的账户列表。
+随着Token账户数量的增加，存储节约模式可以被重复升级激活，重新执行以上操作。
+
 ### 订阅者回调函数实现
 #### tokenCallback (customizable)
 Token订阅者应该实现一个回调函数callback来处理代币发布的消息。  

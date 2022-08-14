@@ -6,6 +6,7 @@
  * Github     : https://github.com/iclighthouse/DRC_standards/
  */
 
+import Prim "mo:⛔";
 import Trie "mo:base/Trie";
 import Principal "mo:base/Principal";
 import Array "mo:base/Array";
@@ -67,6 +68,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     * Config 
     */
     private stable var FEE_TO: AccountId = AID.blackhole(); 
+    private stable var NonceStartBase: Nat = 10000000;
+    private stable var NonceMode: Nat = 0; // Nonce mode is switched on after the number of users exceeds 1 million.
+    private stable var AllowanceLimit: Nat = 50;
 
     /* 
     * State Variables 
@@ -84,12 +88,71 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private stable var balances: Trie.Trie<AccountId, Nat> = Trie.empty();
     private stable var coinSeconds: Trie.Trie<AccountId, CoinSeconds> = Trie.empty();
     private stable var nonces: Trie.Trie<AccountId, Nat> = Trie.empty();
-    private stable var allowances: Trie.Trie2D<AccountId, AccountId, Nat> = Trie.empty(); 
+    private stable var allowances: Trie.Trie2D<AccountId, AccountId, Nat> = Trie.empty(); // Limit 50 records per account
     private stable var cyclesBalances: Trie.Trie<AccountId, Nat> = Trie.empty();
     // Set EN_DEBUG=false in the production environment.
     private var drc202 = DRC202.DRC202({EN_DEBUG = true; MAX_CACHE_TIME = 3 * 30 * 24 * 3600 * 1000000000; MAX_CACHE_NUMBER_PER = 100; MAX_STORAGE_TRIES = 2; }, "dip20; drc20");
     private var pubsub = ICPubSub.ICPubSub<MsgType>({ MAX_PUBLICATION_TRIES = 2 }, func (t1:MsgType, t2:MsgType): Bool{ t1 == t2 });
     
+    /* 
+    * For storage saving mode
+    */
+    private stable var dropedAccounts: Trie.Trie<Blob, Bool> = Trie.empty(); 
+    private func _checkNonceMode(_upgrade: Bool) : (){
+        if (NonceMode == 0 and (_upgrade or Trie.size(nonces) > 1000000 or Trie.size(nonces) > 2000000 or Prim.rts_memory_size() > 3500*1000000)){
+            NonceMode := 1;
+            //Nonce0 := NonceStartBase; // Nonce values restart at NonceStartBase
+            ignore drc202.config({ // Records cache for 30 days
+                EN_DEBUG = null;
+                MAX_CACHE_TIME = ?(30 * 24 * 3600 * 1000000000);
+                MAX_CACHE_NUMBER_PER = null;
+                MAX_STORAGE_TRIES = null;
+            });
+            totalCoinSeconds := { coinSeconds = 0; updateTime = 0; };
+            coinSeconds := Trie.empty(); // Disable the CoinSeconds function
+            nonces := Trie.empty(); // Clearing nonces
+            dropedAccounts := Trie.empty();  // Clearing dropedAccounts
+        }else if (NonceMode > 0 and NonceMode < 400 and (_upgrade or Trie.size(nonces) > 5000000 * NonceMode or Trie.size(dropedAccounts) > 5000000 * NonceMode * 2)){
+            //Nonce0 := NonceStartBase * (NonceMode + 1);
+            NonceMode += 1;
+            nonces := Trie.empty();
+            dropedAccounts := Trie.empty(); 
+        };
+    };
+    private func _checkAllowanceLimit(_a: AccountId) : Bool{
+        switch(Trie.get(allowances, keyb(_a), Blob.equal)){ 
+            case(?(allowTrie)){ return Trie.size(allowTrie) < AllowanceLimit; };
+            case(_){ return true; };
+        };
+    };
+    private func _getShortAccountId(_a: AccountId) : Blob{
+        return Blob.fromArray(AID.slice(Blob.toArray(_a), 0, ?15));
+    };
+    private func _inDropedAccount(_a: AccountId) : Bool{
+        switch(Trie.get(dropedAccounts, keyb(_getShortAccountId(_a)), Blob.equal)){ 
+            case(?(bool)){ return bool; };
+            case(_){ return false; };
+        };
+    };
+    private func _dropAccount(_a: AccountId) : Bool{ // (*)
+        var minValue: Nat = 1;
+        switch (gas_){
+            case(#token(fee)){ minValue := fee; };
+            case(_){};
+        };
+        if (_getBalance(_a) > minValue){
+            return false;
+        };
+        dropedAccounts := Trie.put(dropedAccounts, keyb(_getShortAccountId(_a)), Blob.equal, true).0;
+        //balances
+        balances := Trie.remove(balances, keyb(_a), Blob.equal).0;
+        //coinSeconds
+        coinSeconds := Trie.remove(coinSeconds, keyb(_a), Blob.equal).0;
+        //nonces
+        nonces := Trie.remove(nonces, keyb(_a), Blob.equal).0;
+        return true;
+    };
+
     /* 
     * Local Functions
     */
@@ -132,9 +195,11 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let originalValue = _getBalance(_a);
         // CoinSeconds
         let now = Time.now();
-        let coinSecondsItem = Option.get(Trie.get(coinSeconds, keyb(_a), Blob.equal), {coinSeconds = 0; updateTime = now });
-        let newCoinSeconds = coinSecondsItem.coinSeconds + originalValue * (Int.abs(now - coinSecondsItem.updateTime) / 1000000000);
-        coinSeconds := Trie.put(coinSeconds, keyb(_a), Blob.equal, {coinSeconds = newCoinSeconds; updateTime = now}).0;
+        if (NonceMode == 0){
+            let coinSecondsItem = Option.get(Trie.get(coinSeconds, keyb(_a), Blob.equal), {coinSeconds = 0; updateTime = now });
+            let newCoinSeconds = coinSecondsItem.coinSeconds + originalValue * (Int.abs(now - coinSecondsItem.updateTime) / 1000000000);
+            coinSeconds := Trie.put(coinSeconds, keyb(_a), Blob.equal, {coinSeconds = newCoinSeconds; updateTime = now}).0;
+        };
         if(_v == 0){
             balances := Trie.remove(balances, keyb(_a), Blob.equal).0;
         } else {
@@ -156,7 +221,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                 return nonce;
             };
             case(_){
-                return 0;
+                return NonceStartBase * NonceMode;
             };
         };
     };
@@ -164,6 +229,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         var n = _getNonce(_a);
         nonces := Trie.put(nonces, keyb(_a), Blob.equal, n+1).0;
         index += 1;
+        if (n+1 >= Nat.sub(NonceStartBase * (NonceMode + 1), 1)){
+            _checkNonceMode(true);
+        };
     };
     private func _getAllowances(_a: AccountId): [Allowance]{
         switch(Trie.get(allowances, keyb(_a), Blob.equal)){ 
@@ -318,9 +386,11 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         var balance_to = _getBalance(_to);
         balance_to += _value;
         _setBalance(_to, balance_to);
-        totalCoinSeconds := {
-            coinSeconds = totalCoinSeconds.coinSeconds + totalSupply_ * (Int.abs(Time.now() - totalCoinSeconds.updateTime) / 1000000000); 
-            updateTime = Time.now();
+        if (NonceMode == 0){
+            totalCoinSeconds := {
+                coinSeconds = totalCoinSeconds.coinSeconds + totalSupply_ * (Int.abs(Time.now() - totalCoinSeconds.updateTime) / 1000000000); 
+                updateTime = Time.now();
+            };
         };
         totalSupply_ += _value;
         return true;
@@ -331,9 +401,11 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             if (not(_isCheck)) { 
                 balance_from -= _value;
                 _setBalance(_from, balance_from);
-                totalCoinSeconds := {
-                    coinSeconds = totalCoinSeconds.coinSeconds + totalSupply_ * (Int.abs(Time.now() - totalCoinSeconds.updateTime) / 1000000000); 
-                    updateTime = Time.now();
+                if (NonceMode == 0){
+                    totalCoinSeconds := {
+                        coinSeconds = totalCoinSeconds.coinSeconds + totalSupply_ * (Int.abs(Time.now() - totalCoinSeconds.updateTime) / 1000000000); 
+                        updateTime = Time.now();
+                    };
                 };
                 totalSupply_ -= _value;
             };
@@ -364,6 +436,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     // Do not update state variables before calling _transfer
     private func _transfer(_msgCaller: Principal, _sa: ?[Nat8], _from: AccountId, _to: AccountId, _value: Nat, _nonce: ?Nat, _data: ?Blob, 
     _operation: Operation, _isAllowance: Bool): (result: TxnResult) {
+        _checkNonceMode(false);
         var callerPrincipal = _msgCaller;
         let caller = _getAccountIdFromPrincipal(_msgCaller, _sa);
         let txid = _getTxid(caller);
@@ -377,6 +450,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             allowed := _getAllowance(from, caller);
         };
         let data = Option.get(_data, Blob.fromArray([]));
+        if (_inDropedAccount(from) or _inDropedAccount(to)){
+            return #err({ code=#UndefinedError; message="This account has been dropped"; });
+        };
         if (data.size() > 65536){
             return #err({ code=#UndefinedError; message="The length of _data must be less than 65536B"; });
         };
@@ -497,19 +573,26 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private func __cyclesReceive(__caller: Principal, _account: ?Address) : (balance: Nat){
         let amount = Cycles.available(); 
         assert(amount >= 100000000);
-        let accepted = Cycles.accept(amount); 
         var account = FEE_TO; //_getAccountIdFromPrincipal(Principal.fromActor(this));
         switch(_account){
             case(?(a)){
                 account := _getAccountId(a);
+                switch (gas_){
+                    case(#token(fee)){ assert(false); };
+                    case(_){};
+                };
             };
             case(_){};
         };
+        let accepted = Cycles.accept(amount); 
         let balance = _getCyclesBalances(account);
         _setCyclesBalances(account, balance + accepted);
         return balance + accepted;
     };
     private func __getCoinSeconds(_owner: ?Address) : (totalCoinSeconds: CoinSeconds, accountCoinSeconds: ?CoinSeconds){
+        if (NonceMode > 0){
+            return ({ coinSeconds = 0; updateTime = 0; }, null);
+        };
         let now = Time.now();
         let newTotalCoinSeconds = { coinSeconds = totalCoinSeconds.coinSeconds + totalSupply_ * (Int.abs(now - totalCoinSeconds.updateTime) / 1000000000); updateTime = now; };
         switch(_owner){
@@ -670,6 +753,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let from = _getAccountIdFromPrincipal(__caller, _sa);
         let to = _getAccountId(_spender);
         let operation: Operation = #approve({ allowance = _value; });
+        if (not(_checkAllowanceLimit(from))){
+            return #err({ code=#UndefinedError; message="The number of allowance records exceeds the limit"; });
+        };
         // check fee
         if(not(_checkFee(from, 100, 0))){
             return #err({ code=#InsufficientGas; message="Insufficient Gas"; });
@@ -952,6 +1038,12 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     public query func drc20_approvals(_owner: Address) : async (allowances: [Allowance]) {
         return _getAllowances(_getAccountId(_owner));
     };
+    public shared(msg) func drc20_dropAccount(_sa: ?Sa) : async Bool{
+        return _dropAccount(_getAccountIdFromPrincipal(msg.caller, _sa));
+    };
+    public query func drc20_holdersCount() : async (balances: Nat, nonces: Nat, dropedAccounts: Nat){
+        return (Trie.size(balances), Trie.size(nonces), Trie.size(dropedAccounts));
+    };
 
     // icrc1 standard (https://github.com/dfinity/ICRC-1)
     type Value = ICRC1.Value;
@@ -1019,6 +1111,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     };
     public query func icrc1_decimals() : async Nat8{
         return decimals_;
+    };
+    public query func icrc1_fee() : async Nat{
+        return _icrc1_getFee();
     };
     public query func icrc1_metadata() : async [(Text, Value)]{
         let md1: [(Text, Value)] = [("icrc1:symbol", #Text(symbol_)), ("icrc1:name", #Text(name_)), ("icrc1:decimals", #Nat(Nat8.toNat(decimals_))), ("icrc1:fee", #Nat(_icrc1_getFee()))];

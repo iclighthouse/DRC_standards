@@ -182,5 +182,7 @@ type DRC20 = service {
    drc20_txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
    drc20_txnRecord : (Txid) -> (opt TxnRecord);
    drc20_getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
+   drc20_dropAccount : (opt Sa) -> bool;
+   drc20_holdersCount : () -> (nat, nat, nat) query;
  };
 service : (InitArgs) -> DRC20

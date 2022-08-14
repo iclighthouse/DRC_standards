@@ -10,6 +10,8 @@ Add token --> Custom --> Fill in Token Canister ID and select "DIP20" --> Contin
 
 ## Update:
 
+[2022-8-14] Upgraded the example.
+
 [2022-8-11] Compatible with [ICRC-1 standard](https://github.com/dfinity/ICRC-1).
 
    

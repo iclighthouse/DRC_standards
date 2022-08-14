@@ -425,7 +425,9 @@ module {
             var _storeRecords = List.nil<(Txid, Nat)>();
             let storageFee = await drc202().fee();
             var item = List.pop(storeRecords);
-            while (Option.isSome(item.0)){
+            var n : Nat = 0;
+            let m : Nat = 20;
+            while (Option.isSome(item.0) and n < m){
                 storeRecords := item.1;
                 switch(item.0){
                     case(?(txid, callCount)){
@@ -447,6 +449,7 @@ module {
                     case(_){};
                 };
                 item := List.pop(storeRecords);
+                n += 1;
             };
             //storeRecords := _storeRecords;
             _rePush(_storeRecords);

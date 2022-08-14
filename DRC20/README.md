@@ -4,9 +4,11 @@ A standard interface for Dfinity tokens
 
 ## Latest upgrade: 
 
-2022-3-25: Refactoring example code; Using Trie instead of HashMap; Implementing DRC202. (Notes: This version is not compatible with the previous version and upgrading will result in data loss.)
+2022-8-14: Upgraded examples; Added storage saving mode; Added `drc20_dropAccount` and `drc20_holdersCount` methods.
 
 2022-8-11: Examples are compatible with [ICRC-1 standard](https://github.com/dfinity/ICRC-1).
+
+2022-3-25: Refactoring example code; Using Trie instead of HashMap; Implementing DRC202. (Notes: This version is not compatible with the previous version and upgrading will result in data loss.)
  
 ## Abstract
 A standard interface for Dfinity tokens. The standard complies with ERC20 interface specification, and has some improvements to match IC network features.

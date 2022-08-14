@@ -89,7 +89,9 @@ module {
         public func pub() : async (){ //publish
             var _publishMessages = List.nil<(AccountId, T, Message, Nat)>();
             var item = List.pop(publishMessages);
-            while (Option.isSome(item.0)){
+            var n : Nat = 0;
+            let m : Nat = 20;
+            while (Option.isSome(item.0) and n < m){
                 publishMessages := item.1;
                 switch(item.0){
                     case(?(account, msgType, msg, callCount)){
@@ -109,6 +111,7 @@ module {
                     case(_){};
                 };
                 item := List.pop(publishMessages);
+                n += 1;
             };
             publishMessages := _publishMessages;
         };

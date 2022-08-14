@@ -225,6 +225,8 @@ type DRC20 = service {
    drc20_txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
    drc20_txnRecord : (Txid) -> (opt TxnRecord);
    drc20_getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
+   drc20_dropAccount : (opt Sa) -> bool;
+   drc20_holdersCount : () -> (nat, nat, nat) query;
  };
 service : (InitArgs) -> DRC20
 ```
@@ -308,7 +310,8 @@ balanceOf: (_owner: Address) -> (balance: nat) query;
 drc20_balanceOf: (_owner: Address) -> (balance: nat) query;
 ```
 #### getCoinSeconds
-Returns total `CoinSeconds` and the given account `_owner`s `CoinSeconds`. CoinSeconds is the time-weighted cumulative value of the account balance. CoinSeconds = Σ(balance_i * period_i).  
+Returns total `CoinSeconds` and the given account `_owner`s `CoinSeconds`. CoinSeconds is the time-weighted cumulative value of the account balance. CoinSeconds = Σ(balance_i * period_i).   
+In storage saving mode, this function will be disabled and CoinSeconds cannot be queried.  
 OPTIONAL - This method can be used to improve usability, but the method may not be present.  
 ``` candid
 getCoinSeconds: (opt Address) -> (totalCoinSeconds: CoinSeconds, accountCoinSeconds: opt CoinSeconds) query;
@@ -385,8 +388,8 @@ subscribed: (_owner: Address) -> (result: opt Subscription) query;
 drc20_subscribed: (_owner: Address) -> (result: opt Subscription) query;
 ```
 #### approve
-Allows `_spender` to withdraw from your account multiple times, up to the `_value` amount.
-If this function is called again it overwrites the current allowance with `_value`.  
+Allows `_spender` to withdraw from your account multiple times, up to the `_value` amount. If this function is called again it overwrites the current allowance with `_value`.   
+A maximum of 50 approvals can exist per account.   
 **NOTE**: When you execute `approve()` to authorize the spender, it may cause security problems, you can execute `approve(_spender, 0, ...)` to deauthorize.
 ``` candid
 approve: (_spender: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
@@ -405,6 +408,30 @@ OPTIONAL - This method can be used to improve usability, but the method may not 
 approvals: (_owner: Address) -> (allowances: vec Allowance) query;
 drc20_approvals: (_owner: Address) -> (allowances: vec Allowance) query;
 ```
+#### dropAccount
+Closes the account. The account can only be closed if the balance of the account is not greater than the GAS fee.   
+OPTIONAL - This method can be used to improve usability, but the method may not be present.
+``` candid
+dropAccount : (opt Sa) -> bool;
+drc20_dropAccount : (opt Sa) -> bool;
+```
+#### holdersCount
+Returns the number of accounts with a non-zero balance, the number of accounts with existing transactions, and the number of accounts that have been dropped. 
+OPTIONAL - This method can be used to improve usability, but the method may not be present.
+``` candid
+holdersCount : () -> (balances: nat, nonces: nat, dropedAccounts: nat) query;
+drc20_holdersCount : () -> (balances: nat, nonces: nat, dropedAccounts: nat) query;
+```
+
+### About Storage Saving Mode
+
+When the number of accounts exceeds a specified number (e.g. 1 million) or when the canister storage space is close to being full, the Token contract will enable storage saving mode, which will achieve the following.   
+- Reduce the transaction record cache time.
+- Disable the CoinSeconds function and delete all CoinSeconds records.
+- Delete all nonce records, with the account's nonce restarting at a new value (e.g. 10000000).
+- Delete all dropped account list records.
+As the number of Token accounts increases, the storage saving mode can be activated by repeated upgrades to perform the above operations again.
+
 ### Subscriber's Callback
 #### tokenCallback (customizable)
 Token canister subscribers should implement a callback function for handling token published messages.
