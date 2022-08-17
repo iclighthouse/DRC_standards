@@ -1,4 +1,3 @@
-type Value = variant { Blob: blob; Int: int; Nat: nat; Text: text; };
 type TxnResult = variant {
    err: record {
       code: variant {
@@ -44,24 +43,6 @@ type TxnQueryRequest = variant {
    txnCountGlobal;
  };
 type Txid = blob;
-type TransferError = variant {
-   BadBurn: record {min_burn_amount: nat;};
-   BadFee: record {expected_fee: nat;};
-   CreatedInFuture;
-   Duplicate: record {duplicate_of: nat;};
-   GenericError: record { error_code: nat; message: text; };
-   InsufficientFunds: record {balance: nat;};
-   TemporarilyUnavailable;
-   TooOld: record {allowed_window_nanos: Duration;};
- };
-type TransferArgs = record {
-   amount: nat;
-   created_at_time: opt Timestamp;
-   fee: opt nat;
-   from_subaccount: opt Subaccount;
-   memo: opt blob;
-   to: Account;
- };
 type Transaction = record {
    data: opt blob;
    from: AccountId;
@@ -98,7 +79,6 @@ type InitArgs = record {
 type Gas = variant { cycles: nat; noFee; token: nat; };
 type From = text;
 type ExecuteType = variant { fallback; send: nat; sendAll; };
-type Duration = nat64;
 type Decider = text;
 type Data = blob;
 type CoinSeconds = record { coinSeconds: nat; updateTime: int; };
@@ -156,16 +136,5 @@ type DRC20 = service {
    drc20_transferFrom: (From, To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
    drc20_txnRecord: (Txid) -> (opt TxnRecord);
-
-   icrc1_balance_of: (Account) -> (nat) query;
-   icrc1_decimals: () -> (nat8) query;
-   icrc1_fee: () -> (nat) query;
-   icrc1_metadata: () -> (vec record { text; Value; }) query;
-   icrc1_minting_account: () -> (Account) query;
-   icrc1_name: () -> (text) query;
-   icrc1_supported_standards: () -> (vec record { name: text; url: text; }) query;
-   icrc1_symbol: () -> (text) query;
-   icrc1_total_supply: () -> (nat) query;
-   icrc1_transfer: (TransferArgs) -> (variant { Err: TransferError; Ok: nat; });
  };
 service : (InitArgs) -> DRC20
