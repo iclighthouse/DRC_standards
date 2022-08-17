@@ -1,15 +1,13 @@
-type TxnResult = 
- variant {
-   err:
-    record {
-      code:
-       variant {
+type Value = variant { Blob: blob; Int: int; Nat: nat; Text: text; };
+type TxnResult = variant {
+   err: record {
+      code: variant {
+         DuplicateExecutedTransfer;
          InsufficientAllowance;
          InsufficientBalance;
          InsufficientGas;
-         NoLockedTransfer;
-         DuplicateExecutedTransfer;
          LockedTransferExpired;
+         NoLockedTransfer;
          NonceError;
          UndefinedError;
        };
@@ -17,8 +15,7 @@ type TxnResult =
     };
    ok: Txid;
  };
-type TxnRecord = 
- record {
+type TxnRecord = record {
    caller: AccountId;
    gas: Gas;
    index: nat;
@@ -28,21 +25,16 @@ type TxnRecord =
    transaction: Transaction;
    txid: Txid;
  };
-type TxnQueryResponse = 
- variant {
+type TxnQueryResponse = variant {
    getEvents: vec TxnRecord;
    getTxn: opt TxnRecord;
    lastTxids: vec Txid;
    lastTxidsGlobal: vec Txid;
-   lockedTxns: record {
-                 lockedBalance: nat;
-                 txns: vec TxnRecord;
-               };
+   lockedTxns: record { lockedBalance: nat; txns: vec TxnRecord; };
    txnCount: nat;
    txnCountGlobal: nat;
  };
-type TxnQueryRequest = 
- variant {
+type TxnQueryRequest = variant {
    getEvents: record {owner: opt Address;};
    getTxn: record {txid: Txid;};
    lastTxids: record {owner: Address;};
@@ -52,8 +44,25 @@ type TxnQueryRequest =
    txnCountGlobal;
  };
 type Txid = blob;
-type Transaction = 
- record {
+type TransferError = variant {
+   BadBurn: record {min_burn_amount: nat;};
+   BadFee: record {expected_fee: nat;};
+   CreatedInFuture;
+   Duplicate: record {duplicate_of: nat;};
+   GenericError: record { error_code: nat; message: text; };
+   InsufficientFunds: record {balance: nat;};
+   TemporarilyUnavailable;
+   TooOld: record {allowed_window_nanos: Duration;};
+ };
+type TransferArgs = record {
+   amount: nat;
+   created_at_time: opt Timestamp;
+   fee: opt nat;
+   from_subaccount: opt Subaccount;
+   memo: opt blob;
+   to: Account;
+ };
+type Transaction = record {
    data: opt blob;
    from: AccountId;
    operation: Operation;
@@ -61,90 +70,57 @@ type Transaction =
    value: nat;
  };
 type To = text;
+type Timestamp = nat64;
 type Timeout = nat32;
 type Time = int;
-type Subscription = 
- record {
-   callback: Callback;
-   msgTypes: vec MsgType;
- };
+type Subscription = record { callback: Callback; msgTypes: vec MsgType; };
+type Subaccount = blob;
 type Spender = text;
 type Sa = vec nat8;
-type Operation = 
- variant {
+type Operation = variant {
    approve: record {allowance: nat;};
-   executeTransfer: record {
-                      fallback: nat;
-                      lockedTxid: Txid;
-                    };
-   lockTransfer: record {
-                   decider: AccountId;
-                   expiration: Time;
-                   locked: nat;
-                 };
-   transfer: record {action: variant {
-                               burn;
-                               mint;
-                               send;
-                             };};
+   executeTransfer: record { fallback: nat; lockedTxid: Txid; };
+   lockTransfer: record { decider: AccountId; expiration: Time; locked: nat;};
+   transfer: record {action: variant { burn; mint; send; };};
  };
 type Nonce = nat;
-type MsgType = 
- variant {
-   onApprove;
-   onExecute;
-   onLock;
-   onTransfer;
- };
-type Metadata = 
- record {
-   content: text;
-   name: text;
- };
-type InitArgs = 
- record {
+type MsgType = variant { onApprove; onExecute; onLock; onTransfer; };
+type Metadata = record { content: text; name: text; };
+type InitArgs = record {
    decimals: nat8;
-   founder: opt Address;
    fee: nat;
+   founder: opt Address;
    metadata: opt vec Metadata;
    name: opt text;
    symbol: opt text;
    totalSupply: nat;
  };
-type Gas = 
- variant {
-   cycles: nat;
-   noFee;
-   token: nat;
- };
+type Gas = variant { cycles: nat; noFee; token: nat; };
 type From = text;
-type ExecuteType = 
- variant {
-   fallback;
-   send: nat;
-   sendAll;
- };
+type ExecuteType = variant { fallback; send: nat; sendAll; };
+type Duration = nat64;
 type Decider = text;
 type Data = blob;
 type CoinSeconds = record { coinSeconds: nat; updateTime: int; };
 type Callback = func (TxnRecord) -> ();
 type Amount = nat;
-type Allowance = 
- record {
-   remaining: nat;
-   spender: AccountId;
- };
+type Allowance = record { remaining: nat; spender: AccountId; };
 type Address = text;
 type AccountId = blob;
+type Account = record { owner: principal; subaccount: opt Subaccount; };
 type DRC20 = service {
    standard: () -> (text) query;
+   
    allowance: (Address, Spender) -> (Amount) query;
    approvals: (Address) -> (vec Allowance) query;
    approve: (Spender, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    balanceOf: (Address) -> (Amount) query;
    decimals: () -> (nat8) query;
+   dropAccount: (opt Sa) -> (bool);
    executeTransfer: (Txid, ExecuteType, opt To, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    fee: () -> (Amount) query;
+   getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
+   holdersCount: () -> (nat, nat, nat) query;
    lockTransfer: (To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    lockTransferFrom: (From, To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    metadata: () -> (vec Metadata) query;
@@ -156,15 +132,18 @@ type DRC20 = service {
    transfer: (To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    transferFrom: (From, To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
-   txnRecord : (Txid) -> (opt TxnRecord);
-   getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
+   txnRecord: (Txid) -> (opt TxnRecord);
+
    drc20_allowance: (Address, Spender) -> (Amount) query;
    drc20_approvals: (Address) -> (vec Allowance) query;
    drc20_approve: (Spender, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_balanceOf: (Address) -> (Amount) query;
    drc20_decimals: () -> (nat8) query;
+   drc20_dropAccount: (opt Sa) -> (bool);
    drc20_executeTransfer: (Txid, ExecuteType, opt To, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_fee: () -> (Amount) query;
+   drc20_getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
+   drc20_holdersCount: () -> (nat, nat, nat) query;
    drc20_lockTransfer: (To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_lockTransferFrom: (From, To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_metadata: () -> (vec Metadata) query;
@@ -176,9 +155,17 @@ type DRC20 = service {
    drc20_transfer: (To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_transferFrom: (From, To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
-   drc20_txnRecord : (Txid) -> (opt TxnRecord);
-   drc20_getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
-   drc20_dropAccount : (opt Sa) -> bool;
-   drc20_holdersCount : () -> (nat, nat, nat) query;
+   drc20_txnRecord: (Txid) -> (opt TxnRecord);
+
+   icrc1_balance_of: (Account) -> (nat) query;
+   icrc1_decimals: () -> (nat8) query;
+   icrc1_fee: () -> (nat) query;
+   icrc1_metadata: () -> (vec record { text; Value; }) query;
+   icrc1_minting_account: () -> (Account) query;
+   icrc1_name: () -> (text) query;
+   icrc1_supported_standards: () -> (vec record { name: text; url: text; }) query;
+   icrc1_symbol: () -> (text) query;
+   icrc1_total_supply: () -> (nat) query;
+   icrc1_transfer: (TransferArgs) -> (variant { Err: TransferError; Ok: nat; });
  };
 service : (InitArgs) -> DRC20
