@@ -105,7 +105,7 @@ type InitArgs =
  record {
    decimals: nat8;
    founder: opt Address;
-   gas: Gas;
+   fee: nat;
    metadata: opt vec Metadata;
    name: opt text;
    symbol: opt text;
@@ -142,11 +142,9 @@ type DRC20 = service {
    approvals: (Address) -> (vec Allowance) query;
    approve: (Spender, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    balanceOf: (Address) -> (Amount) query;
-   cyclesBalanceOf: (Address) -> (nat) query;
-   cyclesReceive: (opt Address) -> (nat);
    decimals: () -> (nat8) query;
    executeTransfer: (Txid, ExecuteType, opt To, opt Nonce, opt Sa, opt Data) -> (TxnResult);
-   gas: () -> (Gas) query;
+   fee: () -> (Amount) query;
    lockTransfer: (To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    lockTransferFrom: (From, To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    metadata: () -> (vec Metadata) query;
@@ -164,11 +162,9 @@ type DRC20 = service {
    drc20_approvals: (Address) -> (vec Allowance) query;
    drc20_approve: (Spender, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_balanceOf: (Address) -> (Amount) query;
-   drc20_cyclesBalanceOf: (Address) -> (nat) query;
-   drc20_cyclesReceive: (opt Address) -> (nat);
    drc20_decimals: () -> (nat8) query;
    drc20_executeTransfer: (Txid, ExecuteType, opt To, opt Nonce, opt Sa, opt Data) -> (TxnResult);
-   drc20_gas: () -> (Gas) query;
+   drc20_fee: () -> (Amount) query;
    drc20_lockTransfer: (To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_lockTransferFrom: (From, To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_metadata: () -> (vec Metadata) query;

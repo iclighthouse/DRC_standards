@@ -85,7 +85,7 @@ module {
   public type InitArgs = {
       totalSupply: Nat;
       decimals: Nat8;
-      gas: Gas;
+      fee: Nat;
       name: ?Text;
       symbol: ?Text;
       metadata: ?[Metadata];
@@ -97,11 +97,11 @@ module {
     approvals : shared query Address -> async [Allowance];
     approve : shared (Spender, Amount, ?Nonce, ?Sa, ?Data) -> async TxnResult;
     balanceOf : shared query Address -> async Amount;
-    cyclesBalanceOf : shared query Address -> async Nat;
-    cyclesReceive : shared ?Address -> async Nat;
+    //cyclesBalanceOf : shared query Address -> async Nat;
+    //cyclesReceive : shared ?Address -> async Nat;
     decimals : shared query () -> async Nat8;
     executeTransfer : shared (Txid, ExecuteType, ?To, ?Nonce, ?Sa, ?Data) -> async TxnResult;
-    gas : shared query () -> async Gas;
+    fee : shared query () -> async Amount;
     lockTransfer : shared (
         To,
         Amount,
@@ -143,11 +143,12 @@ module {
     drc20_approvals : shared query Address -> async [Allowance];
     drc20_approve : shared (Spender, Amount, ?Nonce, ?Sa, ?Data) -> async TxnResult;
     drc20_balanceOf : shared query Address -> async Amount;
-    drc20_cyclesBalanceOf : shared query Address -> async Nat;
-    drc20_cyclesReceive : shared ?Address -> async Nat;
+    //drc20_cyclesBalanceOf : shared query Address -> async Nat;
+    //drc20_cyclesReceive : shared ?Address -> async Nat;
     drc20_decimals : shared query () -> async Nat8;
     drc20_executeTransfer : shared (Txid, ExecuteType, ?To, ?Nonce, ?Sa, ?Data) -> async TxnResult;
-    drc20_gas : shared query () -> async Gas;
+    //drc20_gas : shared query () -> async Gas;
+    drc20_fee : shared query () -> async Amount;
     drc20_lockTransfer : shared (
         To,
         Amount,

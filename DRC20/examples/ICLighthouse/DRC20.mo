@@ -32,7 +32,7 @@ import Trie "mo:base/Trie";
 import Types "./lib/DRC20";
 import ICRC1 "./lib/ICRC1";
 
-//record { totalSupply=1000000000000; decimals=8; gas=variant{token=10}; name=opt "TokenTest"; symbol=opt "TTT"; metadata=null; founder=null;} 
+//record { totalSupply=1000000000000; decimals=8; fee=10; name=opt "TokenTest"; symbol=opt "TTT"; metadata=null; founder=null;} 
 shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     /*
     * Types 
@@ -82,14 +82,14 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private stable let decimals_: Nat8 = initArgs.decimals;
     private stable var totalSupply_: Nat = initArgs.totalSupply;
     private stable var totalCoinSeconds: CoinSeconds = {coinSeconds = 0; updateTime = Time.now()};
-    private stable var gas_: Gas = initArgs.gas;
+    private stable var fee_: Nat = initArgs.fee;
     private stable var metadata_: [Metadata] = Option.get(initArgs.metadata, []);
     private stable var index: Nat = 0;
     private stable var balances: Trie.Trie<AccountId, Nat> = Trie.empty();
     private stable var coinSeconds: Trie.Trie<AccountId, CoinSeconds> = Trie.empty();
     private stable var nonces: Trie.Trie<AccountId, Nat> = Trie.empty();
     private stable var allowances: Trie.Trie2D<AccountId, AccountId, Nat> = Trie.empty(); // Limit 50 records per account
-    private stable var cyclesBalances: Trie.Trie<AccountId, Nat> = Trie.empty();
+    // private stable var cyclesBalances: Trie.Trie<AccountId, Nat> = Trie.empty();
     // Set EN_DEBUG=false in the production environment.
     private var drc202 = DRC202.DRC202({EN_DEBUG = true; MAX_CACHE_TIME = 3 * 30 * 24 * 3600 * 1000000000; MAX_CACHE_NUMBER_PER = 100; MAX_STORAGE_TRIES = 2; }, "drc20");
     private var pubsub = ICPubSub.ICPubSub<MsgType>({ MAX_PUBLICATION_TRIES = 2 }, func (t1:MsgType, t2:MsgType): Bool{ t1 == t2 });
@@ -135,11 +135,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         };
     };
     private func _dropAccount(_a: AccountId) : Bool{ // (*)
-        var minValue: Nat = 1;
-        switch (gas_){
-            case(#token(fee)){ minValue := fee; };
-            case(_){};
-        };
+        let minValue = fee_;
         if (_getBalance(_a) > minValue){
             return false;
         };
@@ -204,15 +200,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             balances := Trie.remove(balances, keyb(_a), Blob.equal).0;
         } else {
             balances := Trie.put(balances, keyb(_a), Blob.equal, _v).0;
-            switch (gas_){
-                case(#token(fee)){
-                    if (_v < fee/2){
-                        //ignore _burn(_a, _v, false);
-                        balances := Trie.remove(balances, keyb(_a), Blob.equal).0;
-                    };
-                };
-                case(_){};
-            }
+            if (_v < fee_ / 2){
+                balances := Trie.remove(balances, keyb(_a), Blob.equal).0;
+            };
         };
     };
     private func _getNonce(_a: AccountId): Nat{
@@ -270,102 +260,48 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             allowances := Trie.remove2D(allowances, keyb(_a), Blob.equal, keyb(_s), Blob.equal).0;
         };
     };
-    private func _getCyclesBalances(_a: AccountId) : Nat{
-        switch(Trie.get(cyclesBalances, keyb(_a), Blob.equal)){
-            case(?(balance)){ return balance; };
-            case(_){ return 0; };
-        };
-    };
-    private func _setCyclesBalances(_a: AccountId, _v: Nat) : (){
-        if(_v == 0){
-            cyclesBalances := Trie.remove(cyclesBalances, keyb(_a), Blob.equal).0;
-        } else {
-            switch (gas_){
-                case(#cycles(fee)){
-                    if (_v < fee/2){
-                        cyclesBalances := Trie.remove(cyclesBalances, keyb(_a), Blob.equal).0;
-                    } else{
-                        cyclesBalances := Trie.put(cyclesBalances, keyb(_a), Blob.equal, _v).0;
-                    };
-                };
-                case(_){
-                    cyclesBalances := Trie.put(cyclesBalances, keyb(_a), Blob.equal, _v).0;
-                };
-            }
-        };
-    };
+    // private func _getCyclesBalances(_a: AccountId) : Nat{
+    //     switch(Trie.get(cyclesBalances, keyb(_a), Blob.equal)){
+    //         case(?(balance)){ return balance; };
+    //         case(_){ return 0; };
+    //     };
+    // };
+    // private func _setCyclesBalances(_a: AccountId, _v: Nat) : (){
+    //     if(_v == 0){
+    //         cyclesBalances := Trie.remove(cyclesBalances, keyb(_a), Blob.equal).0;
+    //     } else {
+    //         switch (gas_){
+    //             case(#cycles(fee)){
+    //                 if (_v < fee/2){
+    //                     cyclesBalances := Trie.remove(cyclesBalances, keyb(_a), Blob.equal).0;
+    //                 } else{
+    //                     cyclesBalances := Trie.put(cyclesBalances, keyb(_a), Blob.equal, _v).0;
+    //                 };
+    //             };
+    //             case(_){
+    //                 cyclesBalances := Trie.put(cyclesBalances, keyb(_a), Blob.equal, _v).0;
+    //             };
+    //         }
+    //     };
+    // };
     private func _checkFee(_caller: AccountId, _percent: Nat, _amount: Nat): Bool{
-        let cyclesAvailable = Cycles.available(); 
-        switch(gas_){
-            case(#cycles(v)){
-                if(v > 0) {
-                    let fee = Nat.max(v * _percent / 100, 1);
-                    if (cyclesAvailable >= fee){
-                        return true;
-                    } else {
-                        let callerBalance = _getCyclesBalances(_caller);
-                        if (callerBalance >= fee){
-                            return true;
-                        } else {
-                            return false;
-                        };
-                    };
-                };
-                return true;
-            };
-            case(#token(v)){ 
-                if(v > 0) {
-                    let fee = Nat.max(v * _percent / 100, 1);
-                    if (_getBalance(_caller) >= fee + _amount){
-                        return true;
-                    } else {
-                        return false;
-                    };
-                };
-                return true;
-            };
-            case(_){ return true; };
+        if(fee_ > 0) {
+            let fee = Nat.max(fee_ * _percent / 100, 1);
+            return _getBalance(_caller) >= fee + _amount;
         };
+        return true;
     };
     private func _chargeFee(_caller: AccountId, _percent: Nat): Bool{
-        let cyclesAvailable = Cycles.available(); 
-        switch(gas_){
-            case(#cycles(v)){
-                if(v > 0) {
-                    let fee = Nat.max(v * _percent / 100, 1);
-                    if (cyclesAvailable >= fee){
-                        let accepted = Cycles.accept(fee); 
-                        let feeToBalance = _getCyclesBalances(FEE_TO);
-                        _setCyclesBalances(FEE_TO, feeToBalance + accepted);
-                        return true;
-                    } else {
-                        let callerBalance = _getCyclesBalances(_caller);
-                        if (callerBalance >= fee){
-                            _setCyclesBalances(_caller, callerBalance - fee);
-                            let feeToBalance = _getCyclesBalances(FEE_TO);
-                            _setCyclesBalances(FEE_TO, feeToBalance + fee);
-                            return true;
-                        } else {
-                            return false;
-                        };
-                    };
-                };
+        if(fee_ > 0) {
+            let fee = Nat.max(fee_ * _percent / 100, 1);
+            if (_getBalance(_caller) >= fee){
+                ignore _send(_caller, FEE_TO, fee, false);
                 return true;
+            } else {
+                return false;
             };
-            case(#token(v)){ 
-                if(v > 0) {
-                    let fee = Nat.max(v * _percent / 100, 1);
-                    if (_getBalance(_caller) >= fee){
-                        ignore _send(_caller, FEE_TO, fee, false);
-                        return true;
-                    } else {
-                        return false;
-                    };
-                };
-                return true;
-            };
-            case(_){ return true; };
         };
+        return true;
     };
     private func _send(_from: AccountId, _to: AccountId, _value: Nat, _isCheck: Bool): Bool{
         var balance_from = _getBalance(_from);
@@ -443,7 +379,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let from = _from;
         let to = _to;
         let value = _value; 
-        var gas = gas_;
+        var gas: Gas = #token(fee_);
         var allowed: Nat = 0; // *
         var spendValue = _value; // *
         if (_isAllowance){
@@ -570,25 +506,25 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     };
 
     //--------------
-    private func __cyclesReceive(__caller: Principal, _account: ?Address) : (balance: Nat){
-        let amount = Cycles.available(); 
-        assert(amount >= 100000000);
-        var account = FEE_TO; //_getAccountIdFromPrincipal(Principal.fromActor(this));
-        switch(_account){
-            case(?(a)){
-                account := _getAccountId(a);
-                switch (gas_){
-                    case(#token(fee)){ assert(false); };
-                    case(_){};
-                };
-            };
-            case(_){};
-        };
-        let accepted = Cycles.accept(amount); 
-        let balance = _getCyclesBalances(account);
-        _setCyclesBalances(account, balance + accepted);
-        return balance + accepted;
-    };
+    // private func __cyclesReceive(__caller: Principal, _account: ?Address) : (balance: Nat){
+    //     let amount = Cycles.available(); 
+    //     assert(amount >= 100000000);
+    //     var account = FEE_TO; //_getAccountIdFromPrincipal(Principal.fromActor(this));
+    //     switch(_account){
+    //         case(?(a)){
+    //             account := _getAccountId(a);
+    //             switch (gas_){
+    //                 case(#token(fee)){ assert(false); };
+    //                 case(_){};
+    //             };
+    //         };
+    //         case(_){};
+    //     };
+    //     let accepted = Cycles.accept(amount); 
+    //     let balance = _getCyclesBalances(account);
+    //     _setCyclesBalances(account, balance + accepted);
+    //     return balance + accepted;
+    // };
     private func __getCoinSeconds(_owner: ?Address) : (totalCoinSeconds: CoinSeconds, accountCoinSeconds: ?CoinSeconds){
         if (NonceMode > 0){
             return ({ coinSeconds = 0; updateTime = 0; }, null);
@@ -875,16 +811,16 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     };
     /// Sends/donates cycles to the token canister in _account's name, and return cycles balance of the account/token.
     /// If the parameter `_account` is null, it means donation.
-    public shared(msg) func cyclesReceive(_account: ?Address) : async (balance: Nat){
-        return __cyclesReceive(msg.caller, _account);
-    };
+    // public shared(msg) func cyclesReceive(_account: ?Address) : async (balance: Nat){
+    //     return __cyclesReceive(msg.caller, _account);
+    // };
     /// Returns the cycles balance of the given account _owner in the token.
-    public query func cyclesBalanceOf(_owner: Address) : async (balance: Nat){
-        return _getCyclesBalances(_getAccountId(_owner));
-    };
-    /// Returns the transaction fee of the token.
-    public query func gas() : async Gas{
-        return gas_;
+    // public query func cyclesBalanceOf(_owner: Address) : async (balance: Nat){
+    //     return _getCyclesBalances(_getAccountId(_owner));
+    // };
+    /// Returns the transaction fee of the token. 
+    public query func fee() : async Amount{
+        return fee_;
     };
     /// Returns the total token supply.
     public query func totalSupply() : async Amount{
@@ -977,14 +913,14 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     public query func drc20_metadata() : async [Metadata]{
         return metadata_;
     };
-    public shared(msg) func drc20_cyclesReceive(_account: ?Address) : async (balance: Nat){
-        return __cyclesReceive(msg.caller, _account);
-    };
-    public query func drc20_cyclesBalanceOf(_owner: Address) : async (balance: Nat){
-        return _getCyclesBalances(_getAccountId(_owner));
-    };
-    public query func drc20_gas() : async Gas{
-        return gas_;
+    // public shared(msg) func drc20_cyclesReceive(_account: ?Address) : async (balance: Nat){
+    //     return __cyclesReceive(msg.caller, _account);
+    // };
+    // public query func drc20_cyclesBalanceOf(_owner: Address) : async (balance: Nat){
+    //     return _getCyclesBalances(_getAccountId(_owner));
+    // };
+    public query func drc20_fee() : async Amount{
+        return fee_;
     };
     public query func drc20_totalSupply() : async Amount{
         return totalSupply_;
@@ -1056,10 +992,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         return _getAccountIdFromPrincipal(_a.owner, sub);
     };
     private func _icrc1_getFee() : Nat{
-        switch(gas_){
-            case(#token(v)){ return v; };
-            case(_){ return 0; };  // When Cycles is used as gas, it is not represented properly.
-        };
+        return fee_;
     };
     private func _icrc1_receipt(_result: TxnResult, _a: AccountId) : { #Ok: Nat; #Err: TransferError; }{
         switch(_result){
@@ -1070,12 +1003,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                 };
             };
             case(#err(err)){
-                var fee = { expected_fee: Nat = 0 };
-                switch(gas_){
-                    case(#cycles(v)){ fee := { expected_fee =  v } };
-                    case(#token(v)){ fee := { expected_fee =  v } };
-                    case(_){};
-                };
+                var fee = { expected_fee: Nat = fee_ };
                 switch(err.code){
                     case(#InsufficientGas) { return #Err(#BadFee(fee)) };
                     case(#InsufficientAllowance) { return #Err(#GenericError({ error_code = 101; message = err.message })) };
@@ -1166,6 +1094,11 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     //     assert(msg.caller == owner);
     //     return pubsub.config(config);
     // };
+
+    public func wallet_receive(): async (){
+        let amout = Cycles.available();
+        let accepted = Cycles.accept(amout);
+    };
 
     /* 
     * Genesis

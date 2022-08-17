@@ -4,6 +4,8 @@ DRC20 Token Factory: http://ictokens.com
 
 ## Update:
 
+[2022-8-17] Method fee() replaces gas(); Upgraded examples.
+
 [2022-8-14] Upgraded the example.
 
 [2022-8-11] Compatible with [ICRC-1 standard](https://github.com/dfinity/ICRC-1).

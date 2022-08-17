@@ -4,6 +4,8 @@ A standard interface for Dfinity tokens
 
 ## Latest upgrade: 
 
+2022-8-17: Method fee() replaces gas(); Upgraded examples.
+
 2022-8-14: Upgraded examples; Added storage saving mode; Added `drc20_dropAccount` and `drc20_holdersCount` methods.
 
 2022-8-11: Examples are compatible with [ICRC-1 standard](https://github.com/dfinity/ICRC-1).

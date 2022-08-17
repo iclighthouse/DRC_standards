@@ -162,7 +162,7 @@ type Metadata = record { content: text; name: text; };
 type InitArgs = record {
    decimals: nat8;
    founder: opt Address;
-   gas: Gas;
+   fee: nat;
    metadata: opt vec Metadata;
    name: opt text;
    symbol: opt text;
@@ -185,11 +185,9 @@ type DRC20 = service {
    approvals: (Address) -> (vec Allowance) query;
    approve: (Spender, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    balanceOf: (Address) -> (Amount) query;
-   cyclesBalanceOf: (Address) -> (nat) query;
-   cyclesReceive: (opt Address) -> (nat);
    decimals: () -> (nat8) query;
    executeTransfer: (Txid, ExecuteType, opt To, opt Nonce, opt Sa, opt Data) -> (TxnResult);
-   gas: () -> (Gas) query;
+   fee: () -> (Amount) query;
    lockTransfer: (To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    lockTransferFrom: (From, To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    metadata: () -> (vec Metadata) query;
@@ -207,11 +205,9 @@ type DRC20 = service {
    drc20_approvals: (Address) -> (vec Allowance) query;
    drc20_approve: (Spender, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_balanceOf: (Address) -> (Amount) query;
-   drc20_cyclesBalanceOf: (Address) -> (nat) query;
-   drc20_cyclesReceive: (opt Address) -> (nat);
    drc20_decimals: () -> (nat8) query;
    drc20_executeTransfer: (Txid, ExecuteType, opt To, opt Nonce, opt Sa, opt Data) -> (TxnResult);
-   drc20_gas: () -> (Gas) query;
+   drc20_fee: () -> (Amount) query;
    drc20_lockTransfer: (To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_lockTransferFrom: (From, To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_metadata: () -> (vec Metadata) query;
@@ -275,26 +271,12 @@ OPTIONAL - 这个方法可以用来提高可用性，但值可能不存在。
 metadata: () -> (vec Metadata) query;
 drc20_metadata: () -> (vec Metadata) query;
 ```
-#### cyclesReceive
-以`_account`名义向token canister发送/捐赠cycles，并返回该账户的cycles余额。如果参数`_account`为空，则意味着捐赠。  
-OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
+#### fee
+返回代币的交易费设置值。例如：`"10000000"`。   
+*注意* fee将从账户的余额中收取（而不是从转账的`_value`中收取）。transferFrom、lockTransferFrom从账户`_from`扣除fee，executeTransfer不收取fee，其他update方法都是从账户`caller`扣除fee。
 ``` candid
-cyclesReceive: (_account: opt Address) -> (balance: nat);
-drc20_cyclesReceive: (_account: opt Address) -> (balance: nat);
-```
-#### cyclesBalanceOf
-返回给定账户`_owner`的cycles余额。 如果Token采用cycles作为gas支付方式，该方法可以方便用户查询其cycles余额。  
-OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
-``` candid
-cyclesBalanceOf: (_owner: Address) -> (balance: nat) query;
-drc20_cyclesBalanceOf: (_owner: Address) -> (balance: nat) query;
-```
-#### gas
-返回代币的交易费设置值。例如：`"variant { token=10000000 }"`。   
-*注意* 支持 "cycles"，"token"作为gas的支付方式。如果选择`token`作为gas，将从账户的余额中收取（而不是从转账的`_value`中收取）。transferFrom、lockTransferFrom从账户`_from`扣除gas，executeTransfer不收取gas，其他update方法都是从账户`caller`扣除gas。
-``` candid
-gas: () -> (Gas) query;
-drc20_gas: () -> (Gas) query;
+fee: () -> (Amount) query;
+drc20_fee: () -> (Amount) query;
 ```
 #### totalSupply
 返回总的代币供应量。

@@ -162,7 +162,7 @@ type Metadata = record { content: text; name: text; };
 type InitArgs = record {
    decimals: nat8;
    founder: opt Address;
-   gas: Gas;
+   fee: nat;
    metadata: opt vec Metadata;
    name: opt text;
    symbol: opt text;
@@ -185,11 +185,9 @@ type DRC20 = service {
    approvals: (Address) -> (vec Allowance) query;
    approve: (Spender, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    balanceOf: (Address) -> (Amount) query;
-   cyclesBalanceOf: (Address) -> (nat) query;
-   cyclesReceive: (opt Address) -> (nat);
    decimals: () -> (nat8) query;
    executeTransfer: (Txid, ExecuteType, opt To, opt Nonce, opt Sa, opt Data) -> (TxnResult);
-   gas: () -> (Gas) query;
+   fee: () -> (Amount) query;
    lockTransfer: (To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    lockTransferFrom: (From, To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    metadata: () -> (vec Metadata) query;
@@ -207,11 +205,9 @@ type DRC20 = service {
    drc20_approvals: (Address) -> (vec Allowance) query;
    drc20_approve: (Spender, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_balanceOf: (Address) -> (Amount) query;
-   drc20_cyclesBalanceOf: (Address) -> (nat) query;
-   drc20_cyclesReceive: (opt Address) -> (nat);
    drc20_decimals: () -> (nat8) query;
    drc20_executeTransfer: (Txid, ExecuteType, opt To, opt Nonce, opt Sa, opt Data) -> (TxnResult);
-   drc20_gas: () -> (Gas) query;
+   drc20_fee: () -> (Amount) query;
    drc20_lockTransfer: (To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_lockTransferFrom: (From, To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_metadata: () -> (vec Metadata) query;
@@ -275,27 +271,13 @@ OPTIONAL - This method can be used to improve usability, but the value may not b
 metadata: () -> (vec Metadata) query;
 drc20_metadata: () -> (vec Metadata) query;
 ```
-#### cyclesReceive
-Sends/donates cycles to the token canister in `_account`'s name, and return cycles balance of the account. If the parameter `_account` is null, it means donation. 
-OPTIONAL - This method can be used to improve usability, but the method may not be present.
+#### fee
+Returns the transaction fee of the token. E.g. `"10000000"`.  
+*Note* The fee will be charged from the balance of the account, not be charged from the `_value` of the transfer. 
+transferFrom, lockTransferFrom charge fee from account `_from`, executeTransfer does not charge fee, all other update methods charge fee from account `caller`.
 ``` candid
-cyclesReceive: (_account: opt Address) -> (balance: nat);
-drc20_cyclesReceive: (_account: opt Address) -> (balance: nat);
-```
-#### cyclesBalanceOf
-Returns the cycles balance of the given account `_owner` in the token.  
-OPTIONAL - This method can be used to improve usability, but the method may not be present.
-``` candid
-cyclesBalanceOf: (_owner: Address) -> (balance: nat) query;
-drc20_cyclesBalanceOf: (_owner: Address) -> (balance: nat) query;
-```
-#### gas
-Returns the transaction fee of the token. E.g. `"variant { token=10000000 }"`.  
-*Note* Supports `cycles`, `token` as payment method for gas. If selected `token` as gas, it will be additionally charged from the balance of the account, not be charged from the `_value` of the transfer. 
-transferFrom, lockTransferFrom charge gas from account `_from`, executeTransfer does not charge gas, all other update methods charge gas from account `caller`.
-``` candid
-gas: () -> (Gas) query;
-drc20_gas: () -> (Gas) query;
+fee: () -> (Amount) query;
+drc20_fee: () -> (Amount) query;
 ```
 #### totalSupply
 Returns the total token supply.

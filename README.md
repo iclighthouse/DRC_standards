@@ -12,6 +12,7 @@ Specification: https://github.com/iclighthouse/DRC_standards/tree/main/CTSNC
 2022-3-2: Improved compatibility, implemented DIP20 compatible example; added upgrade function.  
 2022-3-25: Refactoring example code; Using Trie instead of HashMap; Implementing DRC202. (Notes: This version is not compatible with the previous version and upgrading will result in data loss.)
 2022-8-11: Examples are compatible with [ICRC-1 standard](https://github.com/dfinity/ICRC-1).
+2022-8-17: Method fee() replaces gas(); Upgraded examples.
 
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse)  
