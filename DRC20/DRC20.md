@@ -2,7 +2,7 @@
 DRC: 20  
 Title: Dfinity Fungible Token Standard  
 Author: Avida <avida.life@hotmail.com>, Simpson <icpstaking-wei@hotmail.com>  
-Status: Draft  
+Status: Draft (PR version)  
 Category: Token DRC  
 Created: 2021-11-03
 ***
@@ -181,26 +181,6 @@ type Address = text;
 type AccountId = blob;
 type DRC20 = service {
    standard: () -> (text) query;
-   allowance: (Address, Spender) -> (Amount) query;
-   approvals: (Address) -> (vec Allowance) query;
-   approve: (Spender, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
-   balanceOf: (Address) -> (Amount) query;
-   decimals: () -> (nat8) query;
-   executeTransfer: (Txid, ExecuteType, opt To, opt Nonce, opt Sa, opt Data) -> (TxnResult);
-   fee: () -> (Amount) query;
-   lockTransfer: (To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
-   lockTransferFrom: (From, To, Amount, Timeout, opt Decider, opt Nonce, opt Sa, opt Data) -> (TxnResult);
-   metadata: () -> (vec Metadata) query;
-   name: () -> (text) query;
-   subscribe: (Callback, vec MsgType, opt Sa) -> (bool);
-   subscribed: (Address) -> (opt Subscription) query;
-   symbol: () -> (text) query;
-   totalSupply: () -> (Amount) query;
-   transfer: (To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
-   transferFrom: (From, To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
-   txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
-   txnRecord : (Txid) -> (opt TxnRecord);
-   getCoinSeconds: (opt Address) -> (CoinSeconds, opt CoinSeconds) query;
    drc20_allowance: (Address, Spender) -> (Amount) query;
    drc20_approvals: (Address) -> (vec Allowance) query;
    drc20_approve: (Spender, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
@@ -234,7 +214,7 @@ service : (InitArgs) -> DRC20
  - The optional parameter `_nonce` is used to specify the nonce of the transaction. The nonce value for each AccountId starts at 0 and is incremented by 1 on the success of each specific transaction. If the caller specifies an incorrect nonce value, the transaction will be rejected. The specific transactions include: approve(), transfer(), transferFrom(), lockTransfer(), lockTransferFrom(), executeTransfer().
  - The optional parameter `_sa` is the subaccount of the caller, which is a 32 bytes nat8 array. If length of `_sa` is less than 32 bytes, it will be prepended with [0] to make up.
  - The optional parameter `_data` is the custom data provided by the caller, which can be used for calldata, memo, etc. The length of `_data` should be less than 65536 bytes (It is recommended to use candid encoding format, e.g. 4-byte method name hash + arguments data). 
- - For better compatibility, it is recommended to use method names prefixed with "drc20_".
+ - For better compatibility, use method names prefixed with "drc20_".
  
 #### standard
 
@@ -244,97 +224,84 @@ OPTIONAL - This method can be used to improve usability, but the value may not b
 standard: () -> (text) query;
 ```
 
-#### name
+#### drc20_name
 Returns the name of the token. E.g. `"ICLighthouseToken"`.  
 OPTIONAL - This method can be used to improve usability, but the value may not be present.
 ``` candid
-name: () -> (text) query;
 drc20_name: () -> (text) query;
 ```
-#### symbol
+#### drc20_symbol
 Returns the symbol of the token. E.g. `"ICL"`.  
 OPTIONAL - This method can be used to improve usability, but the value may not be present.
 ``` candid
-symbol: () -> (text) query;
 drc20_symbol: () -> (text) query;
 ```
-#### decimals
+#### drc20_decimals
 Returns the number of decimals the token uses. E.g. `8`, means to divide the token amount by `100000000` to get its user representation.  
 ``` candid
-decimals: () -> (nat8) query;
 drc20_decimals: () -> (nat8) query;
 ```
-#### metadata
+#### drc20_metadata
 Returns the extend metadata info of the token, It's Metadata type. E.g. `'vec {record { name: "logo"; content: "data:img/jpg;base64,iVBOR....";}; }'`.    
 OPTIONAL - This method can be used to improve usability, but the value may not be present.
 ``` candid
-metadata: () -> (vec Metadata) query;
 drc20_metadata: () -> (vec Metadata) query;
 ```
-#### fee
+#### drc20_fee
 Returns the transaction fee of the token. E.g. `"10000000"`.  
 *Note* The fee will be charged from the balance of the account, not be charged from the `_value` of the transfer. 
 transferFrom, lockTransferFrom charge fee from account `_from`, executeTransfer does not charge fee, all other update methods charge fee from account `caller`.
 ``` candid
-fee: () -> (Amount) query;
 drc20_fee: () -> (Amount) query;
 ```
-#### totalSupply
+#### drc20_totalSupply
 Returns the total token supply.
 ``` candid
-totalSupply: () -> (nat) query;
 drc20_totalSupply: () -> (nat) query;
 ```
-#### balanceOf
+#### drc20_balanceOf
 Returns the account balance of the given account `_owner`, not including the locked balance. 
 ``` candid
-balanceOf: (_owner: Address) -> (balance: nat) query;
 drc20_balanceOf: (_owner: Address) -> (balance: nat) query;
 ```
-#### getCoinSeconds
+#### drc20_getCoinSeconds
 Returns total `CoinSeconds` and the given account `_owner`s `CoinSeconds`. CoinSeconds is the time-weighted cumulative value of the account balance. CoinSeconds = Σ(balance_i * period_i).   
 In storage saving mode, this function will be disabled and CoinSeconds cannot be queried.  
 OPTIONAL - This method can be used to improve usability, but the method may not be present.  
 ``` candid
-getCoinSeconds: (opt Address) -> (totalCoinSeconds: CoinSeconds, accountCoinSeconds: opt CoinSeconds) query;
 drc20_getCoinSeconds: (opt Address) -> (totalCoinSeconds: CoinSeconds, accountCoinSeconds: opt CoinSeconds) query;
 ```
-#### transfer
+#### drc20_transfer
 Transfers `_value` amount of tokens from caller's account to address `_to`, returns type `TxnResult`.  
 On success, the returned TxnResult contains the txid. The `txid` is generated in the transaction, is unique in the token transactions. Recommended method of generating txid(DRC202 Standard): convert token's canisterId, caller's accountId, and caller's nonce into [nat8] arrays respectively, and join them together as `txInfo: [nat8]`. Then get the `txid` value as: "000000"(big-endian 4-bytes, `encode(caller.nonce)`) + "0000..00"(28-bytes,`sha224(txInfo)`).    
 *Note* Transfers of 0 values MUST be treated as normal transfers. An account transfer to itself is ALLOWED. 
 ``` candid
-transfer: (_to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 drc20_transfer: (_to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
-#### transferFrom
+#### drc20_transferFrom
 Transfers `_value` amount of tokens from address `_from` to address `_to`, returns type `TxnResult`.
 The `transferFrom` method is used for allowing contracts to transfer tokens on your behalf. This can be used for example to allow a contract to transfer tokens on your behalf and/or to charge fees. The caller is `spender` who SHOULD be authorized by the `_from` account and have an `allowance(_from, _spender)` value greater than `_value`.  
 *Note* Transfers of 0 values MUST be treated as normal transfers. `_from` account transfer to itself is ALLOWED.
 ``` candid
-transferFrom: (_from:Address, _to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 drc20_transferFrom: (_from:Address, _to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
-#### lockTransfer
+#### drc20_lockTransfer
 Locks a transaction, specifies a `_decider` who can decide the execution of this transaction, and sets an expiration period `_timeout` seconds after which the locked transaction will be unlocked. The parameter _timeout SHOULD not be greater than 64,000,000 seconds.  
 Creating a two-phase transfer structure can improve atomicity. The process is that (1) the owner locks the transaction and (2) the decider executes the transaction or the owner fallback the transaction after it has expired.
 ``` candid
-lockTransfer: (_to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 drc20_lockTransfer: (_to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
-#### lockTransferFrom
+#### drc20_lockTransferFrom
 `spender` locks a transaction.
 ``` candid
-lockTransferFrom: (_from: Address, _to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 drc20_lockTransferFrom: (_from: Address, _to: Address, _value: nat, _timeout: nat32, _decider: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
-#### executeTransfer
+#### drc20_executeTransfer
 The `decider` executes the locked transaction `_txid`, or the `owner` can fallback the locked transaction after the lock has expired. If the recipient of the locked transaction `_to` is decider, the decider can specify a new recipient `_to`.
 ``` candid
-executeTransfer: (_txid: Txid, _executeType: ExecuteType, _to: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 drc20_executeTransfer: (_txid: Txid, _executeType: ExecuteType, _to: opt Address, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
-#### txnQuery
+#### drc20_txnQuery
 Queries transaction counts and recent transaction records cached in token canister.   
 Query type `_request`:  
 #txnCountGlobal: returns global transaction count.  
@@ -345,63 +312,55 @@ Query type `_request`:
 #lockedTxns: returns the locked balance of `owner`, and the locked transaction records.   
 #getEvents: returns global latest transaction events or `owner`s transaction events.   
 ``` candid
-txnQuery: (_request: TxnQueryRequest) -> (response: TxnQueryResponse) query;
 drc20_txnQuery: (_request: TxnQueryRequest) -> (response: TxnQueryResponse) query;
 ```
-#### txnRecord
+#### drc20_txnRecord
 returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in the token canister.   
 OPTIONAL - This method can be used to improve usability, but the method may not be present.
 ``` candid
-txnRecord : (Txid) -> (opt TxnRecord);
 drc20_txnRecord : (Txid) -> (opt TxnRecord);
 ```
-#### subscribe
+#### drc20_subscribe
 Subscribes to the token's messages, giving the `_callback` function and the `_msgTypes` as parameters. Message types are `onTransfer`, `onLock`, `onExecute`, and `onApprove`. Subscribers will only receive messages that are related to them (the subscriber is transaction‘s _from, _to, _spender, or _decider).
-The subscriber SHOULD be a canister, Implementing callback functions in the code.
+The subscriber SHOULD be a canister, Implementing callback functions in the code.  
+OPTIONAL - This method can be used to improve usability, but the method may not be present.
 ``` candid
-subscribe: (_callback: Callback, _msgTypes: vec MsgType, _sa: opt vec nat8) -> bool;
 drc20_subscribe: (_callback: Callback, _msgTypes: vec MsgType, _sa: opt vec nat8) -> bool;
 ```
-#### subscribed
+#### drc20_subscribed
 Returns the subscription status of the subscriber `_owner`.  
 OPTIONAL - This method can be used to improve usability, but the method may not be present.
 ``` candid
-subscribed: (_owner: Address) -> (result: opt Subscription) query;
 drc20_subscribed: (_owner: Address) -> (result: opt Subscription) query;
 ```
-#### approve
+#### drc20_approve
 Allows `_spender` to withdraw from your account multiple times, up to the `_value` amount. If this function is called again it overwrites the current allowance with `_value`.   
 A maximum of 50 approvals can exist per account.   
 **NOTE**: When you execute `approve()` to authorize the spender, it may cause security problems, you can execute `approve(_spender, 0, ...)` to deauthorize.
 ``` candid
-approve: (_spender: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 drc20_approve: (_spender: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
-#### allowance
+#### drc20_allowance
 Returns the amount which `_spender` is still allowed to withdraw from `_owner`.
 ``` candid
-allowance: (_owner: Address, _spender: Address) -> (remaining: nat) query;
 drc20_allowance: (_owner: Address, _spender: Address) -> (remaining: nat) query;
 ```
-#### approvals
+#### drc20_approvals
 Returns all `_owner`s approvals with a non-zero amount.  
 OPTIONAL - This method can be used to improve usability, but the method may not be present.
 ``` candid
-approvals: (_owner: Address) -> (allowances: vec Allowance) query;
 drc20_approvals: (_owner: Address) -> (allowances: vec Allowance) query;
 ```
-#### dropAccount
+#### drc20_dropAccount
 Closes the account. The account can only be closed if the balance of the account is not greater than the GAS fee.   
 OPTIONAL - This method can be used to improve usability, but the method may not be present.
 ``` candid
-dropAccount : (opt Sa) -> bool;
 drc20_dropAccount : (opt Sa) -> bool;
 ```
-#### holdersCount
+#### drc20_holdersCount
 Returns the number of accounts with a non-zero balance, the number of accounts with existing transactions, and the number of accounts that have been dropped. 
 OPTIONAL - This method can be used to improve usability, but the method may not be present.
 ``` candid
-holdersCount : () -> (balances: nat, nonces: nat, dropedAccounts: nat) query;
 drc20_holdersCount : () -> (balances: nat, nonces: nat, dropedAccounts: nat) query;
 ```
 

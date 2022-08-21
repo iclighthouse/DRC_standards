@@ -4,6 +4,8 @@ A standard interface for Dfinity tokens
 
 ## Latest upgrade: 
 
+2022-8-21: Use the "drc20_" prefix as the standard method name.
+
 2022-8-17: Method fee() replaces gas(); Upgraded examples.
 
 2022-8-14: Upgraded examples; Added storage saving mode; Added `drc20_dropAccount` and `drc20_holdersCount` methods.

@@ -93,52 +93,6 @@ module {
   };
   public type Self = actor {
     standard : shared query () -> async Text;
-    allowance : shared query (Address, Spender) -> async Amount;
-    approvals : shared query Address -> async [Allowance];
-    approve : shared (Spender, Amount, ?Nonce, ?Sa, ?Data) -> async TxnResult;
-    balanceOf : shared query Address -> async Amount;
-    //cyclesBalanceOf : shared query Address -> async Nat;
-    //cyclesReceive : shared ?Address -> async Nat;
-    decimals : shared query () -> async Nat8;
-    executeTransfer : shared (Txid, ExecuteType, ?To, ?Nonce, ?Sa, ?Data) -> async TxnResult;
-    fee : shared query () -> async Amount;
-    lockTransfer : shared (
-        To,
-        Amount,
-        Timeout,
-        ?Decider, 
-        ?Nonce,
-        ?Sa,
-        ?Data,
-      ) -> async TxnResult;
-    lockTransferFrom : shared (
-        From,
-        To,
-        Amount,
-        Timeout,
-        ?Decider, 
-        ?Nonce,
-        ?Sa,
-        ?Data,
-      ) -> async TxnResult;
-    metadata : shared query () -> async [Metadata];
-    name : shared query () -> async Text;
-    subscribe : shared (Callback, [MsgType], ?Sa) -> async Bool;
-    subscribed : shared query Address -> async ?Subscription;
-    symbol : shared query () -> async Text;
-    totalSupply : shared query () -> async Amount;
-    transfer : shared (To, Amount, ?Nonce, ?Sa, ?Data) -> async TxnResult;
-    transferFrom : shared (
-        From,
-        To,
-        Amount, 
-        ?Nonce,
-        ?Sa,
-        ?Data,
-      ) -> async TxnResult;
-    txnQuery : shared query TxnQueryRequest -> async TxnQueryResponse;
-    txnRecord : shared (Txid) -> async ?TxnRecord;
-    getCoinSeconds : shared query ?Address -> async (CoinSeconds, ?CoinSeconds);
     drc20_allowance : shared query (Address, Spender) -> async Amount;
     drc20_approvals : shared query Address -> async [Allowance];
     drc20_approve : shared (Spender, Amount, ?Nonce, ?Sa, ?Data) -> async TxnResult;

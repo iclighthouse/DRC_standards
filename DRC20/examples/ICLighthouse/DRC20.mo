@@ -792,115 +792,106 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         return standard_;
     };
 
+    // drc20 standard (aliase interface).
+    // /// Returns the name of the token.
+    // public query func name() : async Text{
+    //     return name_;
+    // };
+    // /// Returns the symbol of the token.
+    // public query func symbol() : async Text{
+    //     return symbol_;
+    // };
+    // /// Returns the number of decimals the token uses.
+    // public query func decimals() : async Nat8{
+    //     return decimals_;
+    // };
+    // /// Returns the extend metadata info of the token.
+    // public query func metadata() : async [Metadata]{
+    //     return metadata_;
+    // };
+    // /// Returns the transaction fee of the token. 
+    // public query func fee() : async Amount{
+    //     return fee_;
+    // };
+    // /// Returns the total token supply.
+    // public query func totalSupply() : async Amount{
+    //     return totalSupply_;
+    // };
+    // /// Returns coinSeconds value
+    // public query func getCoinSeconds(_owner: ?Address) : async (totalCoinSeconds: CoinSeconds, accountCoinSeconds: ?CoinSeconds){
+    //     return __getCoinSeconds(_owner);
+    // };
+    // /// Returns the account balance of the given account _owner, not including the locked balance.
+    // public query func balanceOf(_owner: Address) : async (balance: Amount){
+    //     return _getBalance(_getAccountId(_owner));
+    // };
+    // /// Transfers _value amount of tokens from caller's account to address _to, returns type TxnResult.
+    // public shared(msg) func transfer(_to: To, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
+    //     return await __transferFrom(msg.caller, _getAccountIdFromPrincipal(msg.caller, _sa), _getAccountId(_to), _value, _nonce, _sa, _data, false);
+    // };
+    // /// Transfers _value amount of tokens from address _from to address _to, returns type TxnResult.
+    // public shared(msg) func transferFrom(_from: From, _to: To, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : 
+    // async (result: TxnResult) {
+    //     return await __transferFrom(msg.caller, _getAccountId(_from), _getAccountId(_to), _value, _nonce, _sa, _data, true);
+    // };
+    // /// Locks a transaction, specifies a `_decider` who can decide the execution of this transaction, 
+    // /// and sets an expiration period `_timeout` seconds after which the locked transaction will be unlocked.
+    // /// The parameter _timeout should not be greater than 64,000,000 seconds.
+    // public shared(msg) func lockTransfer(_to: To, _value: Amount, _timeout: Timeout, 
+    // _decider: ?Decider, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
+    //     return await __lockTransferFrom(msg.caller, _getAccountIdFromPrincipal(msg.caller, _sa), _getAccountId(_to), _value, _timeout, _decider, _nonce, _sa, _data, false);
+    // };
+    // /// `spender` locks a transaction.
+    // public shared(msg) func lockTransferFrom(_from: From, _to: To, _value: Amount, 
+    // _timeout: Timeout, _decider: ?Decider, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
+    //     return await __lockTransferFrom(msg.caller, _getAccountId(_from), _getAccountId(_to), _value, _timeout, _decider, _nonce, _sa, _data, true);
+    // };
+    // /// The `decider` executes the locked transaction `_txid`, or the `owner` can fallback the locked transaction after the lock has expired.
+    // /// If the recipient of the locked transaction `_to` is decider, the decider can specify a new recipient `_to`.
+    // public shared(msg) func executeTransfer(_txid: Txid, _executeType: ExecuteType, _to: ?To, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
+    //     return await __executeTransfer(msg.caller, _txid, _executeType, _to, _nonce, _sa, _data);
+    // };
+    // /// Queries the transaction records information.
+    // public query func txnQuery(_request: TxnQueryRequest) : async (response: TxnQueryResponse){
+    //     return __txnQuery(_request);
+    // };
+
+    // /// returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in the token canister.
+    // public shared func txnRecord(_txid: Txid) : async ?TxnRecord{
+    //     return await drc202.get2(Principal.fromActor(this), _txid);
+    // };
+
+    // /// Subscribes to the token's messages, giving the callback function and the types of messages as parameters.
+    // public shared(msg) func subscribe(_callback: Callback, _msgTypes: [MsgType], _sa: ?Sa) : async Bool{
+    //     return __subscribe(msg.caller, _callback, _msgTypes, _sa);
+    // };
+    // /// Returns the subscription status of the subscriber `_owner`. 
+    // public query func subscribed(_owner: Address) : async (result: ?Subscription){
+    //     return pubsub.getSub(_getAccountId(_owner));
+    // };
+    // /// Allows `_spender` to withdraw from your account multiple times, up to the `_value` amount.
+    // /// If this function is called again it overwrites the current allowance with `_value`. 
+    // public shared(msg) func approve(_spender: Spender, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult){
+    //     return await __approve(msg.caller, _spender, _value, _nonce, _sa, _data);
+    // };
+    // /// Returns the amount which `_spender` is still allowed to withdraw from `_owner`.
+    // public query func allowance(_owner: Address, _spender: Spender) : async (remaining: Amount) {
+    //     return _getAllowance(_getAccountId(_owner), _getAccountId(_spender));
+    // };
+    // /// Returns all your approvals with a non-zero amount.
+    // public query func approvals(_owner: Address) : async (allowances: [Allowance]) {
+    //     return _getAllowances(_getAccountId(_owner));
+    // };
+    // /// Closes the account. The account can only be closed if the balance of the account is not greater than the GAS fee. 
+    // public shared(msg) func dropAccount(_sa: ?Sa) : async Bool{
+    //     return _dropAccount(_getAccountIdFromPrincipal(msg.caller, _sa));
+    // };
+    // /// Returns the number of accounts with a non-zero balance, the number of accounts with existing transactions, and the number of accounts that have been dropped. 
+    // public query func holdersCount() : async (balances: Nat, nonces: Nat, dropedAccounts: Nat){
+    //     return (Trie.size(balances), Trie.size(nonces), Trie.size(dropedAccounts));
+    // };
+
     // drc20 standard (main interface).
-    /// Returns the name of the token.
-    public query func name() : async Text{
-        return name_;
-    };
-    /// Returns the symbol of the token.
-    public query func symbol() : async Text{
-        return symbol_;
-    };
-    /// Returns the number of decimals the token uses.
-    public query func decimals() : async Nat8{
-        return decimals_;
-    };
-    /// Returns the extend metadata info of the token.
-    public query func metadata() : async [Metadata]{
-        return metadata_;
-    };
-    /// Sends/donates cycles to the token canister in _account's name, and return cycles balance of the account/token.
-    /// If the parameter `_account` is null, it means donation.
-    // public shared(msg) func cyclesReceive(_account: ?Address) : async (balance: Nat){
-    //     return __cyclesReceive(msg.caller, _account);
-    // };
-    /// Returns the cycles balance of the given account _owner in the token.
-    // public query func cyclesBalanceOf(_owner: Address) : async (balance: Nat){
-    //     return _getCyclesBalances(_getAccountId(_owner));
-    // };
-    /// Returns the transaction fee of the token. 
-    public query func fee() : async Amount{
-        return fee_;
-    };
-    /// Returns the total token supply.
-    public query func totalSupply() : async Amount{
-        return totalSupply_;
-    };
-    /// Returns coinSeconds value
-    public query func getCoinSeconds(_owner: ?Address) : async (totalCoinSeconds: CoinSeconds, accountCoinSeconds: ?CoinSeconds){
-        return __getCoinSeconds(_owner);
-    };
-    /// Returns the account balance of the given account _owner, not including the locked balance.
-    public query func balanceOf(_owner: Address) : async (balance: Amount){
-        return _getBalance(_getAccountId(_owner));
-    };
-    /// Transfers _value amount of tokens from caller's account to address _to, returns type TxnResult.
-    public shared(msg) func transfer(_to: To, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
-        return await __transferFrom(msg.caller, _getAccountIdFromPrincipal(msg.caller, _sa), _getAccountId(_to), _value, _nonce, _sa, _data, false);
-    };
-    /// Transfers _value amount of tokens from address _from to address _to, returns type TxnResult.
-    public shared(msg) func transferFrom(_from: From, _to: To, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : 
-    async (result: TxnResult) {
-        return await __transferFrom(msg.caller, _getAccountId(_from), _getAccountId(_to), _value, _nonce, _sa, _data, true);
-    };
-    /// Locks a transaction, specifies a `_decider` who can decide the execution of this transaction, 
-    /// and sets an expiration period `_timeout` seconds after which the locked transaction will be unlocked.
-    /// The parameter _timeout should not be greater than 64,000,000 seconds.
-    public shared(msg) func lockTransfer(_to: To, _value: Amount, _timeout: Timeout, 
-    _decider: ?Decider, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
-        return await __lockTransferFrom(msg.caller, _getAccountIdFromPrincipal(msg.caller, _sa), _getAccountId(_to), _value, _timeout, _decider, _nonce, _sa, _data, false);
-    };
-    /// `spender` locks a transaction.
-    public shared(msg) func lockTransferFrom(_from: From, _to: To, _value: Amount, 
-    _timeout: Timeout, _decider: ?Decider, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
-        return await __lockTransferFrom(msg.caller, _getAccountId(_from), _getAccountId(_to), _value, _timeout, _decider, _nonce, _sa, _data, true);
-    };
-    /// The `decider` executes the locked transaction `_txid`, or the `owner` can fallback the locked transaction after the lock has expired.
-    /// If the recipient of the locked transaction `_to` is decider, the decider can specify a new recipient `_to`.
-    public shared(msg) func executeTransfer(_txid: Txid, _executeType: ExecuteType, _to: ?To, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
-        return await __executeTransfer(msg.caller, _txid, _executeType, _to, _nonce, _sa, _data);
-    };
-    /// Queries the transaction records information.
-    public query func txnQuery(_request: TxnQueryRequest) : async (response: TxnQueryResponse){
-        return __txnQuery(_request);
-    };
-
-    /// returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in the token canister.
-    public shared func txnRecord(_txid: Txid) : async ?TxnRecord{
-        return await drc202.get2(Principal.fromActor(this), _txid);
-    };
-
-    /// Subscribes to the token's messages, giving the callback function and the types of messages as parameters.
-    public shared(msg) func subscribe(_callback: Callback, _msgTypes: [MsgType], _sa: ?Sa) : async Bool{
-        return __subscribe(msg.caller, _callback, _msgTypes, _sa);
-    };
-    /// Returns the subscription status of the subscriber `_owner`. 
-    public query func subscribed(_owner: Address) : async (result: ?Subscription){
-        return pubsub.getSub(_getAccountId(_owner));
-    };
-    /// Allows `_spender` to withdraw from your account multiple times, up to the `_value` amount.
-    /// If this function is called again it overwrites the current allowance with `_value`. 
-    public shared(msg) func approve(_spender: Spender, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult){
-        return await __approve(msg.caller, _spender, _value, _nonce, _sa, _data);
-    };
-    /// Returns the amount which `_spender` is still allowed to withdraw from `_owner`.
-    public query func allowance(_owner: Address, _spender: Spender) : async (remaining: Amount) {
-        return _getAllowance(_getAccountId(_owner), _getAccountId(_spender));
-    };
-    /// Returns all your approvals with a non-zero amount.
-    public query func approvals(_owner: Address) : async (allowances: [Allowance]) {
-        return _getAllowances(_getAccountId(_owner));
-    };
-    /// Closes the account. The account can only be closed if the balance of the account is not greater than the GAS fee. 
-    public shared(msg) func dropAccount(_sa: ?Sa) : async Bool{
-        return _dropAccount(_getAccountIdFromPrincipal(msg.caller, _sa));
-    };
-    /// Returns the number of accounts with a non-zero balance, the number of accounts with existing transactions, and the number of accounts that have been dropped. 
-    public query func holdersCount() : async (balances: Nat, nonces: Nat, dropedAccounts: Nat){
-        return (Trie.size(balances), Trie.size(nonces), Trie.size(dropedAccounts));
-    };
-
-    // drc20 standard (Compatibility aliases).
     public query func drc20_name() : async Text{
         return name_;
     };
@@ -913,12 +904,6 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     public query func drc20_metadata() : async [Metadata]{
         return metadata_;
     };
-    // public shared(msg) func drc20_cyclesReceive(_account: ?Address) : async (balance: Nat){
-    //     return __cyclesReceive(msg.caller, _account);
-    // };
-    // public query func drc20_cyclesBalanceOf(_owner: Address) : async (balance: Nat){
-    //     return _getCyclesBalances(_getAccountId(_owner));
-    // };
     public query func drc20_fee() : async Amount{
         return fee_;
     };
