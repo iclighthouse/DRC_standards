@@ -46,7 +46,8 @@ TODO: Standard drafting and motoko example implementation
 
 2022-3-10: Drafted standard.   
 2022-3-25: Implemented the example with motoko.   
-2022-8-11: Upgrade examples.  
+2022-8-11: Upgrade examples. 
+2022-9-20: Update the data structure TxnRecord. 
 
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC205](https://github.com/iclighthouse/DRC_standards/tree/main/DRC205)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/examples/ICLighthouse)  
@@ -55,7 +56,7 @@ Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/example
 
 ## DRC207: Monitorable Canister standards
 
-TODO: Standard drafting and motoko example implementation
+2022-9-20: Implemented the example with motoko. 
 
 ## Community
 

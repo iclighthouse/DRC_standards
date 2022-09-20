@@ -19,7 +19,7 @@ import Cycles "mo:base/ExperimentalCycles";
 
     // DRC207 ICMonitor
     /// DRC207 support
-    public func drc207() : async DRC207.DRC207Support{
+    public query func drc207() : async DRC207.DRC207Support{
         return {
             monitorable_by_self = true;
             monitorable_by_blackhole = { allowed = true; canister_id = ?Principal.fromText("7hdtw-jqaaa-aaaak-aaccq-cai"); };
@@ -64,3 +64,14 @@ dfx canister --network ic call aaaaa-aa update_settings '(record {canister_id=pr
 **Step 3**
 Select a monitor and subscribe to the canister's events. For example https://github.com/iclighthouse/ICMonitor.
 
+### About Blackhole Canister
+
+Use Blackhole canister as a proxy canister to monitor the status of your canister, before using it you need to set a blackhole canister-id as one of the controllers of your canister.
+The controller of the blackhole canister has been modified to its own canister id and no one can control the canister. 
+
+The Blackhole canister id is "7hdtw-jqaaa-aaaak-aaccq-cai", or you can deploy one yourself. 
+
+- Canister id:  7hdtw-jqaaa-aaaak-aaccq-cai  
+- ModuleHash(dfx: 0.8.4):  603692eda4a0c322caccaff93cf4a21dc44aebad6d71b40ecefebef89e55f3be  
+- Controllers:  7hdtw-jqaaa-aaaak-aaccq-cai   
+- Github:  https://github.com/iclighthouse/ICMonitor/blob/main/Blackhole.mo

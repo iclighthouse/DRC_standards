@@ -19,7 +19,7 @@ actor CanisterName {
     *     timer.interval_seconds=`0` means that timer_tick() will be executed once per heartbeat by the Monitor, 
     *     Notes: Timer_tick() will be executed once the eventType `TimerTick` has been subscribed to in the Monitor. There is no guarantee that timer_tick() will be triggered on time.
     **/
-    public func drc207() : async DRC207.DRC207Support{
+    public query func drc207() : async DRC207.DRC207Support{
         return {
             monitorable_by_self = true;
             monitorable_by_blackhole = { allowed = true; canister_id = ?Principal.fromText("7hdtw-jqaaa-aaaak-aaccq-cai"); };

@@ -56,7 +56,7 @@ module {
 /* Implementation example:
 
     /// DRC207 support
-    public func drc207() : async DRC207.DRC207Support{
+    public query func drc207() : async DRC207.DRC207Support{
         return {
             monitorable_by_self = true;
             monitorable_by_blackhole = { allowed = true; canister_id = ?Principal.fromText("7hdtw-jqaaa-aaaak-aaccq-cai"); };
