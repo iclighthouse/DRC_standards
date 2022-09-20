@@ -347,6 +347,23 @@ shared(installMsg) actor class ProxyActor() = this {
         assert(_onlyOwner(msg.caller));
         storeErrPool := List.nil<(AppId, DataType, Nat)>();
     };
+    public shared(msg) func setController(_bucket: Principal, _add: Bool) : async () {
+        assert(_onlyOwner(msg.caller));
+        var controllers : [Principal] = [_bucket, Principal.fromText("7hdtw-jqaaa-aaaak-aaccq-cai"), Principal.fromActor(this), msg.caller];
+        if (not(_add)){
+            controllers := [_bucket, Principal.fromText("7hdtw-jqaaa-aaaak-aaccq-cai"), Principal.fromActor(this)];
+        };
+        let ic: IC.Self = actor("aaaaa-aa");
+        let settings = await ic.update_settings({
+            canister_id = _bucket; 
+            settings={ 
+                compute_allocation = null;
+                controllers = ?controllers; 
+                freezing_threshold = null;
+                memory_allocation = null;
+            };
+        });
+    };
     // receive cycles
     public func wallet_receive(): async (){
         let amout = Cycles.available();

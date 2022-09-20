@@ -31,6 +31,7 @@ module {
     public type OperationType = Types.OperationType; 
     public type BalanceChange = Types.BalanceChange; 
     public type ShareChange = Types.ShareChange; 
+    public type TxnRecordTemp = Types.TxnRecordTemp;
     public type TxnRecord = Types.TxnRecord;
     public type Bucket = Principal;
     public type BucketInfo = {

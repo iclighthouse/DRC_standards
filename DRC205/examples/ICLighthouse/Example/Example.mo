@@ -27,15 +27,20 @@ shared actor class Example() = this {
             cyclesWallet = null; // Cycles wallet principal, used only for one of trading pair tokens is cycles.
             token0 = #Token(Principal.fromText("ueghb-uqaaa-aaaak-aaioa-cai")); // Trading pair { #Cycles; #Icp; #Token: Principal; }
             token1 = #Token(Principal.fromText("udhbv-ziaaa-aaaak-aaioq-cai")); // Trading pair { #Cycles; #Icp; #Token: Principal; }
-            token0Value = #DebitRecord(10000000000); // #DebitRecord indicates the amount of token0 spent for swapping.
-            token1Value = #CreditRecord(20000000000); // #CreditRecord indicates the amount of token1 received from swapping.
             fee = {token0Fee = 0; token1Fee = 20000; }; // fee
             shares = #NoChange; // Liquidity shares change of user. { #Mint: Nat; #Burn: Nat; #NoChange; }
             time = Time.now(); // Timestamp (nanoseconds).
             index = _n;  // Global Index
             nonce = _n;  // Nonce of user
-            orderType = #AMM; // Order Type  { #AMM; #OrderBook; }
+            order = { // Order Request
+                token0Value = ?#DebitRecord(10000000000); // #DebitRecord indicates the amount of token0 spent for swapping.
+                token1Value = ?#CreditRecord(20000000000); // #CreditRecord indicates the amount of token1 received from swapping.
+            };
+            orderMode = #AMM; // Order Mode, { #AMM; #OrderBook; }
+            orderType = null; // Order Type for #OrderBook, { #LMT; #FOK; #FAK; #MKT; }
+            filled = {token0Value = #DebitRecord(10000000000); token1Value = #CreditRecord(20000000000);}; // Order Filled
             details = []; // Counterparty order list, for orderbook mode only.
+            status = #Completed; // Status, {#Failed; #Pending; #Completed;}
             data = null; // Attached data (Blob)
         };
         drc205.put(txn); // Put txn to the current canister cache.

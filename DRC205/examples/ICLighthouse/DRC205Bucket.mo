@@ -10,7 +10,8 @@ import Blob "mo:base/Blob";
 import Nat32 "mo:base/Nat32";
 import Nat64 "mo:base/Nat64";
 import Time "mo:base/Time";
-import Trie "mo:base/Trie";
+import Array "mo:base/Array";
+import Trie "./lib/Trie";
 import Cycles "mo:base/ExperimentalCycles";
 import CyclesWallet "./sys/CyclesWallet";
 import SwapRecord "./lib/SwapRecord";
@@ -22,12 +23,15 @@ shared(installMsg) actor class BucketActor() = this {
     type AppId = SwapRecord.AppId;
     type Txid = SwapRecord.Txid;  
     type Sid = SwapRecord.Sid;
+    type BalanceChange = SwapRecord.BalanceChange;
+    type TxnRecordTemp = SwapRecord.TxnRecordTemp;
     type TxnRecord = SwapRecord.TxnRecord;
 
     private stable var owner: Principal = installMsg.caller;
     private var bucketVersion: Nat8 = 1;
     private stable var data: Trie.Trie<Sid, ([Nat8], Time.Time)> = Trie.empty(); 
-    private stable var txnData: Trie.Trie<Sid, (TxnRecord, Time.Time)> = Trie.empty(); 
+    private stable var txnData: Trie.Trie<Sid, (TxnRecordTemp, Time.Time)> = Trie.empty(); 
+    private stable var txnData2: Trie.Trie<Sid, (TxnRecord, Time.Time)> = Trie.empty(); 
     private stable var count: Nat = 0;
     private stable var lastStorage: (Sid, Time.Time) = (Blob.fromArray([]), 0);
 
@@ -50,8 +54,8 @@ shared(installMsg) actor class BucketActor() = this {
         assert(_onlyOwner(msg.caller));
         //let _data = SwapRecord.encode(_txn);
         let now = Time.now();
-        let res = Trie.put(txnData, key(_sid), Blob.equal, (_txn, now));
-        txnData := res.0;
+        let res = Trie.put(txnData2, key(_sid), Blob.equal, (_txn, now));
+        txnData2 := res.0;
         switch (res.1){
             case(?(v)){ lastStorage := (_sid, now); };
             case(_){ count += 1; lastStorage := (_sid, now); };
@@ -66,7 +70,7 @@ shared(installMsg) actor class BucketActor() = this {
     };
     public query func txn(_app: AppId, _txid: Txid) : async ?(TxnRecord, Time.Time){
         let _sid = SwapRecord.generateSid(_app, _txid);
-        let _txn = Trie.get(txnData, key(_sid), Blob.equal);
+        let _txn = Trie.get(txnData2, key(_sid), Blob.equal);
         switch (_txn){
             case(?(v)){
                 return ?(v.0, v.1);
@@ -131,6 +135,36 @@ shared(installMsg) actor class BucketActor() = this {
     /// timer tick
     // public func timer_tick(): async (){
     //     //
+    // };
+
+    // system func postupgrade() {
+    //     txnData2 := Trie.mapFilter(txnData, func (k:Sid, v:(TxnRecordTemp, Time.Time)): ?(TxnRecord, Time.Time){
+    //         return ?({
+    //             txid = v.0.txid;
+    //             msgCaller = v.0.msgCaller;
+    //             caller = v.0.caller;
+    //             operation = v.0.operation;
+    //             account = v.0.account;
+    //             cyclesWallet = v.0.cyclesWallet;
+    //             token0 = v.0.token0;
+    //             token1 = v.0.token1;
+    //             fee = v.0.fee;
+    //             shares = v.0.shares;
+    //             time = v.0.time;
+    //             index = v.0.index;
+    //             nonce = v.0.nonce;
+    //             order = {token0Value = ?v.0.token0Value; token1Value = ?v.0.token1Value;};
+    //             orderMode = v.0.orderType;
+    //             orderType = null;
+    //             filled = {token0Value = v.0.token0Value; token1Value = v.0.token1Value;};
+    //             details = Array.map(v.0.details, func (item:{counterparty: Txid; token0Value: BalanceChange; token1Value: BalanceChange;}): 
+    //             {counterparty: Txid; token0Value: BalanceChange; token1Value: BalanceChange; time: Time.Time;}{
+    //                 {counterparty = item.counterparty; token0Value = item.token0Value; token1Value = item.token1Value; time = v.0.time; }
+    //             });
+    //             status = #Completed;
+    //             data = v.0.data;
+    //         }, v.1);
+    //     });
     // };
 
 }
