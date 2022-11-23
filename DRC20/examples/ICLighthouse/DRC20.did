@@ -109,6 +109,7 @@ type DRC20 = service {
    drc20_symbol: () -> (text) query;
    drc20_totalSupply: () -> (Amount) query;
    drc20_transfer: (To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   drc20_transferBatch : (vec To, vec Amount, opt Nonce, opt Sa, opt Data) -> (vec TxnResult);
    drc20_transferFrom: (From, To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
    drc20_txnRecord: (Txid) -> (opt TxnRecord);

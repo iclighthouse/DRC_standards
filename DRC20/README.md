@@ -4,6 +4,8 @@ A standard interface for Dfinity tokens
 
 ## Latest upgrade: 
 
+2022-11-20: Add drc20_transferBatch() method; Modify the length of _data to a maximum of 2KB.  
+
 2022-8-21: Use the "drc20_" prefix as the standard method name.
 
 2022-8-17: Method fee() replaces gas(); Upgraded examples.

@@ -2,7 +2,7 @@
 DRC: 20  
 Title: Dfinity Fungible Token Standard  
 Author: Avida <avida.life@hotmail.com>, Simpson <icpstaking-wei@hotmail.com>  
-Status: Draft (PR version)  
+Status: Stable version 
 Category: Token DRC  
 Created: 2021-11-03
 ***
@@ -197,6 +197,7 @@ type DRC20 = service {
    drc20_symbol: () -> (text) query;
    drc20_totalSupply: () -> (Amount) query;
    drc20_transfer: (To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   drc20_transferBatch : (vec To, vec Amount, opt Nonce, opt Sa, opt Data) -> (vec TxnResult);
    drc20_transferFrom: (From, To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
    drc20_txnRecord : (Txid) -> (opt TxnRecord);
@@ -213,7 +214,7 @@ service : (InitArgs) -> DRC20
  - The following specifications use syntax from Candid.
  - The optional parameter `_nonce` is used to specify the nonce of the transaction. The nonce value for each AccountId starts at 0 and is incremented by 1 on the success of each specific transaction. If the caller specifies an incorrect nonce value, the transaction will be rejected. The specific transactions include: approve(), transfer(), transferFrom(), lockTransfer(), lockTransferFrom(), executeTransfer().
  - The optional parameter `_sa` is the subaccount of the caller, which is a 32 bytes nat8 array. If length of `_sa` is less than 32 bytes, it will be prepended with [0] to make up.
- - The optional parameter `_data` is the custom data provided by the caller, which can be used for calldata, memo, etc. The length of `_data` should be less than 65536 bytes (It is recommended to use candid encoding format, e.g. 4-byte method name hash + arguments data). 
+ - The optional parameter `_data` is the custom data provided by the caller, which can be used for calldata, memo, etc. The length of `_data` should be less than 2 KB (It is recommended to use candid encoding format, e.g. 4-byte method name hash + arguments data). 
  - For better compatibility, use method names prefixed with "drc20_".
  
 #### standard
@@ -277,6 +278,12 @@ On success, the returned TxnResult contains the txid. The `txid` is generated in
 *Note* Transfers of 0 values MUST be treated as normal transfers. An account transfer to itself is ALLOWED. 
 ``` candid
 drc20_transfer: (_to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
+```
+#### drc20_transferBatch
+Sends transactions in batches, the parameters `_to` and `_value` are equal-length arrays, meaning transferring `_value[i]` tokens to account `_to[i]` respectively, returning the result `result[i]`.  
+*Note* If the `_nonce` parameter is provided, it is used to check the nonce value of the first transaction. If the first transaction has a `NonceError` error, all transactions are rejected. Each transaction sent in a batch takes up a nonce value.
+``` candid
+drc20_transferBatch : (_to: vec Address, _value: vec nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: vec TxnResult);
 ```
 #### drc20_transferFrom
 Transfers `_value` amount of tokens from address `_from` to address `_to`, returns type `TxnResult`.
@@ -352,7 +359,7 @@ OPTIONAL - This method can be used to improve usability, but the method may not 
 drc20_approvals: (_owner: Address) -> (allowances: vec Allowance) query;
 ```
 #### drc20_dropAccount
-Closes the account. The account can only be closed if the balance of the account is not greater than the GAS fee.   
+Closes the account by the owner himself. The account can only be closed if its balance is not greater than the GAS fee, otherwise it will fail to close.    
 OPTIONAL - This method can be used to improve usability, but the method may not be present.
 ``` candid
 drc20_dropAccount : (opt Sa) -> bool;

@@ -75,7 +75,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     /* 
     * State Variables 
     */
-    private stable var standard_: Text = "dip20; drc20; icrc1"; 
+    private stable var standard_: Text = "dip20; drc20; icrc1; icrc2"; 
     //private stable var owner: Principal = installMsg.caller; 
     private stable var name_: Text = Option.get(initArgs.name, "");
     private stable var symbol_: Text = Option.get(initArgs.symbol, "");
@@ -91,8 +91,10 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private stable var allowances: Trie.Trie2D<AccountId, AccountId, Nat> = Trie.empty(); // Limit 50 records per account
     // private stable var cyclesBalances: Trie.Trie<AccountId, Nat> = Trie.empty();
     // Set EN_DEBUG=false in the production environment.
-    private var drc202 = DRC202.DRC202({EN_DEBUG = true; MAX_CACHE_TIME = 3 * 30 * 24 * 3600 * 1000000000; MAX_CACHE_NUMBER_PER = 100; MAX_STORAGE_TRIES = 2; }, "dip20; drc20");
+    private var drc202 = DRC202.DRC202({EN_DEBUG = true; MAX_CACHE_TIME = 3 * 30 * 24 * 3600 * 1000000000; MAX_CACHE_NUMBER_PER = 100; MAX_STORAGE_TRIES = 2; }, standard_);
+    private stable var drc202_lastStorageTime : Time.Time = 0;
     private var pubsub = ICPubSub.ICPubSub<MsgType>({ MAX_PUBLICATION_TRIES = 2 }, func (t1:MsgType, t2:MsgType): Bool{ t1 == t2 });
+    private stable var icps_lastPublishTime : Time.Time = 0;
     
     /* 
     * For storage saving mode
@@ -389,8 +391,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         if (_inDropedAccount(from) or _inDropedAccount(to)){
             return #err({ code=#UndefinedError; message="This account has been dropped"; });
         };
-        if (data.size() > 65536){
-            return #err({ code=#UndefinedError; message="The length of _data must be less than 65536B"; });
+        if (data.size() > 2048){
+            return #err({ code=#UndefinedError; message="The length of _data must be less than 2 KB"; });
         };
         if (Option.isSome(_nonce) and _getNonce(caller) != Option.get(_nonce,0)){
             return #err({ code=#NonceError; message="Wrong nonce! The nonce value should be "#Nat.toText(_getNonce(caller)); });
@@ -546,7 +548,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         };
     };
     private func __transferFrom(__caller: Principal, _from: AccountId, _to: AccountId, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data, _isSpender: Bool) : 
-    async (result: TxnResult) {
+    (result: TxnResult) {
         let from = _from;
         let to = _to;
         let operation: Operation = #transfer({ action = #send; });
@@ -556,10 +558,6 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         };
         // transfer
         let res = _transfer(__caller, _sa, from, to, _value, _nonce, _data, operation, _isSpender);
-        // publish
-        let pub = pubsub.pub();
-        // records storage (DRC202 Standard)
-        let store = drc202.store();
         // charge fee
         switch(res){
             case(#ok(v)){ ignore _chargeFee(from, 100); return res; };
@@ -567,7 +565,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         };
     };
     private func __lockTransferFrom(__caller: Principal, _from: AccountId, _to: AccountId, _value: Amount, 
-    _timeout: Timeout, _decider: ?Decider, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data, _isSpender: Bool) : async (result: TxnResult) {
+    _timeout: Timeout, _decider: ?Decider, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data, _isSpender: Bool) : (result: TxnResult) {
         if (_timeout > 64000000){
             return #err({ code=#UndefinedError; message="Parameter _timeout should not be greater than 64,000,000 seconds."; });
         };
@@ -589,17 +587,13 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         };
         // transfer
         let res = _transfer(__caller, _sa, from, to, 0, _nonce, _data, operation, _isSpender);
-        // publish
-        let pub = pubsub.pub();
-        // records storage (DRC202 Standard)
-        let store = drc202.store();
         // charge fee
         switch(res){
             case(#ok(v)){ ignore _chargeFee(from, 100); return res; };
             case(#err(v)){ return res; };
         };
     };
-    private func __executeTransfer(__caller: Principal, _txid: Txid, _executeType: ExecuteType, _to: ?To, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
+    private func __executeTransfer(__caller: Principal, _txid: Txid, _executeType: ExecuteType, _to: ?To, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : (result: TxnResult) {
         let txid = _txid;
         let caller = _getAccountIdFromPrincipal(__caller, _sa);
         // check fee
@@ -664,10 +658,6 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                             fallback = fallback;
                         });
                         let res = _transfer(__caller, _sa, from, to, value, _nonce, _data, operation, false);
-                        // publish
-                        let pub = pubsub.pub();
-                        // records storage (DRC202 Standard)
-                        let store = drc202.store();
                         // charge fee
                         // switch(res){
                         //     case(#ok(v)){ ignore _chargeFee(caller, 100); };
@@ -685,7 +675,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             };
         };
     };
-    private func __approve(__caller: Principal, _spender: Spender, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult){
+    private func __approve(__caller: Principal, _spender: Spender, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : (result: TxnResult){
         let from = _getAccountIdFromPrincipal(__caller, _sa);
         let to = _getAccountId(_spender);
         let operation: Operation = #approve({ allowance = _value; });
@@ -698,10 +688,6 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         };
         // transfer
         let res = _transfer(__caller, _sa, from, to, 0, _nonce, _data, operation, false);
-        // publish
-        let pub = pubsub.pub();
-        // records storage (DRC202 Standard)
-        let store = drc202.store();
         // charge fee
         switch(res){
             case(#ok(v)){ ignore _chargeFee(from, 100); return res; };
@@ -819,19 +805,49 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         let _from = _getAccountIdFromPrincipal(msg.caller, null);
         let _to = _getAccountIdFromPrincipal(to, null);
         // dip20 does not support account-id, sub-account, nonce, attached data
-        let res = await __transferFrom(msg.caller, _from, _to, value, null, null, null, false);
+        let res = __transferFrom(msg.caller, _from, _to, value, null, null, null, false);
+        // publish
+        if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
+            icps_lastPublishTime := Time.now();
+            ignore pubsub.pub();
+        };
+        // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
+        if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
+            drc202_lastStorageTime := Time.now();
+            ignore drc202.store(); 
+        };
         return _receipt(res);
     };
     public shared(msg) func transferFrom(from: Principal, to: Principal, value: Nat) : async DIP20.TxReceipt {
         let _from = _getAccountIdFromPrincipal(from, null);
         let _to = _getAccountIdFromPrincipal(to, null);
         // dip20 does not support account-id, sub-account, nonce, attached data
-        let res = await __transferFrom(msg.caller, _from, _to, value, null, null, null, true);
+        let res = __transferFrom(msg.caller, _from, _to, value, null, null, null, true);
+        // publish
+        if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
+            icps_lastPublishTime := Time.now();
+            ignore pubsub.pub();
+        };
+        // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
+        if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
+            drc202_lastStorageTime := Time.now();
+            ignore drc202.store(); 
+        };
         return _receipt(res);
     };
     public shared(msg) func approve(spender: Principal, value: Nat) : async DIP20.TxReceipt {
         // dip20 does not support account-id, sub-account, nonce, attached data
-        let res = await __approve(msg.caller, Principal.toText(spender), value, null, null, null);
+        let res = __approve(msg.caller, Principal.toText(spender), value, null, null, null);
+        // publish
+        if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
+            icps_lastPublishTime := Time.now();
+            ignore pubsub.pub();
+        };
+        // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
+        if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
+            drc202_lastStorageTime := Time.now();
+            ignore drc202.store(); 
+        };
         return _receipt(res);
     };
     private func _getLogo() : Text{
@@ -930,28 +946,117 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         return _getBalance(_getAccountId(_owner));
     };
     public shared(msg) func drc20_transfer(_to: To, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
-        return await __transferFrom(msg.caller, _getAccountIdFromPrincipal(msg.caller, _sa), _getAccountId(_to), _value, _nonce, _sa, _data, false);
+        let res = __transferFrom(msg.caller, _getAccountIdFromPrincipal(msg.caller, _sa), _getAccountId(_to), _value, _nonce, _sa, _data, false);
+        // publish
+        if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
+            icps_lastPublishTime := Time.now();
+            ignore pubsub.pub();
+        };
+        // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
+        if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
+            drc202_lastStorageTime := Time.now();
+            ignore drc202.store(); 
+        };
+        return res;
+    };
+    public shared(msg) func drc20_transferBatch(_to: [To], _value: [Amount], _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: [TxnResult]) {
+        assert(_to.size() == _value.size());
+        var res : [TxnResult] = [];
+        var i : Nat = 0;
+        var nonce = _nonce;
+        label send for (to in _to.vals()){
+            if (i > 0) { nonce := null; };
+            let r = __transferFrom(msg.caller, _getAccountIdFromPrincipal(msg.caller, _sa), _getAccountId(to), _value[i], nonce, _sa, _data, false);
+            res := AID.arrayAppend(res, [r]);
+            switch(r){
+                case(#err(e)){
+                    if (i == 0 and e.code == #NonceError){ break send; };
+                };
+                case(_){};
+            };
+            i += 1;
+        };
+        // publish
+        if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
+            icps_lastPublishTime := Time.now();
+            ignore pubsub.pub();
+        };
+        // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
+        if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
+            drc202_lastStorageTime := Time.now();
+            ignore drc202.store(); 
+        };
+        return res;
     };
     public shared(msg) func drc20_transferFrom(_from: From, _to: To, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : 
     async (result: TxnResult) {
-        return await __transferFrom(msg.caller, _getAccountId(_from), _getAccountId(_to), _value, _nonce, _sa, _data, true);
+        let res = __transferFrom(msg.caller, _getAccountId(_from), _getAccountId(_to), _value, _nonce, _sa, _data, true);
+        // publish
+        if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
+            icps_lastPublishTime := Time.now();
+            ignore pubsub.pub();
+        };
+        // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
+        if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
+            drc202_lastStorageTime := Time.now();
+            ignore drc202.store(); 
+        };
+        return res;
     };
     public shared(msg) func drc20_lockTransfer(_to: To, _value: Amount, _timeout: Timeout, 
     _decider: ?Decider, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
-        return await __lockTransferFrom(msg.caller, _getAccountIdFromPrincipal(msg.caller, _sa), _getAccountId(_to), _value, _timeout, _decider, _nonce, _sa, _data, false);
+        let res = __lockTransferFrom(msg.caller, _getAccountIdFromPrincipal(msg.caller, _sa), _getAccountId(_to), _value, _timeout, _decider, _nonce, _sa, _data, false);
+        // publish
+        if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
+            icps_lastPublishTime := Time.now();
+            ignore pubsub.pub();
+        };
+        // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
+        if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
+            drc202_lastStorageTime := Time.now();
+            ignore drc202.store(); 
+        };
+        return res;
     };
     public shared(msg) func drc20_lockTransferFrom(_from: From, _to: To, _value: Amount, 
     _timeout: Timeout, _decider: ?Decider, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
-        return await __lockTransferFrom(msg.caller, _getAccountId(_from), _getAccountId(_to), _value, _timeout, _decider, _nonce, _sa, _data, true);
+        let res = __lockTransferFrom(msg.caller, _getAccountId(_from), _getAccountId(_to), _value, _timeout, _decider, _nonce, _sa, _data, true);
+        // publish
+        if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
+            icps_lastPublishTime := Time.now();
+            ignore pubsub.pub();
+        };
+        // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
+        if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
+            drc202_lastStorageTime := Time.now();
+            ignore drc202.store(); 
+        };
+        return res;
     };
     public shared(msg) func drc20_executeTransfer(_txid: Txid, _executeType: ExecuteType, _to: ?To, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult) {
-        return await __executeTransfer(msg.caller, _txid, _executeType, _to, _nonce, _sa, _data);
+        let res = __executeTransfer(msg.caller, _txid, _executeType, _to, _nonce, _sa, _data);
+        // publish
+        if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
+            icps_lastPublishTime := Time.now();
+            ignore pubsub.pub();
+        };
+        // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
+        if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
+            drc202_lastStorageTime := Time.now();
+            ignore drc202.store(); 
+        };
+        return res;
     };
     public query func drc20_txnQuery(_request: TxnQueryRequest) : async (response: TxnQueryResponse){
         return __txnQuery(_request);
     };
     public shared func drc20_txnRecord(_txid: Txid) : async ?TxnRecord{
-        return await drc202.get2(Principal.fromActor(this), _txid);
+        switch(drc202.get(_txid)){
+            case(?(txn)){ return ?txn; };
+            case(_){
+                return await drc202.get2(Principal.fromActor(this), _txid);
+            };
+        };
     };
     public shared(msg) func drc20_subscribe(_callback: Callback, _msgTypes: [MsgType], _sa: ?Sa) : async Bool{
         return __subscribe(msg.caller, _callback, _msgTypes, _sa);
@@ -960,7 +1065,18 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         return pubsub.getSub(_getAccountId(_owner));
     };
     public shared(msg) func drc20_approve(_spender: Spender, _value: Amount, _nonce: ?Nonce, _sa: ?Sa, _data: ?Data) : async (result: TxnResult){
-        return await __approve(msg.caller, _spender, _value, _nonce, _sa, _data);
+        let res = __approve(msg.caller, _spender, _value, _nonce, _sa, _data);
+        // publish
+        if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
+            icps_lastPublishTime := Time.now();
+            ignore pubsub.pub();
+        };
+        // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
+        if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
+            drc202_lastStorageTime := Time.now();
+            ignore drc202.store(); 
+        };
+        return res;
     };
     public query func drc20_allowance(_owner: Address, _spender: Spender) : async (remaining: Amount) {
         return _getAllowance(_getAccountId(_owner), _getAccountId(_spender));
@@ -1019,7 +1135,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         return [
             {name = "DIP20"; url = "https://github.com/Psychedelic/DIP20"},
             {name = "DRC20"; url = "https://github.com/iclighthouse/DRC_standards/blob/main/DRC20/DRC20.md"},
-            {name = "ICRC-1"; url = "https://github.com/dfinity/ICRC-1"}
+            {name = "ICRC-1"; url = "https://github.com/dfinity/ICRC-1"},
+            {name = "ICRC-2"; url = "https://github.com/dfinity/ICRC-1/tree/main/standards/ICRC-2"}
         ];
     };
     public query func icrc1_minting_account() : async Account{
@@ -1038,8 +1155,10 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         return _icrc1_getFee();
     };
     public query func icrc1_metadata() : async [(Text, Value)]{
-        let md1: [(Text, Value)] = [("icrc1:symbol", #Text(symbol_)), ("icrc1:name", #Text(name_)), ("icrc1:decimals", #Nat(Nat8.toNat(decimals_))), ("icrc1:fee", #Nat(_icrc1_getFee()))];
-        let md2: [(Text, Value)] = Array.map<Metadata, (Text, Value)>(metadata_, func (item: Metadata) : (Text, Value) { ("icrc1:"#item.name, #Text(item.content)) });
+        let md1: [(Text, Value)] = [("icrc1:symbol", #Text(symbol_)), ("icrc1:name", #Text(name_)), ("icrc1:decimals", #Nat(Nat8.toNat(decimals_))), ("icrc1:fee", #Nat(_icrc1_getFee())), ("icrc1:totalSupply", #Nat(totalSupply_))];
+        var md2: [(Text, Value)] = Array.map<Metadata, (Text, Value)>(metadata_, func (item: Metadata) : (Text, Value) { ("drc20:"#item.name, #Text(item.content)) });
+        md2 := AID.arrayAppend(md2, [("drc20:height", #Nat(index))]);
+        md2 := AID.arrayAppend(md2, [("drc20:holders", #Nat(Trie.size(balances)))]);
         return AID.arrayAppend(md1, md2);
     };
     public query func icrc1_total_supply() : async Nat{
@@ -1049,12 +1168,137 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         return _getBalance(_icrc1_get_account(_owner));
     };
     public shared(msg) func icrc1_transfer(_args: TransferArgs) : async ({ #Ok: Nat; #Err: TransferError; }) {
+        switch(_args.fee){
+            case(?(icrc1_fee)){
+                if (icrc1_fee < fee_){ return #Err(#BadFee({ expected_fee = fee_ })) };
+            };
+            case(_){};
+        };
         let from = _icrc1_get_account({ owner = msg.caller; subaccount = _args.from_subaccount; });
         let sub = ?Blob.toArray(Option.get(_args.from_subaccount, Blob.fromArray([])));
         let to = _icrc1_get_account(_args.to);
         let data = _args.memo;
-        let res = await __transferFrom(msg.caller, from, to, _args.amount, null, sub, data, false);
+        let res = __transferFrom(msg.caller, from, to, _args.amount, null, sub, data, false);
+        // publish
+        if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
+            icps_lastPublishTime := Time.now();
+            ignore pubsub.pub();
+        };
+        // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
+        if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
+            drc202_lastStorageTime := Time.now();
+            ignore drc202.store(); 
+        };
         return _icrc1_receipt(res, from);
+    };
+    /*
+    * ICRC-2
+    */
+    type ApproveArgs = ICRC1.ApproveArgs;
+    type ApproveError = ICRC1.ApproveError;
+    type TransferFromArgs = ICRC1.TransferFromArgs;
+    type TransferFromError = ICRC1.TransferFromError;
+    type AllowanceArgs = ICRC1.AllowanceArgs;
+    private func _icrc2_approve_receipt(_result: TxnResult, _a: AccountId) : { #Ok: Nat; #Err: ApproveError; }{
+        switch(_result){
+            case(#ok(txid)){
+                switch(drc202.get(txid)){
+                    case(?(txn)){ return #Ok(txn.index) };
+                    case(_){ return #Ok(0) };
+                };
+            };
+            case(#err(err)){
+                var fee = { expected_fee: Nat = fee_ };
+                switch(err.code){
+                    case(#InsufficientGas) { return #Err(#BadFee(fee)) };
+                    case(#InsufficientAllowance) { return #Err(#GenericError({ error_code = 101; message = err.message })) };
+                    case(#UndefinedError) { return #Err(#GenericError({ error_code = 999; message = err.message })) };
+                    case(#InsufficientBalance) { return #Err(#InsufficientFunds({ balance = _getBalance(_a); })) };
+                    case(#NonceError) { return #Err(#GenericError({ error_code = 102; message = err.message })) };
+                    case(#NoLockedTransfer) { return #Err(#GenericError({ error_code = 103; message = err.message })) };
+                    case(#DuplicateExecutedTransfer) { return #Err(#GenericError({ error_code = 104; message = err.message })) };
+                    case(#LockedTransferExpired) { return #Err(#GenericError({ error_code = 105; message = err.message })) };
+                };
+            };
+        };
+    };
+    private func _icrc2_transfer_from_receipt(_result: TxnResult, _a: AccountId, _spender: AccountId) : { #Ok: Nat; #Err: TransferFromError; }{
+        switch(_result){
+            case(#ok(txid)){
+                switch(drc202.get(txid)){
+                    case(?(txn)){ return #Ok(txn.index) };
+                    case(_){ return #Ok(0) };
+                };
+            };
+            case(#err(err)){
+                var fee = { expected_fee: Nat = fee_ };
+                switch(err.code){
+                    case(#InsufficientGas) { return #Err(#BadFee(fee)) };
+                    case(#InsufficientAllowance) { return #Err(#InsufficientAllowance({ allowance = _getAllowance(_a, _spender)})) };
+                    case(#UndefinedError) { return #Err(#GenericError({ error_code = 999; message = err.message })) };
+                    case(#InsufficientBalance) { return #Err(#InsufficientFunds({ balance = _getBalance(_a); })) };
+                    case(#NonceError) { return #Err(#GenericError({ error_code = 102; message = err.message })) };
+                    case(#NoLockedTransfer) { return #Err(#GenericError({ error_code = 103; message = err.message })) };
+                    case(#DuplicateExecutedTransfer) { return #Err(#GenericError({ error_code = 104; message = err.message })) };
+                    case(#LockedTransferExpired) { return #Err(#GenericError({ error_code = 105; message = err.message })) };
+                };
+            };
+        };
+    };
+    public shared(msg) func icrc2_approve(_args: ApproveArgs) : async { #Ok : Nat; #Err : ApproveError }{
+        switch(_args.fee){
+            case(?(icrc1_fee)){
+                if (icrc1_fee < fee_){ return #Err(#BadFee({ expected_fee = fee_ })) };
+            };
+            case(_){};
+        };
+        let spender = _icrc1_get_account({ owner = _args.spender; subaccount = null; });
+        let value = _args.amount;
+        let from = _icrc1_get_account({ owner = msg.caller; subaccount = _args.from_subaccount; });
+        let sub = ?Blob.toArray(Option.get(_args.from_subaccount, Blob.fromArray([])));
+        let data = _args.memo;
+        let res = __approve(msg.caller, Hex.encode(Blob.toArray(spender)), value, null, sub, data);
+        // publish
+        if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
+            icps_lastPublishTime := Time.now();
+            ignore pubsub.pub();
+        };
+        // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
+        if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
+            drc202_lastStorageTime := Time.now();
+            ignore drc202.store(); 
+        };
+        return _icrc2_approve_receipt(res, from);
+    };
+    public shared(msg) func icrc2_transfer_from(_args: TransferFromArgs) : async { #Ok : Nat; #Err : TransferFromError } {
+        switch(_args.fee){
+            case(?(icrc1_fee)){
+                if (icrc1_fee < fee_){ return #Err(#BadFee({ expected_fee = fee_ })) };
+            };
+            case(_){};
+        };
+        let spender = _icrc1_get_account({ owner = msg.caller; subaccount = null; });
+        let from = _icrc1_get_account(_args.from);
+        let to = _icrc1_get_account(_args.to);
+        let value = _args.amount;
+        let data = _args.memo;
+        let res = __transferFrom(msg.caller, from, to, value, null, null, data, true);
+        // publish
+        if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
+            icps_lastPublishTime := Time.now();
+            ignore pubsub.pub();
+        };
+        // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
+        if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
+            drc202_lastStorageTime := Time.now();
+            ignore drc202.store(); 
+        };
+        return _icrc2_transfer_from_receipt(res, from, spender);
+    };
+    public query func icrc2_allowance(_args: AllowanceArgs) : async Nat {
+        let owner = _icrc1_get_account(_args.account);
+        let spender = _icrc1_get_account({ owner = _args.spender; subaccount = null; });
+        return _getAllowance(owner, spender);
     };
 
     // drc202
@@ -1082,7 +1326,16 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     };
     /// returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in this canister.
     public shared func drc202_txn2(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
-        return await drc202.get2(Principal.fromActor(this), _txid);
+        switch(drc202.get(_txid)){
+            case(?(txn)){ return ?txn; };
+            case(_){
+                return await drc202.get2(Principal.fromActor(this), _txid);
+            };
+        };
+    };
+    /// returns drc202 pool
+    public query func drc202_pool() : async [(DRC202.Txid, Nat)]{
+        return drc202.getPool();
     };
 
     // ICPubSub
@@ -1133,8 +1386,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private stable var __drc202Data: [DRC202.DataTemp] = [];
     private stable var __pubsubData: [ICPubSub.DataTemp<MsgType>] = [];
     system func preupgrade() {
-        __drc202Data := AID.arrayAppend(__drc202Data, [drc202.getData()]);
-        __pubsubData := AID.arrayAppend(__pubsubData, [pubsub.getData()]);
+        __drc202Data := [drc202.getData()];
+        __pubsubData := [pubsub.getData()];
     };
     system func postupgrade() {
         if (__drc202Data.size() > 0){

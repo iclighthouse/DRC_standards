@@ -10,6 +10,8 @@ Add token --> Custom --> Fill in Token Canister ID and select "DIP20" --> Contin
 
 ## Update:
 
+[2022-11-20] Upgraded examples.
+
 [2022-8-17] Method fee() replaces gas(); Upgraded examples.
 
 [2022-8-14] Upgraded the example.

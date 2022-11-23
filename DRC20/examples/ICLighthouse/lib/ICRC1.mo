@@ -27,6 +27,49 @@ module {
         #TemporarilyUnavailable;
         #GenericError: { error_code : Nat; message : Text };
     };
+    public type ApproveArgs = {
+        from_subaccount : ?Blob;
+        spender : Principal;
+        amount : Nat;
+        fee : ?Nat;
+        memo : ?Blob;
+        created_at_time : ?Nat64;
+    };
+    public type ApproveError = {
+        #BadFee : { expected_fee : Nat };
+        // The caller does not have enough funds to pay the approval fee.
+        #InsufficientFunds : { balance : Nat };
+        #TooOld;
+        #CreatedInFuture: { ledger_time : Nat64 };
+        #Duplicate : { duplicate_of : Nat };
+        #TemporarilyUnavailable;
+        #GenericError : { error_code : Nat; message : Text };
+    };
+    public type TransferFromArgs = {
+        from : Account;
+        to : Account;
+        amount : Nat;
+        fee : ?Nat;
+        memo : ?Blob;
+        created_at_time : ?Nat64;
+    };
+    public type TransferFromError = {
+        #BadFee : { expected_fee : Nat };
+        #BadBurn : { min_burn_amount : Nat };
+        // The [from] account does not hold enough funds for the transfer.
+        #InsufficientFunds : { balance : Nat };
+        // The caller exceeded its allowance.
+        #InsufficientAllowance : { allowance : Nat };
+        #TooOld;
+        #CreatedInFuture: { ledger_time : Nat64 };
+        #Duplicate : { duplicate_of : Nat };
+        #TemporarilyUnavailable;
+        #GenericError : { error_code : Nat; message : Text };
+    };
+    public type AllowanceArgs = {
+        account : Account;
+        spender : Principal;
+    };
     
     public type Self = actor {
         icrc1_supported_standards : shared query () -> async [{ name : Text; url : Text }];
@@ -39,5 +82,8 @@ module {
         icrc1_minting_account : shared query () -> async ?Account;
         icrc1_balance_of : shared query (_owner: Account) -> async Nat;
         icrc1_transfer : shared (_args: TransferArgs) -> async { #Ok: Nat; #Err: TransferError; };
+        icrc2_approve : shared (ApproveArgs) -> async { #Ok : Nat; #Err : ApproveError };
+        icrc2_transfer_from : shared (TransferFromArgs) -> async { #Ok : Nat; #Err : TransferFromError };
+        icrc2_allowance : shared query (AllowanceArgs) -> async Nat;
     }
 };

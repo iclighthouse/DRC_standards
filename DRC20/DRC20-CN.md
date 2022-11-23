@@ -2,7 +2,7 @@
 DRC: 20  
 Title: Dfinity Fungible Token Standard  
 Author: Avida <avida.life@hotmail.com>, Simpson <icpstaking-wei@hotmail.com>  
-Status: Draft (PR version)  
+Status: Stable version 
 Category: Token DRC  
 Created: 2021-11-03
 ***
@@ -197,6 +197,7 @@ type DRC20 = service {
    drc20_symbol: () -> (text) query;
    drc20_totalSupply: () -> (Amount) query;
    drc20_transfer: (To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
+   drc20_transferBatch : (vec To, vec Amount, opt Nonce, opt Sa, opt Data) -> (vec TxnResult);
    drc20_transferFrom: (From, To, Amount, opt Nonce, opt Sa, opt Data) -> (TxnResult);
    drc20_txnQuery: (TxnQueryRequest) -> (TxnQueryResponse) query;
    drc20_txnRecord : (Txid) -> (opt TxnRecord);
@@ -213,7 +214,7 @@ service : (InitArgs) -> DRC20
  - 以下规范使用Candid的语法。 
  - 可选参数`_nonce`用于指定交易的nonce。每个AccountId的nonce值从0开始，并在每个特定交易成功时增加1。如果调用者指定了一个错误的nonce值，交易将被拒绝。特定交易包括：approve(), transfer(), transferFrom(), lockTransfer(), lockTransferFrom(), executeTransfer()。
  - 可选参数`_sa`是调用者的子账户，它是一个32字节的nat8数组。如果`_sa`的长度小于32字节，它将以[0]作为前缀来补足。
- - 可选参数`_data`是调用者提供的自定义数据，可用于calldata, memo等。`_data`的长度应小于65536字节（建议使用candid的编码格式，如4字节的方法名哈希+参数数据）。
+ - 可选参数`_data`是调用者提供的自定义数据，可用于calldata, memo等。`_data`的长度应小于2KB（建议使用candid的编码格式，如4字节的方法名哈希+参数数据）。
  - 为了具有更好的兼容性，使用"drc20_"前缀的方法名。
  
 #### standard
@@ -277,12 +278,18 @@ drc20_getCoinSeconds: (opt Address) -> (totalCoinSeconds: CoinSeconds, accountCo
 ``` candid
 drc20_transfer: (_to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
+#### drc20_transferBatch
+批量发送交易，参数`_to`和`_value`是等长的数组，分别向`_to[i]`转移`_value[i]`数量的代币，返回`result[i]`结果。  
+*注意* 如果提供`_nonce`参数，则用于校验第一笔交易的nonce值，如果出现`NonceError`错误，则拒绝发送所有交易。批量发送的每笔交易都会占用一个nonce值。
+``` candid
+drc20_transferBatch : (_to: vec Address, _value: vec nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: vec TxnResult);
+```
 #### drc20_transferFrom
 从账户`_from`向账户`_to`转移`value`数量的代币，返回类型`TxnResult`。  
 `transferFrom`方法用于允许Canister代表`_from`转移代币。这可用于允许Canister代表`_from`转移代币和或收取费用。调用者是`spender`，他应该得到`_from`账户的授权，并且`allowance(_from, _spender)`值需大于`_value`。   
 *注意* 0值的转账必须被视为正常转账。`_from`账户向自己转账是被允许的。
 ``` candid
-drc20_transferFrom: (_from:Address, _to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
+drc20_transferFrom: (_from: Address, _to: Address, _value: nat, _nonce: opt nat, _sa: opt vec nat8, _data: opt blob) -> (result: TxnResult);
 ```
 #### drc20_lockTransfer
 锁定一个交易，指定一个可以决定该交易最终是否执行的`_decider`，并设置一个过期时间`_timeout`秒，过期后锁定的交易将被解锁。参数_timeout不应该大于64,000,000秒(约740天)。   
@@ -351,7 +358,7 @@ OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 drc20_approvals: (_owner: Address) -> (allowances: vec Allowance) query;
 ```
 #### drc20_dropAccount
-注销账户。仅在该账户余额不大于gas费的时候才可注销。   
+注销账户。仅在该账户余额不大于gas费的时候才可被账户所有者自己注销。   
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 ``` candid
 drc20_dropAccount : (opt Sa) -> bool;

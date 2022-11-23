@@ -4,6 +4,8 @@ DRC20 Token Factory: http://ictokens.com
 
 ## Update:
 
+[2022-11-20] Add drc20_transferBatch() method; Modified ICPubSub and DRC202; Modify the length of _data to a maximum of 2KB.  
+
 [2022-8-17] Method fee() replaces gas(); Upgraded examples.
 
 [2022-8-14] Upgraded the example.
