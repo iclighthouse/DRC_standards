@@ -2,6 +2,10 @@
 # DRC205: Swap Transaction Records Storage Standard
 A common swap transaction record data type and scalability storage specification.
  
+## Latest upgrade: 
+2022-11-20: upgrade store() for batch storage of records into Bucket of DRC205.  
+2022-11-3: add txnHistory() and txnBytesHistory().
+
 ## Abstract
 The DRC205 standard defines swap transaction record data structures, scalable storage interfaces, and swap application storage and query specifications.
 

@@ -16,6 +16,7 @@ import Cycles "mo:base/ExperimentalCycles";
 import CyclesWallet "./sys/CyclesWallet";
 import SwapRecord "./lib/SwapRecord";
 import DRC207 "./lib/DRC207";
+import Tools "./lib/Tools";
 
 shared(installMsg) actor class BucketActor() = this {
     type Bucket = SwapRecord.Bucket;
@@ -29,9 +30,11 @@ shared(installMsg) actor class BucketActor() = this {
 
     private stable var owner: Principal = installMsg.caller;
     private var bucketVersion: Nat8 = 1;
-    private stable var data: Trie.Trie<Sid, ([Nat8], Time.Time)> = Trie.empty(); 
-    private stable var txnData: Trie.Trie<Sid, (TxnRecordTemp, Time.Time)> = Trie.empty(); 
-    private stable var txnData2: Trie.Trie<Sid, (TxnRecord, Time.Time)> = Trie.empty(); 
+    // private stable var data: Trie.Trie<Sid, ([Nat8], Time.Time)> = Trie.empty(); 
+    private stable var database: Trie.Trie<Sid, [([Nat8], Time.Time)]> = Trie.empty(); 
+    // private stable var txnData: Trie.Trie<Sid, (TxnRecordTemp, Time.Time)> = Trie.empty(); 
+    // private stable var txnData2: Trie.Trie<Sid, (TxnRecord, Time.Time)> = Trie.empty(); 
+    private stable var database2: Trie.Trie<Sid, [(TxnRecord, Time.Time)]> = Trie.empty(); 
     private stable var count: Nat = 0;
     private stable var lastStorage: (Sid, Time.Time) = (Blob.fromArray([]), 0);
 
@@ -40,42 +43,102 @@ shared(installMsg) actor class BucketActor() = this {
     };
     private func key(t: Sid) : Trie.Key<Sid> { return { key = t; hash = Blob.hash(t) }; };
 
-    public shared(msg) func storeBytes(_sid: Sid, _data: [Nat8]) : async (){
-        assert(_onlyOwner(msg.caller));
+    private func _store(_sid: Sid, _data: [Nat8]) : (){
         let now = Time.now();
-        let res = Trie.put(data, key(_sid), Blob.equal, (_data, now));
-        data := res.0;
+        var values : [([Nat8], Time.Time)] = [(_data, now)];
+        switch(Trie.get(database, key(_sid), Blob.equal)){
+            case(?(items)){ values := Tools.arrayAppend(items, values); };
+            case(_){};
+        };
+        let res = Trie.put(database, key(_sid), Blob.equal, values);
+        database := res.0;
         switch (res.1){
             case(?(v)){ lastStorage := (_sid, now); };
             case(_){ count += 1; lastStorage := (_sid, now); };
+        };
+    };
+    private func _get(_sid: Sid) : ?([Nat8], Time.Time){
+        switch(Trie.get(database, key(_sid), Blob.equal)){
+            case(?(values)){
+                if (values.size() > 0){
+                    return ?values[values.size() - 1];
+                }else{ return null; };
+            };
+            case(_){ return null; };
+        };
+    };
+    private func _store2(_sid: Sid, _data: TxnRecord) : (){
+        let now = Time.now();
+        var values : [(TxnRecord, Time.Time)] = [(_data, now)];
+        switch(Trie.get(database2, key(_sid), Blob.equal)){
+            case(?(items)){ values := Tools.arrayAppend(items, values); };
+            case(_){};
+        };
+        let res = Trie.put(database2, key(_sid), Blob.equal, values);
+        database2 := res.0;
+        switch (res.1){
+            case(?(v)){ lastStorage := (_sid, now); };
+            case(_){ count += 1; lastStorage := (_sid, now); };
+        };
+    };
+    private func _get2(_sid: Sid) : ?(TxnRecord, Time.Time){
+        switch(Trie.get(database2, key(_sid), Blob.equal)){
+            case(?(values)){
+                if (values.size() > 0){
+                    return ?values[values.size() - 1];
+                }else{ return null; };
+            };
+            case(_){ return null; };
+        };
+    };
+
+    public shared(msg) func storeBytes(_sid: Sid, _data: [Nat8]) : async (){
+        assert(_onlyOwner(msg.caller));
+        _store(_sid, _data);
+    };
+    public shared(msg) func storeBytesBatch(batch: [(_sid: Sid, _data: [Nat8])]) : async (){
+        assert(_onlyOwner(msg.caller));
+        for ((_sid, _data) in batch.vals()){
+            _store(_sid, _data);
         };
     };
     public shared(msg) func store(_sid: Sid, _txn: TxnRecord) : async (){
         assert(_onlyOwner(msg.caller));
-        //let _data = SwapRecord.encode(_txn);
-        let now = Time.now();
-        let res = Trie.put(txnData2, key(_sid), Blob.equal, (_txn, now));
-        txnData2 := res.0;
-        switch (res.1){
-            case(?(v)){ lastStorage := (_sid, now); };
-            case(_){ count += 1; lastStorage := (_sid, now); };
+        _store2(_sid, _txn);
+    };
+    public shared(msg) func storeBatch(batch: [(_sid: Sid, _txn: TxnRecord)]) : async (){
+        assert(_onlyOwner(msg.caller));
+        for ((_sid, _txn) in batch.vals()){
+            _store2(_sid, _txn);
         };
     };
     public query func txnBytes(_app: AppId, _txid: Txid) : async ?([Nat8], Time.Time){
         let _sid = SwapRecord.generateSid(_app, _txid);
-        return Trie.get(data, key(_sid), Blob.equal);
+        return _get(_sid);
+    };
+    public query func txnBytesHistory(_app: AppId, _txid: Txid) : async [([Nat8], Time.Time)]{
+        let _sid = SwapRecord.generateSid(_app, _txid);
+        switch(Trie.get(database, key(_sid), Blob.equal)){
+            case(?(values)){
+                return values;
+            };
+            case(_){ return []; };
+        };
     };
     public query func txnBytes2(_sid: Sid) : async ?([Nat8], Time.Time){
-        return Trie.get(data, key(_sid), Blob.equal);
+        return _get(_sid);
     };
     public query func txn(_app: AppId, _txid: Txid) : async ?(TxnRecord, Time.Time){
         let _sid = SwapRecord.generateSid(_app, _txid);
-        let _txn = Trie.get(txnData2, key(_sid), Blob.equal);
-        switch (_txn){
-            case(?(v)){
-                return ?(v.0, v.1);
+        return _get2(_sid);
+    };
+    public query func txnHistory(_app: AppId, _txid: Txid) : async [(TxnRecord, Time.Time)]{
+        let _sid = SwapRecord.generateSid(_app, _txid);
+        switch(Trie.get(database2, key(_sid), Blob.equal)){
+            case(?(values)){
+                return values;
             };
-            case(_){ return null; };
+            case(_){ return []; };
         };
     };
 
@@ -114,19 +177,19 @@ shared(installMsg) actor class BucketActor() = this {
     
     // DRC207 ICMonitor
     /// DRC207 support
-    public func drc207() : async DRC207.DRC207Support{
+    public query func drc207() : async DRC207.DRC207Support{
         return {
-            monitorable_by_self = true;
+            monitorable_by_self = false;
             monitorable_by_blackhole = { allowed = true; canister_id = ?Principal.fromText("7hdtw-jqaaa-aaaak-aaccq-cai"); };
             cycles_receivable = true;
             timer = { enable = false; interval_seconds = null; }; 
         };
     };
     /// canister_status
-    public func canister_status() : async DRC207.canister_status {
-        let ic : DRC207.IC = actor("aaaaa-aa");
-        await ic.canister_status({ canister_id = Principal.fromActor(this) });
-    };
+    // public func canister_status() : async DRC207.canister_status {
+    //     let ic : DRC207.IC = actor("aaaaa-aa");
+    //     await ic.canister_status({ canister_id = Principal.fromActor(this) });
+    // };
     /// receive cycles
     // public func wallet_receive(): async (){
     //     let amout = Cycles.available();
@@ -165,6 +228,15 @@ shared(installMsg) actor class BucketActor() = this {
     //             data = v.0.data;
     //         }, v.1);
     //     });
+    // };
+
+    // system func postupgrade() {
+    //     for ((k, v) in Trie.iter(data)) {
+    //         database := Trie.put(database, key(k), Blob.equal, [v]).0;
+    //     };
+    //     for ((k, v) in Trie.iter(txnData2)) {
+    //         database2 := Trie.put(database2, key(k), Blob.equal, [v]).0;
+    //     };
     // };
 
 }

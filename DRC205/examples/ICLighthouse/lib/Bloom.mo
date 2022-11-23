@@ -34,7 +34,7 @@ module {
         for (t in b.vals()){
             buffer.add(t);
         };
-        return buffer.toArray();
+        return Buffer.toArray(buffer);
     };
     public func blobHash(b: Blob, k: Nat32) : [Hash]{
         if (k == 0){ return [] };
