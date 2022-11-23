@@ -200,12 +200,37 @@ DRC202Bucket用于存储交易记录数据并实现公共查询接口。
 txn: (_token: Token, _txid: Txid) -> (opt record { TxnRecord; Time; }) query;
 ```
 
+#### txnHistory
+
+返回指定`_token`和`_txid`的交易记录，返回数组包含所有修改的历史记录。
+
+``` candid
+txnHistory: (_token: Token, _txid: Txid) -> (vec record { TxnRecord; Time; }) query;
+```
+
 #### txnBytes
 
 返回指定`_token`和`_txid`的交易记录的二进制数据。
 
 ``` candid
 txnBytes: (_token: Token, _txid: Txid) -> (opt record { vec nat8; Time; }) query;
+```
+
+#### txnBytesHistory
+
+返回指定`_token`和`_txid`的交易记录的二进制数据，返回数组包含所有修改的历史记录。
+
+``` candid
+txnBytesHistory: (_token: Token, _txid: Txid) -> (vec record { vec nat8; Time; }) query;
+```
+
+#### txnBytes2
+
+返回指定`_sid`的交易记录的二进制数据。     
+OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
+
+``` candid
+txnBytes2: (_sid: Sid) -> (opt record { vec nat8; Time; }) query;
 ```
 
 #### bucketInfo 
@@ -226,14 +251,6 @@ OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在
 last: () -> (Sid, Time) query;
 ```
 
-#### txnBytes2
-
-返回指定`_sid`的交易记录的二进制数据。     
-OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
-
-``` candid
-txnBytes2: (_sid: Sid) -> (opt record { vec nat8; Time; }) query;
-```
 ### 开发包(Motoko Module)及指南
 
 #### DRC202 Module

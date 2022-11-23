@@ -58,7 +58,6 @@ module {
         public func getErrCount() : Nat{ errCount };
 
         private func keyp(t: Principal) : Trie.Key<Principal> { return { key = t; hash = Principal.hash(t) }; };
-        private func keyn(t: Nat) : Trie.Key<Nat> { return { key = t; hash = Hash.hash(t) }; };
         private func keyb(t: Blob) : Trie.Key<Blob> { return { key = t; hash = Blob.hash(t) }; };
 
         private func pushGlobalTxns(_txid: Txid): (){ 
@@ -219,31 +218,7 @@ module {
             txnRecords := Trie.put(txnRecords, keyb(txid), Blob.equal, _txn).0;
             storeRecords := List.push((txid, 0), storeRecords);
             pushGlobalTxns(txid);
-            //pushLastTxn
-        };
-        private func getTxnRecord2(_token: Principal, _txid: Txid) : async (txn: ?TxnRecord){
-            var step: Nat = 0;
-            func _getTxn(_token: Principal, _txid: Txid) : async ?TxnRecord{
-                switch(await drc202().bucket(_token, _txid, step, null)){
-                    case(?(bucketId)){
-                        let bucket: T.Bucket = actor(Principal.toText(bucketId));
-                        switch(await bucket.txn(_token, _txid)){
-                            case(?(txn, time)){ return ?txn; };
-                            case(_){
-                                step += 1;
-                                return await _getTxn(_token, _txid);
-                            };
-                        };
-                    };
-                    case(_){ return null; };
-                };
-            };
-            switch(getTxnRecord(_txid)){
-                case(?(txn)){ return ?txn; };
-                case(_){
-                    return await _getTxn(_token, _txid);
-                };
-            };
+            //pushLastTxn([_txn.transaction.from, _txn.transaction.to], txid);
         };
         public func getAccountId(p : Principal, sa: ?[Nat8]) : Blob {
             let data = Blob.toArray(Principal.toBlob(p));
@@ -411,8 +386,27 @@ module {
             }
         };
         
-        public func get2(_app: Principal, _txid: Txid) : async (txn: ?TxnRecord){
-            return await getTxnRecord2(_app, _txid);
+        public func get2(_token: Principal, _txid: Txid) : async (txn: ?TxnRecord){
+            var step: Nat = 0;
+            func _getTxn(_token: Principal, _txid: Txid) : async ?TxnRecord{
+                switch(await drc202().bucket(_token, _txid, step, null)){
+                    case(?(bucketId)){
+                        let bucket: T.Bucket = actor(Principal.toText(bucketId));
+                        switch(await bucket.txn(_token, _txid)){
+                            case(?(txn, time)){ return ?txn; };
+                            case(_){
+                                step += 1;
+                                return await _getTxn(_token, _txid);
+                            };
+                        };
+                    };
+                    case(_){ return null; };
+                };
+            };
+            return await _getTxn(_token, _txid);
+        };
+        public func getPool() : [(Txid, Nat)]{
+            return List.toArray(storeRecords);
         };
         // records storage (DRC202 Standard)
         public func store() : async (){
@@ -422,43 +416,33 @@ module {
                     hasSetStd := true;
                 } catch(e){};
             };
-            var _storeRecords = List.nil<(Txid, Nat)>();
+            var _remaining = List.nil<(Txid, Nat)>();
             let storageFee = await drc202().fee();
-            var item = List.pop(storeRecords);
-            var n : Nat = 0;
-            let m : Nat = 20;
-            while (Option.isSome(item.0) and n < m){
-                storeRecords := item.1;
-                switch(item.0){
-                    case(?(txid, callCount)){
-                        if (callCount < setting.MAX_STORAGE_TRIES){
-                            switch(getTxnRecord(txid)){
-                                case(?(txn)){
-                                    try{
-                                        Cycles.add(storageFee);
-                                        await drc202().store(txn);
-                                    } catch(e){ //push
-                                        errCount += 1;
-                                        _storeRecords := List.push((txid, callCount+1), _storeRecords);
-                                    };
-                                };
-                                case(_){};
-                            };
+            var storeBatch: [TxnRecord] = [];
+            var i: Nat = 0;
+            for ((txid, callCount) in List.toArray(storeRecords).vals()){
+                if (i < 300){
+                    switch(getTxnRecord(txid)){
+                        case(?(txn)){
+                            storeBatch := T.arrayAppend([txn], storeBatch); // the first item at 0 position
                         };
+                        case(_){};
                     };
-                    case(_){};
+                }else{
+                     _remaining := List.push((txid, callCount), _remaining);
                 };
-                item := List.pop(storeRecords);
-                n += 1;
+                i += 1;
             };
-            //storeRecords := _storeRecords;
-            _rePush(_storeRecords);
-        };
-        private func _rePush(_store: List.List<(Txid, Nat)>) : (){
-            var _storeRecords = _store;
-            List.iterate(_store, func (t: (Txid, Nat)){
-                storeRecords := List.push(t, storeRecords);
-            });
+            if (storeBatch.size() > 0){
+                Cycles.add(storageFee * storeBatch.size());
+                let _storeRecords = storeRecords;
+                try{
+                    storeRecords := List.reverse(_remaining);
+                    await drc202().storeBatch(storeBatch);
+                }catch(e){
+                    storeRecords := _storeRecords;
+                };
+            };
         };
 
         // for updating

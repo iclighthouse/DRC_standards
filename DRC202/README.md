@@ -3,6 +3,8 @@
 A standard interface for token transaction tecords scalable storage.
 
 ## Latest upgrade: 
+2022-11-20: upgrade store() for batch storage of records into Bucket of DRC202.  
+2022-11-3: add txnHistory() and txnBytesHistory().  
 2022-3-25: Improved some features; provided Motoko module; wrote sample code; improved documentation.  
  
 ## Abstract
