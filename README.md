@@ -3,7 +3,7 @@
 Dfinity Request for Comments
 
 ## Compatibility Token Standard Namespace Convention
-2022-3-2: Drafted.
+2022-3-2: Drafted.  
 Specification: https://github.com/iclighthouse/DRC_standards/tree/main/CTSNC
  
 ## DRC20: Fungible Token Standard 
@@ -14,6 +14,7 @@ Specification: https://github.com/iclighthouse/DRC_standards/tree/main/CTSNC
 2022-8-11: Examples are compatible with [ICRC-1 standard](https://github.com/dfinity/ICRC-1).  
 2022-8-17: Method fee() replaces gas(); Upgraded examples.  
 2022-8-21: Use the "drc20_" prefix as the standard method name.  
+2022-11-20: Add drc20_transferBatch() method; Modify the length of _data to a maximum of 2KB; Modified Example.   
 
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse)  
@@ -29,6 +30,8 @@ TODO: Standard drafting and motoko example implementation
 2022-1-17: Implemented the example with motoko.   
 2022-3-25: Improved some features; provided Motoko module; wrote sample code; improved documentation.   
 2022-8-11: Upgrade examples.  
+2022-11-3: Add txnHistory() and txnBytesHistory().  
+2022-11-20: Upgrade store() for batch storage of records into Bucket of DRC202.  
 
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC202](https://github.com/iclighthouse/DRC_standards/tree/main/DRC202)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse)  
@@ -47,7 +50,9 @@ TODO: Standard drafting and motoko example implementation
 2022-3-10: Drafted standard.   
 2022-3-25: Implemented the example with motoko.   
 2022-8-11: Upgrade examples. 
-2022-9-20: Update the data structure TxnRecord. 
+2022-9-20: Update the data structure TxnRecord.  
+2022-11-3: Add txnHistory() and txnBytesHistory().  
+2022-11-20: Upgrade store() for batch storage of records into Bucket of DRC205.  
 
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC205](https://github.com/iclighthouse/DRC_standards/tree/main/DRC205)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/examples/ICLighthouse)  
@@ -56,7 +61,7 @@ Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/example
 
 ## DRC207: Monitorable Canister standards
 
-2022-9-20: Implemented the example with motoko. 
+2022-9-20: Implemented the example with motoko.   
 
 ## Community
 
