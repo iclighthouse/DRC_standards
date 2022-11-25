@@ -11,7 +11,7 @@ import Nat32 "mo:base/Nat32";
 import Nat64 "mo:base/Nat64";
 import Time "mo:base/Time";
 import Array "mo:base/Array";
-import Trie "./lib/Trie";
+import Trie "mo:base/Trie";
 import Cycles "mo:base/ExperimentalCycles";
 import CyclesWallet "./sys/CyclesWallet";
 import SwapRecord "./lib/SwapRecord";
