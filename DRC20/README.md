@@ -29,7 +29,7 @@ A standard interface for Dfinity tokens. The standard complies with ERC20 interf
 
 * Scalability of transaction records storage, temporary storage in token canister and permanent storage in external canisters
 
-* Gas mechanism to preventing DDos attack (Supports Cycles and tokens charge mode)
+* Gas mechanism to preventing DDos attack
 
 * Compatibility with different token standards using the [CTSNC](https://github.com/iclighthouse/DRC_standards/tree/main/CTSNC) specification
 
