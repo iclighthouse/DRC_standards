@@ -120,6 +120,13 @@ fee: () -> (cycles: nat) query;
 ``` candid
 store: (_txn: TxnRecord) -> ();
 ```
+#### storeBatch
+
+批量存储交易记录.
+
+``` candid
+storeBatch: (_txns: vec TxnRecord) -> ();
+```
 
 #### storeBytes
 
@@ -128,6 +135,14 @@ store: (_txn: TxnRecord) -> ();
 ``` candid
 storeBytes: (_txid: Txid, _data: vec nat8) -> ();
 ```
+#### storeBytesBatch
+
+批量存储二进制记录.
+
+``` candid
+storeBytesBatch: (_txns: vec record { Txid; vec nat8 }) -> ();
+```
+
 #### getLastTxns
 
 返回最新存储的交易记录。
