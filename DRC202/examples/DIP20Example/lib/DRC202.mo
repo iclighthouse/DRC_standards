@@ -54,6 +54,8 @@ module {
         var lastTxns_: Trie.Trie<AccountId, Deque.Deque<Txid>> = Trie.empty();
         var lockedTxns_: Trie.Trie<AccountId, [Txid]> = Trie.empty();
         var storeRecords = List.nil<(Txid, Nat)>(); 
+        var DRC202Fee : Nat = 0;
+        var lastGetDRC202FeeTime : Time.Time = 0;
         var errCount: Nat = 0;
         public func getErrCount() : Nat{ errCount };
 
@@ -416,15 +418,21 @@ module {
                     hasSetStd := true;
                 } catch(e){};
             };
+            var _storing = List.nil<(Txid, Nat)>();
             var _remaining = List.nil<(Txid, Nat)>();
-            let storageFee = await drc202().fee();
+            if (Time.now() > lastGetDRC202FeeTime + 14400000000000){ //4h
+                lastGetDRC202FeeTime := Time.now();
+                DRC202Fee := await drc202().fee();
+            };
+            var storageFee = DRC202Fee;
             var storeBatch: [TxnRecord] = [];
             var i: Nat = 0;
-            for ((txid, callCount) in List.toArray(storeRecords).vals()){
+            for ((txid, callCount) in List.toArray(List.reverse(storeRecords)).vals()){
                 if (i < 300){
                     switch(getTxnRecord(txid)){
                         case(?(txn)){
-                            storeBatch := T.arrayAppend([txn], storeBatch); // the first item at 0 position
+                            storeBatch := T.arrayAppend(storeBatch, [txn]); // the first item at 0 position
+                            _storing := List.push((txid, callCount), _storing);
                         };
                         case(_){};
                     };
@@ -435,12 +443,12 @@ module {
             };
             if (storeBatch.size() > 0){
                 Cycles.add(storageFee * storeBatch.size());
-                let _storeRecords = storeRecords;
+                storeRecords := List.nil<(Txid, Nat)>();
                 try{
-                    storeRecords := List.reverse(_remaining);
                     await drc202().storeBatch(storeBatch);
+                    storeRecords := List.append(storeRecords, _remaining);
                 }catch(e){
-                    storeRecords := _storeRecords;
+                    storeRecords := List.append(storeRecords, List.append(_remaining, _storing));
                 };
             };
         };

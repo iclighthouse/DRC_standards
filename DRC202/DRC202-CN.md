@@ -107,7 +107,7 @@ version: () -> (nat8) query;
 
 #### fee
 
-返回存储一条交易记录所需支付的费用（cycles）。
+返回存储一条交易记录所需支付的费用（cycles），一次付费永久存储。
 
 ``` candid
 fee: () -> (cycles: nat) query;
@@ -115,14 +115,15 @@ fee: () -> (cycles: nat) query;
 
 #### store
 
-存储一条交易记录`_txn`，其中`_txn.transaction.data`的数据长度最大允许64KB，超出部分会被截取。
+(@deprecated: 该方法将被弃用)  
+存储一条交易记录`_txn`，其中`_txn.transaction.data`的数据长度最大允许64KB，超出部分会被截取。调用该方法时需要添加cycles作为费用（通过`fee()`方法查询）。
 
 ``` candid
 store: (_txn: TxnRecord) -> ();
 ```
 #### storeBatch
 
-批量存储交易记录.
+批量存储交易记录, 允许每间隔20秒以上存储一次. 调用该方法时需要添加cycles作为费用（通过`fee()`方法查询），批量存储n条消息需要支付n*fee Cycles。
 
 ``` candid
 storeBatch: (_txns: vec TxnRecord) -> ();
@@ -130,14 +131,15 @@ storeBatch: (_txns: vec TxnRecord) -> ();
 
 #### storeBytes
 
-以二进制数据格式存储一条交易记录`_data`, 允许的最大数据128KB。
+(@deprecated: 该方法将被弃用)  
+以二进制数据格式存储一条交易记录`_data`, 允许的最大数据128KB。调用该方法时需要添加cycles作为费用（通过`fee()`方法查询）。
 
 ``` candid
 storeBytes: (_txid: Txid, _data: vec nat8) -> ();
 ```
 #### storeBytesBatch
 
-批量存储二进制记录.
+批量存储二进制记录, 允许每间隔20秒以上存储一次. 调用该方法时需要添加cycles作为费用（通过`fee()`方法查询），批量存储n条消息需要支付n*fee Cycles。
 
 ``` candid
 storeBytesBatch: (_txns: vec record { Txid; vec nat8 }) -> ();
@@ -246,6 +248,22 @@ OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在
 
 ``` candid
 txnBytes2: (_sid: Sid) -> (opt record { vec nat8; Time; }) query;
+```
+
+#### txnHash
+
+计算指定交易记录的Hash值。     
+OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
+``` candid
+txnHash: (_token: Token, _txid: Txid, _index: nat) -> (opt text) query;
+```
+
+#### txnBytesHash
+
+计算指定Bytes数据记录的Hash值。     
+OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
+``` candid
+txnBytesHash: (_token: Token, _txid: Txid, _index: nat) -> (opt text) query;
 ```
 
 #### bucketInfo 

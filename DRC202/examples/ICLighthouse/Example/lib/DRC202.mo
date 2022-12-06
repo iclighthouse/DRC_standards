@@ -54,6 +54,8 @@ module {
         var lastTxns_: Trie.Trie<AccountId, Deque.Deque<Txid>> = Trie.empty();
         var lockedTxns_: Trie.Trie<AccountId, [Txid]> = Trie.empty();
         var storeRecords = List.nil<(Txid, Nat)>(); 
+        var DRC202Fee : Nat = 0;
+        var lastGetDRC202FeeTime : Time.Time = 0;
         var errCount: Nat = 0;
         public func getErrCount() : Nat{ errCount };
 
@@ -418,7 +420,11 @@ module {
             };
             var _storing = List.nil<(Txid, Nat)>();
             var _remaining = List.nil<(Txid, Nat)>();
-            let storageFee = await drc202().fee();
+            if (Time.now() > lastGetDRC202FeeTime + 14400000000000){ //4h
+                lastGetDRC202FeeTime := Time.now();
+                DRC202Fee := await drc202().fee();
+            };
+            var storageFee = DRC202Fee;
             var storeBatch: [TxnRecord] = [];
             var i: Nat = 0;
             for ((txid, callCount) in List.toArray(List.reverse(storeRecords)).vals()){

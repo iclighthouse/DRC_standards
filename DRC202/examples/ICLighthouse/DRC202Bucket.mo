@@ -6,6 +6,7 @@
  * Github     : https://github.com/iclighthouse/DRC_standards/
  */
 import Prim "mo:⛔";
+import Debug "mo:base/Debug";
 import Principal "mo:base/Principal";
 import Array "mo:base/Array";
 import Blob "mo:base/Blob";
@@ -18,6 +19,8 @@ import CyclesWallet "./sys/CyclesWallet";
 import TokenRecord "./lib/TokenRecord";
 import DRC207 "./lib/DRC207";
 import Tools "./lib/Tools";
+import Hex "./lib/Hex";
+import Hash256 "./lib/Hash256";
 
 shared(installMsg) actor class BucketActor() = this {
     type Bucket = TokenRecord.Bucket;
@@ -122,6 +125,24 @@ shared(installMsg) actor class BucketActor() = this {
                 });
             };
             case(_){ return []; };
+        };
+    };
+    public query func txnHash(_token: Token, _txid: Txid, _index: Nat) : async ?Hex.Hex{
+        let _sid = TokenRecord.generateSid(_token, _txid);
+        switch(Trie.get(database, key(_sid), Blob.equal)){
+            case(?(values)){
+                return ?Hex.encode(Hash256.hash(null, Blob.toArray(to_candid(TokenRecord.decode(values[_index].0)))));
+            };
+            case(_){ return null; };
+        };
+    };
+    public query func txnBytesHash(_token: Token, _txid: Txid, _index: Nat) : async ?Hex.Hex{
+        let _sid = TokenRecord.generateSid(_token, _txid);
+        switch(Trie.get(database, key(_sid), Blob.equal)){
+            case(?(values)){
+                return ?Hex.encode(Hash256.hash(null, values[_index].0));
+            };
+            case(_){ return null; };
         };
     };
 

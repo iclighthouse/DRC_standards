@@ -69,6 +69,8 @@ module {
     txnBytesHistory: shared query (_token: Token, _txid: Txid) -> async [([Nat8], Time.Time)];
     txn: shared query (_token: Token, _txid: Txid) -> async ?(TxnRecord, Time.Time);
     txnHistory: shared query (_token: Token, _txid: Txid) -> async [(TxnRecord, Time.Time)];
+    txnHash: shared query (_token: Token, _txid: Txid, _index: Nat) -> async ?Text;
+    txnBytesHash: shared query (_token: Token, _txid: Txid, _index: Nat) -> async ?Text;
   };
   public type Impl = actor {
     drc202_getConfig : shared query () -> async Setting;
