@@ -82,34 +82,34 @@ module {
         };
         return na;
     };
-    //version: 1bytes
-    private let _data: [Nat8] = [1];
-    //amount: 9bytes(8bytes+1decimals)
-    private func _amountEncode(_value: Nat) : [Nat8]{
-        var value = _value;
-        var decimals: Nat8 = 0;
-        while (value > Nat64Max){
-            value /= 10;
-            decimals += 1;
-        };
-        return arrayAppend(Binary.BigEndian.fromNat64(Nat64.fromNat(value)), [decimals]);
-    };
-    private func _amountDecode(_bytes: [Nat8]) : Nat{
-        if (_bytes.size() == 0) { return 0; };
-        let value = Nat64.toNat(Binary.BigEndian.toNat64(slice(_bytes, 0, ?7)));
-        let decimals = Nat8.toNat(_bytes[8]);
-        return value * (10 ** decimals);
-    };
-    private func _principalFormat(_p: Text) : Text{
-        var i: Nat = 0;
-        var t: Text = "";
-        for (c in _p.chars()){
-            if (i > 0 and i % 5 == 0) { t #= "-"; };
-            t #= Text.fromChar(c);
-            i += 1;
-        };
-        return t;
-    };
+    // //version: 1bytes
+    // private let _data: [Nat8] = [1];
+    // //amount: 9bytes(8bytes+1decimals)
+    // private func _amountEncode(_value: Nat) : [Nat8]{
+    //     var value = _value;
+    //     var decimals: Nat8 = 0;
+    //     while (value > Nat64Max){
+    //         value /= 10;
+    //         decimals += 1;
+    //     };
+    //     return arrayAppend(Binary.BigEndian.fromNat64(Nat64.fromNat(value)), [decimals]);
+    // };
+    // private func _amountDecode(_bytes: [Nat8]) : Nat{
+    //     if (_bytes.size() == 0) { return 0; };
+    //     let value = Nat64.toNat(Binary.BigEndian.toNat64(slice(_bytes, 0, ?7)));
+    //     let decimals = Nat8.toNat(_bytes[8]);
+    //     return value * (10 ** decimals);
+    // };
+    // private func _principalFormat(_p: Text) : Text{
+    //     var i: Nat = 0;
+    //     var t: Text = "";
+    //     for (c in _p.chars()){
+    //         if (i > 0 and i % 5 == 0) { t #= "-"; };
+    //         t #= Text.fromChar(c);
+    //         i += 1;
+    //     };
+    //     return t;
+    // };
 
     public func generateSid(app: AppId, txid: Txid) : Blob{
         let h224 = SHA224.sha224(arrayAppend(Blob.toArray(Principal.toBlob(app)), Blob.toArray(txid)));

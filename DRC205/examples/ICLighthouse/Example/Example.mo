@@ -44,7 +44,7 @@ shared actor class Example() = this {
             status = #Completed; // Status, {#Failed; #Pending; #Completed;}
             data = null; // Attached data (Blob)
         };
-        drc205.put(txn); // Put txn to the current canister cache.
+        drc205.put(txn, false); // Put txn to the current canister cache.
         // Store data to the DRC205 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
         if (Time.now() > drc205_lastStorageTime + 20*1000000000) { 
             drc205_lastStorageTime := Time.now();
@@ -101,11 +101,11 @@ shared actor class Example() = this {
         };
     };
     /// drc205 pool
-    public query func drc205_pool() : async [(DRC205.Txid, Nat)]{
+    public query func drc205_pool() : async [(DRC205.Txid, DRC205.TxnRecord, Nat)]{
         return drc205.getPool();
     };
     // upgrade
-    private stable var __drc205Data: [DRC205.DataTemp] = [];
+    private stable var __drc205Data: [DRC205.DataTempV2] = [];
     system func preupgrade() {
         __drc205Data := [drc205.getData()];
     };

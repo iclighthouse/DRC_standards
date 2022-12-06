@@ -39,19 +39,23 @@ DRC205标准包含三部分：
 这是一个建议数据结构，如果使用自定义数据结构，可以使用storeBytes和txnBytes方法满足兼容性需求。
 
 ``` candid
+type Status = variant { Failed; Pending; Completed; PartiallyCompletedAndCancelled; Cancelled; };
 type TxnRecord = record {
    account: AccountId;
    caller: AccountId;
    cyclesWallet: opt CyclesWallet;
    data: opt Data;
    details: vec record { counterparty: Txid; token0Value: BalanceChange; token1Value: BalanceChange; };
-   fee: record { token0Fee: nat; token1Fee: nat; };
+   fee: record { token0Fee: int; token1Fee: int; };
    index: nat;
    msgCaller: opt principal;
    nonce: Nonce;
    operation: OperationType;
-   orderType: variant { AMM; OrderBook; };
+   order: record { token0Value: opt BalanceChange; token1Value: opt BalanceChange; };
+   orderMode: variant { AMM; OrderBook; };
+   orderType: opt variant { LMT; FOK; FAK; MKT; };
    shares: ShareChange;
+   status: Status;
    time: Time;
    token0: TokenType;
    token0Value: BalanceChange;
@@ -106,7 +110,7 @@ version: () -> (nat8) query;
 
 #### fee
 
-返回存储一条交易记录所需支付的费用（cycles）。
+返回存储一条交易记录所需支付的费用（cycles），一次付费永久存储。
 
 ``` candid
 fee: () -> (_cycles: nat) query;
@@ -114,14 +118,15 @@ fee: () -> (_cycles: nat) query;
 
 #### store
 
-存储一条交易记录`_txn`，其中`_txn.data`的数据长度最大允许64KB，超出部分会被截取。
+(@deprecated: 该方法将被弃用)  
+存储一条交易记录`_txn`，其中`_txn.data`的数据长度最大允许64KB，超出部分会被截取。调用该方法时需要添加cycles作为费用（通过`fee()`方法查询）。
 
 ``` candid
 store: (_txn: TxnRecord) -> ();
 ```
 #### storeBatch
 
-批量存储交易记录.
+批量存储交易记录, 允许每间隔20秒以上存储一次. 调用该方法时需要添加cycles作为费用（通过`fee()`方法查询），批量存储n条消息需要支付n*fee Cycles。
 
 ``` candid
 storeBatch: (_txns: vec TxnRecord) -> ();
@@ -129,14 +134,16 @@ storeBatch: (_txns: vec TxnRecord) -> ();
 
 #### storeBytes
 
-以二进制数据格式存储一条交易记录`_data`, 允许的最大数据128KB。
+(@deprecated: 该方法将被弃用)  
+以二进制数据格式存储一条交易记录`_data`, 允许的最大数据128KB。调用该方法时需要添加cycles作为费用（通过`fee()`方法查询）。
 
 ``` candid
 storeBytes: (_txid: Txid, _data: vec nat8) -> ();
 ```
+
 #### storeBytesBatch
 
-批量存储二进制记录.
+批量存储二进制记录, 允许每间隔20秒以上存储一次. 调用该方法时需要添加cycles作为费用（通过`fee()`方法查询），批量存储n条消息需要支付n*fee Cycles。
 
 ``` candid
 storeBytesBatch: (_txns: vec record { Txid; vec nat8 }) -> ();
@@ -228,6 +235,22 @@ OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在
 
 ``` candid
 txnBytes2: (_sid: Sid) -> (opt record { vec nat8; Time; }) query;
+```
+
+#### txnHash
+
+计算指定交易记录的Hash值。     
+OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
+``` candid
+txnHash: (_app: AppId, _txid: Txid, _index: nat) -> (opt text) query;
+```
+
+#### txnBytesHash
+
+计算指定Bytes数据记录的Hash值。     
+OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
+``` candid
+txnBytesHash: (_app: AppId, _txid: Txid, _index: nat) -> (opt text) query;
 ```
 
 #### bucketInfo 

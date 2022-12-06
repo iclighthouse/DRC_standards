@@ -17,6 +17,9 @@ import CyclesWallet "./sys/CyclesWallet";
 import SwapRecord "./lib/SwapRecord";
 import DRC207 "./lib/DRC207";
 import Tools "./lib/Tools";
+import Text "mo:base/Text";
+import Hex "./lib/Hex";
+import Hash256 "./lib/Hash256";
 
 shared(installMsg) actor class BucketActor() = this {
     type Bucket = SwapRecord.Bucket;
@@ -67,28 +70,42 @@ shared(installMsg) actor class BucketActor() = this {
             case(_){ return null; };
         };
     };
-    private func _store2(_sid: Sid, _data: TxnRecord) : (){
-        let now = Time.now();
-        var values : [(TxnRecord, Time.Time)] = [(_data, now)];
-        switch(Trie.get(database2, key(_sid), Blob.equal)){
-            case(?(items)){ values := Tools.arrayAppend(items, values); };
-            case(_){};
-        };
-        let res = Trie.put(database2, key(_sid), Blob.equal, values);
-        database2 := res.0;
-        switch (res.1){
-            case(?(v)){ lastStorage := (_sid, now); };
-            case(_){ count += 1; lastStorage := (_sid, now); };
-        };
-    };
+    // private func _store2(_sid: Sid, _data: TxnRecord) : (){
+    //     let now = Time.now();
+    //     var values : [(TxnRecord, Time.Time)] = [(_data, now)];
+    //     switch(Trie.get(database2, key(_sid), Blob.equal)){
+    //         case(?(items)){ values := Tools.arrayAppend(items, values); };
+    //         case(_){};
+    //     };
+    //     let res = Trie.put(database2, key(_sid), Blob.equal, values);
+    //     database2 := res.0;
+    //     switch (res.1){
+    //         case(?(v)){ lastStorage := (_sid, now); };
+    //         case(_){ count += 1; lastStorage := (_sid, now); };
+    //     };
+    // };
     private func _get2(_sid: Sid) : ?(TxnRecord, Time.Time){
-        switch(Trie.get(database2, key(_sid), Blob.equal)){
+        switch(Trie.get(database, key(_sid), Blob.equal)){
             case(?(values)){
                 if (values.size() > 0){
-                    return ?values[values.size() - 1];
+                    let item = values[values.size() - 1];
+                    let data : ?TxnRecord = from_candid(Blob.fromArray(item.0));
+                    switch(data){
+                        case(?(v)){ return ?(v, item.1); };
+                        case(_){ return null; };
+                    };
                 }else{ return null; };
             };
-            case(_){ return null; };
+            case(_){
+                switch(Trie.get(database2, key(_sid), Blob.equal)){
+                    case(?(values)){
+                        if (values.size() > 0){
+                            return ?values[values.size() - 1];
+                        }else{ return null; };
+                    };
+                    case(_){ return null; };
+                };
+            };
         };
     };
 
@@ -104,12 +121,14 @@ shared(installMsg) actor class BucketActor() = this {
     };
     public shared(msg) func store(_sid: Sid, _txn: TxnRecord) : async (){
         assert(_onlyOwner(msg.caller));
-        _store2(_sid, _txn);
+        //_store2(_sid, _txn);
+        _store(_sid, Blob.toArray(to_candid(_txn)));
     };
     public shared(msg) func storeBatch(batch: [(_sid: Sid, _txn: TxnRecord)]) : async (){
         assert(_onlyOwner(msg.caller));
         for ((_sid, _txn) in batch.vals()){
-            _store2(_sid, _txn);
+            //_store2(_sid, _txn);
+            _store(_sid, Blob.toArray(to_candid(_txn)));
         };
     };
     public query func txnBytes(_app: AppId, _txid: Txid) : async ?([Nat8], Time.Time){
@@ -134,11 +153,49 @@ shared(installMsg) actor class BucketActor() = this {
     };
     public query func txnHistory(_app: AppId, _txid: Txid) : async [(TxnRecord, Time.Time)]{
         let _sid = SwapRecord.generateSid(_app, _txid);
-        switch(Trie.get(database2, key(_sid), Blob.equal)){
+        switch(Trie.get(database, key(_sid), Blob.equal)){
             case(?(values)){
-                return values;
+                return Array.mapFilter(values, func (item: ([Nat8], Time.Time)): ?(TxnRecord, Time.Time){
+                    let data : ?TxnRecord = from_candid(Blob.fromArray(item.0));
+                    switch(data){
+                        case(?(v)){ return ?(v, item.1); };
+                        case(_){ return null; };
+                    };
+                });
             };
-            case(_){ return []; };
+            case(_){
+                switch(Trie.get(database2, key(_sid), Blob.equal)){
+                    case(?(values)){
+                        return values;
+                    };
+                    case(_){ return []; };
+                };
+            };
+        };
+    };
+    public query func txnHash(_app: AppId, _txid: Txid, _index: Nat) : async ?Hex.Hex{
+        let _sid = SwapRecord.generateSid(_app, _txid);
+        switch(Trie.get(database, key(_sid), Blob.equal)){
+            case(?(values)){
+                return ?Hex.encode(Hash256.hash(null, values[_index].0));
+            };
+            case(_){
+                switch(Trie.get(database2, key(_sid), Blob.equal)){
+                    case(?(values)){
+                        return ?Hex.encode(Hash256.hash(null, Blob.toArray(to_candid(values[_index].0))));
+                    };
+                    case(_){ return null; };
+                };
+            };
+        };
+    };
+    public query func txnBytesHash(_app: AppId, _txid: Txid, _index: Nat) : async ?Hex.Hex{
+        let _sid = SwapRecord.generateSid(_app, _txid);
+        switch(Trie.get(database, key(_sid), Blob.equal)){
+            case(?(values)){
+                return ?Hex.encode(Hash256.hash(null, values[_index].0));
+            };
+            case(_){ return null; };
         };
     };
 
