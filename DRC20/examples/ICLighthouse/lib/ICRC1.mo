@@ -21,8 +21,8 @@ module {
         #BadFee : { expected_fee : Nat };
         #BadBurn : { min_burn_amount : Nat };
         #InsufficientFunds : { balance : Nat };
-        #TooOld : { allowed_window_nanos : Duration };
-        #CreatedInFuture;
+        #TooOld;
+        #CreatedInFuture : { ledger_time : Nat64 };
         #Duplicate : { duplicate_of : Nat };
         #TemporarilyUnavailable;
         #GenericError: { error_code : Nat; message : Text };
@@ -30,7 +30,8 @@ module {
     public type ApproveArgs = {
         from_subaccount : ?Blob;
         spender : Principal;
-        amount : Nat;
+        amount : Int;
+        expires_at : ?Nat64;
         fee : ?Nat;
         memo : ?Blob;
         created_at_time : ?Nat64;
@@ -39,6 +40,7 @@ module {
         #BadFee : { expected_fee : Nat };
         // The caller does not have enough funds to pay the approval fee.
         #InsufficientFunds : { balance : Nat };
+        #Expired : { ledger_time : Nat64 };
         #TooOld;
         #CreatedInFuture: { ledger_time : Nat64 };
         #Duplicate : { duplicate_of : Nat };
@@ -84,6 +86,6 @@ module {
         icrc1_transfer : shared (_args: TransferArgs) -> async { #Ok: Nat; #Err: TransferError; };
         icrc2_approve : shared (ApproveArgs) -> async { #Ok : Nat; #Err : ApproveError };
         icrc2_transfer_from : shared (TransferFromArgs) -> async { #Ok : Nat; #Err : TransferFromError };
-        icrc2_allowance : shared query (AllowanceArgs) -> async Nat;
+        icrc2_allowance : shared query (AllowanceArgs) -> async ({ allowance : Nat; expires_at : ?Nat64 });
     }
 };

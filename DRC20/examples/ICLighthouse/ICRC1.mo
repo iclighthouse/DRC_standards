@@ -1,5 +1,5 @@
 /**
- * Module     : DRC20.mo
+ * Module     : ICRC1.mo
  * Author     : ICLighthouse Team
  * License    : Apache License 2.0
  * Stability  : Experimental
@@ -880,7 +880,10 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             case(_){};
         };
         let spender = _icrc1_get_account({ owner = _args.spender; subaccount = null; });
-        let value = _args.amount;
+        var value : Nat = 0;
+        if (_args.amount > 0){
+            value := Int.abs(_args.amount);
+        };
         let from = _icrc1_get_account({ owner = msg.caller; subaccount = _args.from_subaccount; });
         let sub = ?Blob.toArray(Option.get(_args.from_subaccount, Blob.fromArray([])));
         let data = _args.memo;
@@ -912,10 +915,10 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         };
         return _icrc2_transfer_from_receipt(res, from, spender);
     };
-    public query func icrc2_allowance(_args: AllowanceArgs) : async Nat {
+    public query func icrc2_allowance(_args: AllowanceArgs) : async { allowance : Nat; expires_at : ?Nat64 } {
         let owner = _icrc1_get_account(_args.account);
         let spender = _icrc1_get_account({ owner = _args.spender; subaccount = null; });
-        return _getAllowance(owner, spender);
+        return { allowance = _getAllowance(owner, spender); expires_at = null };
     };
 
     // drc202
@@ -986,15 +989,30 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         genesisCreated := true;
     };
 
-    // upgrade
+    // upgrade (Compatible with the previous version)
     private stable var __drc202Data: [DRC202.DataTemp] = [];
+    private stable var __drc202DataNew: ?DRC202.DataTemp = null;
     system func preupgrade() {
-        __drc202Data := [drc202.getData()];
+        //__drc202Data := [drc202.getData()];
+        __drc202DataNew := ?drc202.getData();
     };
     system func postupgrade() {
-        if (__drc202Data.size() > 0){
-            drc202.setData(__drc202Data[0]);
-            __drc202Data := [];
+        // if (__drc202Data.size() > 0){
+        //     drc202.setData(__drc202Data[0]);
+        //     __drc202Data := [];
+        // };
+        switch(__drc202DataNew){
+            case(?(data)){
+                drc202.setData(data);
+                __drc202Data := [];
+                __drc202DataNew := null;
+            };
+            case(_){
+                if (__drc202Data.size() > 0){
+                    drc202.setData(__drc202Data[0]);
+                    __drc202Data := [];
+                };
+            };
         };
     };
 
