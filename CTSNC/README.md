@@ -24,7 +24,8 @@ It enables compatibility between different token standards through namespace con
 
 ## Specification
 
-The main interface implements a standard scheme using the method names of ERC20. The optional compatibility interface implements self/other standard schemes with the method names plus the namespace (prefix `xxx_`).
+The main interface implements a standard scheme with method names plus a namespace (prefixed with `xxx_`).
+Optional compatible interfaces implement the standard scheme using the ERC20 method names, and/or the standard scheme using other standard prefixed method names.
 
 ### Specific public methods
 
@@ -34,12 +35,31 @@ Returns the list of supported token standards (standard name i. e. namespace), i
 standard: () -> (text) query;
 ```
 
+## Multi-standard compatibility example
+
 ### Main interface
 
-Use the method names of ERC20 to define the main interface, which allows you to implement the main standard of your choice.
+Use the method names prefixed with standard name "xxx_" to implement the main standard of your choice.
 
 ``` candid
 For example:
+
+drc20_name: () -> (text) query;
+drc20_symbol: () -> (text) query;
+drc20_decimals: () -> (nat8) query;
+drc20_totalSupply: () -> (nat) query;
+drc20_balanceOf: (...) -> (...) query;
+drc20_transfer: (...) -> (...);
+drc20_transferFrom: (...) -> (...);
+drc20_approve: (...) -> (...);
+drc20_allowance: (...) -> (...);
+...
+```
+
+### Optional compatibility interface
+
+``` candid
+For example 1:
 
 name: () -> (text) query;
 symbol: () -> (text) query;
@@ -51,29 +71,8 @@ transferFrom: (...) -> (...);
 approve: (...) -> (...);
 allowance: (...) -> (...);
 ...
-```
 
-### Optional compatibility interface
-
-Use the method names prefixed with standard name "xxx_" to define the compatibility interfaces.
-
-``` candid
-For example 1:
-
-dip20_name: () -> (text) query;
-dip20_symbol: () -> (text) query;
-dip20_decimals: () -> (nat8) query;
-dip20_totalSupply: () -> (nat) query;
-dip20_balanceOf: (...) -> (...) query;
-dip20_transfer: (...) -> (...);
-dip20_transferFrom: (...) -> (...);
-dip20_approve: (...) -> (...);
-dip20_allowance: (...) -> (...);
-...
-```
-``` candid
-For example 2:
-
+// dft
 dft_name: () -> (text) query;
 dft_symbol: () -> (text) query;
 dft_decimals: () -> (nat8) query;
@@ -83,66 +82,6 @@ dft_transfer: (...) -> (...);
 dft_transferFrom: (...) -> (...);
 dft_approve: (...) -> (...);
 dft_allowance: (...) -> (...);
-...
-```
-
-## Single-standard compatibility example
-
-``` candid
-standard: () -> (text) query;  // “drc20”
-
-// drc20
-name: () -> (text) query;
-symbol: () -> (text) query;
-decimals: () -> (nat8) query;
-totalSupply: () -> (nat) query;
-balanceOf: (...) -> (...) query;
-transfer: (...) -> (...);
-transferFrom: (...) -> (...);
-approve: (...) -> (...);
-allowance: (...) -> (...);
-...
-
-// drc20 (Compatibility aliases)
-drc20_name: () -> (text) query;
-drc20_symbol: () -> (text) query;
-drc20_decimals: () -> (nat8) query;
-drc20_totalSupply: () -> (nat) query;
-drc20_balanceOf: (...) -> (...) query;
-drc20_transfer: (...) -> (...);
-drc20_transferFrom: (...) -> (...);
-drc20_approve: (...) -> (...);
-drc20_allowance: (...) -> (...);
-...
-```
-
-## Multi-standard compatibility example
-
-``` candid
-standard: () -> (text) query;  // “dft; drc20”
-
-// dft
-name: () -> (text) query;
-symbol: () -> (text) query;
-decimals: () -> (nat8) query;
-totalSupply: () -> (nat) query;
-balanceOf: (...) -> (...) query;
-transfer: (...) -> (...);
-transferFrom: (...) -> (...);
-approve: (...) -> (...);
-allowance: (...) -> (...);
-...
-
-// drc20
-drc20_name: () -> (text) query;
-drc20_symbol: () -> (text) query;
-drc20_decimals: () -> (nat8) query;
-drc20_totalSupply: () -> (nat) query;
-drc20_balanceOf: (...) -> (...) query;
-drc20_transfer: (...) -> (...);
-drc20_transferFrom: (...) -> (...);
-drc20_approve: (...) -> (...);
-drc20_allowance: (...) -> (...);
 ...
 ```
 
@@ -157,6 +96,8 @@ drc20_allowance: (...) -> (...);
 - ext: https://github.com/Toniq-Labs/extendable-token
 - motokotoken: https://github.com/enzoh/motoko-token
 - is20: https://github.com/infinity-swap/IS20
+- ICRC-1: https://github.com/dfinity/ICRC-1/tree/main/standards/ICRC-1
+- ICRC-2: https://github.com/dfinity/ICRC-1/tree/main/standards/ICRC-2
 
 ### Non-Fungible Token
 
