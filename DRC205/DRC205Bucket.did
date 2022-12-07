@@ -1,0 +1,112 @@
+type TxnRecord = 
+ record {
+   account: AccountId;
+   caller: AccountId;
+   cyclesWallet: opt CyclesWallet;
+   data: opt Data;
+   details:
+    vec
+     record {
+       counterparty: Txid;
+       time: Time;
+       token0Value: BalanceChange;
+       token1Value: BalanceChange;
+     };
+   fee: record {
+          token0Fee: int;
+          token1Fee: int;
+        };
+   filled: record {
+             token0Value: BalanceChange;
+             token1Value: BalanceChange;
+           };
+   index: nat;
+   msgCaller: opt principal;
+   nonce: Nonce;
+   operation: OperationType;
+   order:
+    record {
+      token0Value: opt BalanceChange;
+      token1Value: opt BalanceChange;
+    };
+   orderMode: variant {
+                AMM;
+                OrderBook;
+              };
+   orderType: opt variant {
+                    FAK;
+                    FOK;
+                    LMT;
+                    MKT;
+                  };
+   shares: ShareChange;
+   status: Status;
+   time: Time;
+   token0: TokenType;
+   token1: TokenType;
+   txid: Txid;
+ };
+type Txid = blob;
+type TokenType = 
+ variant {
+   Cycles;
+   Icp;
+   Token: principal;
+ };
+type Time = int;
+type Status = 
+ variant {
+   Cancelled;
+   Completed;
+   Failed;
+   PartiallyCompletedAndCancelled;
+   Pending;
+ };
+type Sid = blob;
+type Shares = nat;
+type ShareChange = 
+ variant {
+   Burn: Shares;
+   Mint: Shares;
+   NoChange;
+ };
+type OperationType = 
+ variant {
+   AddLiquidity;
+   Claim;
+   RemoveLiquidity;
+   Swap;
+ };
+type Nonce = nat;
+type Hex = text;
+type Data = blob;
+type CyclesWallet = principal;
+type BucketInfo = 
+ record {
+   count: nat;
+   cycles: nat;
+   heap: nat;
+   memory: nat;
+   stableMemory: nat32;
+ };
+type BalanceChange = 
+ variant {
+   CreditRecord: nat;
+   DebitRecord: nat;
+   NoChange;
+ };
+type AppId = principal;
+type AccountId = blob;
+type BucketActor = 
+ service {
+   bucketInfo: () -> (BucketInfo) query;
+   last: () -> (Sid, Time) query;
+   txn: (AppId, Txid) -> (opt record { TxnRecord; Time; }) query;
+   txnHistory: (AppId, Txid) -> (vec record { TxnRecord; Time; }) query;
+   txnHash: (AppId, Txid, nat) -> (opt Hex) query;
+   txnBytes: (AppId, Txid) -> (opt record { vec nat8; Time; }) query;
+   txnBytes2: (Sid) -> (opt record { vec nat8; Time; }) query;
+   txnBytesHistory: (AppId, Txid) -> (vec record { vec nat8; Time; }) query;
+   txnBytesHash: (AppId, Txid, nat) -> (opt Hex) query;
+ };
+service : () -> BucketActor

@@ -1,0 +1,141 @@
+type TxnRecord = 
+ record {
+   account: AccountId;
+   caller: AccountId;
+   cyclesWallet: opt CyclesWallet;
+   data: opt Data;
+   details:
+    vec
+     record {
+       counterparty: Txid;
+       time: Time;
+       token0Value: BalanceChange;
+       token1Value: BalanceChange;
+     };
+   fee: record {
+          token0Fee: int;
+          token1Fee: int;
+        };
+   filled: record {
+             token0Value: BalanceChange;
+             token1Value: BalanceChange;
+           };
+   index: nat;
+   msgCaller: opt principal;
+   nonce: Nonce;
+   operation: OperationType;
+   order:
+    record {
+      token0Value: opt BalanceChange;
+      token1Value: opt BalanceChange;
+    };
+   orderMode: variant {
+                AMM;
+                OrderBook;
+              };
+   orderType: opt variant {
+                    FAK;
+                    FOK;
+                    LMT;
+                    MKT;
+                  };
+   shares: ShareChange;
+   status: Status;
+   time: Time;
+   token0: TokenType;
+   token1: TokenType;
+   txid: Txid;
+ };
+type Txid = blob;
+type TokenType = 
+ variant {
+   Cycles;
+   Icp;
+   Token: principal;
+ };
+type Time = int;
+type Status = 
+ variant {
+   Cancelled;
+   Completed;
+   Failed;
+   PartiallyCompletedAndCancelled;
+   Pending;
+ };
+type Shares = nat;
+type ShareChange = 
+ variant {
+   Burn: Shares;
+   Mint: Shares;
+   NoChange;
+ };
+type OperationType = 
+ variant {
+   AddLiquidity;
+   Claim;
+   RemoveLiquidity;
+   Swap;
+ };
+type Nonce = nat;
+type Data = blob;
+type DRC207Support = 
+ record {
+   cycles_receivable: bool;
+   monitorable_by_blackhole:
+    record {
+      allowed: bool;
+      canister_id: opt principal;
+    };
+   monitorable_by_self: bool;
+   timer: record {
+            enable: bool;
+            interval_seconds: opt nat;
+          };
+ };
+type CyclesWallet = principal;
+type BucketInfo = 
+ record {
+   count: nat;
+   cycles: nat;
+   heap: nat;
+   memory: nat;
+   stableMemory: nat32;
+ };
+type Bucket = principal;
+type BalanceChange = 
+ variant {
+   CreditRecord: nat;
+   DebitRecord: nat;
+   NoChange;
+ };
+type AppInfo = 
+ record {
+   count: nat;
+   lastIndex: nat;
+   lastTxid: Txid;
+ };
+type AppId = principal;
+type AccountId = blob;
+type ProxyActor = 
+ service {
+   appInfo: (AppId) -> (opt AppInfo) query;
+   bucket: (AppId, Txid, nat, opt nat8) -> (opt principal) query;
+   bucketInfo: (opt Bucket) -> (Bucket, BucketInfo);
+   fee: () -> (nat) query;
+   generateTxid: (AppId, AccountId, nat) -> (Txid) query;
+   getLastTxns: () -> (vec record { nat; AppId; nat; Txid; }) query;
+   minInterval: () -> (int) query;
+   standard: () -> (text) query;
+   stats: () ->
+    (record {
+       appCount: nat;
+       bucketCount: nat;
+       errCount: nat;
+       storeErrPool: nat;
+       txnCount: nat;
+     }) query;
+   storeBatch: (vec TxnRecord) -> ();
+   storeBytesBatch: (vec record { Txid; vec nat8; }) -> ();
+   version: () -> (nat8) query;
+ };
+service : () -> ProxyActor
