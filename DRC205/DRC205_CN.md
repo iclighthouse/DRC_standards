@@ -38,8 +38,8 @@ https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/dev-guide-cn.md
 
 - 以下规范使用candid语法。
 - `Sid`是全局唯一的交易记录存储ID，Blob类型，32字节，由Proxy合约生成。
-- `Txid`是Dex内唯一的交易记录ID，Blob类型，必须32字节，由Dex合约生成。推荐生成txid的方法是：[DRC205Types.generateTxid(_app: Principal, _caller: AccountId, _nonce: Nat)](https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/examples/ICLighthouse/Example/lib/DRC205Types.mo)。
-    如果你使用Nat作为txid，请将Nat转换为Nat64，然后使用大端序编码，前置填写\00生成32个字节。
+- `Txid`是Dex内唯一的交易记录ID，Blob类型，必须8或32字节，由Dex合约生成。推荐生成txid的方法是：[DRC205Types.generateTxid(_app: Principal, _caller: AccountId, _nonce: Nat)](https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/examples/ICLighthouse/Example/lib/DRC205Types.mo)。
+    如果你使用Nat作为txid，请将Nat转换为Nat64，然后使用大端序编码，生成8字节的bytes。
 - `AccountId`是Swap用户的身份ID，Blob类型，必须32字节，由Dex合约生成。如果使用Principal、[Nat8]等数据类型，则需要转换成32字节Blob。
 
 ### Transaction Record Types (TxnRecord)
