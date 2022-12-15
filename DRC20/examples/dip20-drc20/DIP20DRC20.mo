@@ -69,8 +69,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     */
     private stable var FEE_TO: AccountId = AID.blackhole(); 
     private stable var NonceStartBase: Nat = 10000000;
-    private stable var NonceMode: Nat = 0; // Nonce mode is switched on after the number of users exceeds 1 million.
+    private stable var NonceMode: Nat = 0; // Nonce mode is turned on when there is not enough storage space or when the nonce value of a single user exceeds `NonceStartBase`.
     private stable var AllowanceLimit: Nat = 50;
+    private let MAX_MEMORY: Nat = 23*1024*1024*1024; // 23G
 
     /* 
     * State Variables 
@@ -101,21 +102,21 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     */
     private stable var dropedAccounts: Trie.Trie<Blob, Bool> = Trie.empty(); 
     private func _checkNonceMode(_upgrade: Bool) : (){
-        if (NonceMode == 0 and (_upgrade or Trie.size(nonces) > 1000000 or Trie.size(nonces) > 2000000 or Prim.rts_memory_size() > 3500*1000000)){
+        if (NonceMode == 0 and (_upgrade or Prim.rts_memory_size() > MAX_MEMORY)){
             NonceMode := 1;
-            //Nonce0 := NonceStartBase; // Nonce values restart at NonceStartBase
-            ignore drc202.config({ // Records cache for 30 days
-                EN_DEBUG = null;
-                MAX_CACHE_TIME = ?(30 * 24 * 3600 * 1000000000);
-                MAX_CACHE_NUMBER_PER = null;
-                MAX_STORAGE_TRIES = null;
-            });
+            if (drc202.getConfig().MAX_CACHE_TIME > 30 * 24 * 3600 * 1000000000){
+                ignore drc202.config({ // Records cache for 30 days
+                    EN_DEBUG = null;
+                    MAX_CACHE_TIME = ?(30 * 24 * 3600 * 1000000000);
+                    MAX_CACHE_NUMBER_PER = null;
+                    MAX_STORAGE_TRIES = null;
+                });
+            };
             totalCoinSeconds := { coinSeconds = 0; updateTime = 0; };
             coinSeconds := Trie.empty(); // Disable the CoinSeconds function
             nonces := Trie.empty(); // Clearing nonces
             dropedAccounts := Trie.empty();  // Clearing dropedAccounts
-        }else if (NonceMode > 0 and NonceMode < 400 and (_upgrade or Trie.size(nonces) > 5000000 * NonceMode or Trie.size(dropedAccounts) > 5000000 * NonceMode * 2)){
-            //Nonce0 := NonceStartBase * (NonceMode + 1);
+        }else if (NonceMode > 0 and NonceMode < 200 and (_upgrade or Prim.rts_memory_size() > MAX_MEMORY)){
             NonceMode += 1;
             nonces := Trie.empty();
             dropedAccounts := Trie.empty(); 
@@ -148,6 +149,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         coinSeconds := Trie.remove(coinSeconds, keyb(_a), Blob.equal).0;
         //nonces
         nonces := Trie.remove(nonces, keyb(_a), Blob.equal).0;
+        //allowances
+        allowances := Trie.remove(allowances, keyb(_a), Blob.equal).0;
         return true;
     };
 

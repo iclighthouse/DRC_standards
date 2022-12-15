@@ -372,7 +372,7 @@ drc20_holdersCount : () -> (balances: nat, nonces: nat, dropedAccounts: nat) que
 
 ### 关于存储节约模式
 
-当账户数量超过指定数量（如100万个）或者canister存储空间接近存满时，Token合约将启用存储节约模式，它将实现如下操作： 
+当canister存储空间接近存满时，Token合约将启用存储节约模式，它将实现如下操作： 
 - 减少交易记录缓存时间；
 - 关闭CoinSeconds功能，删除所有CoinSeconds记录；
 - 删除所有nonce记录，账户的nonce重新从一个新值开始（如10000000）；

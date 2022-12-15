@@ -373,7 +373,7 @@ drc20_holdersCount : () -> (balances: nat, nonces: nat, dropedAccounts: nat) que
 
 ### About Storage Saving Mode
 
-When the number of accounts exceeds a specified number (e.g. 1 million) or when the canister storage space is close to being full, the Token contract will enable storage saving mode, which will achieve the following.   
+When the canister storage space is close to being full, the Token contract will enable storage saving mode, which will achieve the following.   
 - Reduce the transaction record cache time.
 - Disable the CoinSeconds function and delete all CoinSeconds records.
 - Delete all nonce records, with the account's nonce restarting at a new value (e.g. 10000000).
