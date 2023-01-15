@@ -1,8 +1,6 @@
 /**
- * Module     : DRC207.mo
- * Author     : ICLighthouse Team
- * License    : Apache License 2.0
- * Stability  : Experimental
+ * Module     : DRC207.mo (Canister Monitor)
+ * Author     : ICLight.house Team
  * Github     : https://github.com/iclighthouse/DRC_standards/
  */
 module {
@@ -42,7 +40,12 @@ module {
   };
 
   public type IC = actor {
-   canister_status : { canister_id : canister_id } -> async canister_status;
+    canister_status : { canister_id : canister_id } -> async canister_status;
+    deposit_cycles : shared { canister_id : canister_id } -> async ();
+  };
+
+  public type Blackhole = actor {
+    canister_status : { canister_id : canister_id } -> async canister_status;
   };
 
   public type Self = actor {
@@ -64,17 +67,17 @@ module {
             timer = { enable = true; interval_seconds = ?300; };   // 5 minutes 
         };
     };
-    /// canister_status
+    /// canister_status (Optional)
     public func canister_status() : async DRC207.canister_status {
         let ic : DRC207.IC = actor("aaaaa-aa");
         await ic.canister_status({ canister_id = Principal.fromActor(this) });
     };
-    /// receive cycles
+    /// receive cycles (Optional)
     public func wallet_receive(): async (){
         let amout = Cycles.available();
         let accepted = Cycles.accept(amout);
     };
-    /// timer tick
+    /// timer tick (Optional)
     public func timer_tick(): async (){
         // do something
     };

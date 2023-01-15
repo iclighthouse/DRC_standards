@@ -27,17 +27,17 @@ import Cycles "mo:base/ExperimentalCycles";
             timer = { enable = false; interval_seconds = null; }; 
         };
     };
-    /// canister_status
+    /// canister_status (Optional)
     public func canister_status() : async DRC207.canister_status {
         let ic : DRC207.IC = actor("aaaaa-aa");
         await ic.canister_status({ canister_id = Principal.fromActor(CanisterName) });
     };
-    /// receive cycles
+    /// receive cycles (Optional)
     public func wallet_receive(): async (){
         let amout = Cycles.available();
         let accepted = Cycles.accept(amout);
     };
-    /// timer tick
+    /// timer tick (Optional)
     public func timer_tick(): async (){
         //do something
     };
@@ -62,6 +62,8 @@ dfx canister --network ic call aaaaa-aa update_settings '(record {canister_id=pr
 ```
 
 **Step 3**
+Customize a Monitor program. For example https://github.com/iclighthouse/DRC_standards/tree/main/DRC207/examples/ICLighthouse/CustomMonitor.mo    
+Or:  
 Select a monitor and subscribe to the canister's events. For example https://github.com/iclighthouse/ICMonitor.
 
 ### About Blackhole Canister
