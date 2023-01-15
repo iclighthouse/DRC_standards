@@ -270,9 +270,9 @@ module {
 
         private func insertTxnRecord(_txn: TxnRecord, _isAppend: Bool): (){
             var txid = _txn.txid;
-            assert(Blob.toArray(txid).size() == 32);
-            assert(Blob.toArray(_txn.caller).size() == 32);
-            assert(Blob.toArray(_txn.account).size() == 32);
+            assert(Blob.toArray(txid).size() >= 4);
+            //assert(Blob.toArray(_txn.caller).size() == 32);
+            //assert(Blob.toArray(_txn.account).size() == 32);
             storagePool := List.push((txid, _txn, 0), storagePool);
             if (_isAppend){
                 switch(getTxnRecord(txid)){
