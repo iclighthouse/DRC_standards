@@ -262,14 +262,14 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     };
     private func _checkFee(_caller: AccountId, _percent: Nat, _amount: Nat): Bool{
         if(fee_ > 0) {
-            let fee = Nat.max(fee_ * _percent / 100, 1);
+            let fee = fee_ * _percent / 100;
             return _getBalance(_caller) >= fee + _amount;
         };
         return true;
     };
     private func _chargeFee(_caller: AccountId, _percent: Nat): Bool{
         if(fee_ > 0) {
-            let fee = Nat.max(fee_ * _percent / 100, 1);
+            let fee = fee_ * _percent / 100;
             if (_getBalance(_caller) >= fee){
                 ignore _send(_caller, FEE_TO, fee, false);
                 return true;
