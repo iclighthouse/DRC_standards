@@ -32,6 +32,7 @@ module {
         #SelfAuthId;  //02
         #DerivedId;  //03
         #AnonymousId;  //04
+        #ICRC1Account; //127
         #NoneId;  //trap
     };
     public func arrayAppend<T>(a: [T], b: [T]) : [T]{
@@ -162,6 +163,7 @@ module {
                 case (2) { return #SelfAuthId; };
                 case (3) { return #DerivedId; };
                 case (4) { return #AnonymousId; };
+                case (127) { return #ICRC1Account; };
                 case (_) { return #NoneId; };
             };
         };
@@ -180,6 +182,68 @@ module {
         var hash = Array.init<Nat8>(28, 0);
         var crc : [Nat8] = CRC32.crc32(Array.freeze(hash));
         return Blob.fromArray(arrayAppend(crc, Array.freeze(hash)));   
+    };
+
+    //ICRC1 Accout Encoding/Decoding
+    public func icrc1Encode(_account: {owner: Principal; subaccount: ?Blob}): Blob{
+        switch(_account.subaccount){
+            case(null){
+                return Principal.toBlob(_account.owner);
+            };
+            case(?(sub)){
+                var sa = Blob.toArray(sub);
+                while (sa.size() > 0 and sa[0] == 0){
+                    sa := slice(sa, 1, null);
+                };
+                if (sa.size() == 0){
+                    return Principal.toBlob(_account.owner);
+                }else{
+                    let owner = Blob.toArray(Principal.toBlob(_account.owner));
+                    sa := arrayAppend(sa, [Nat8.fromNat(sa.size()), 127: Nat8]);
+                    return Blob.fromArray(arrayAppend(owner, sa));
+                };
+            };
+        };
+    };
+    public func icrc1Decode(_account: Blob): ?{owner: Principal; subaccount: ?Blob}{
+        let accountRaw = Blob.toArray(_account);
+        let len = accountRaw.size();
+        if (len == 0){ return null };
+        if (len > 2 and accountRaw[Nat.sub(len, 1)] == 127){
+            let saLength = Nat8.toNat(accountRaw[Nat.sub(len, 2)]);
+            let owner = slice(accountRaw, 0, ?Nat.sub(len, saLength+3));
+            var subaccount = slice(accountRaw, Nat.sub(len, saLength+2), ?Nat.sub(len, 3));
+            while (subaccount.size() < 32){
+                subaccount := arrayAppend([0:Nat8], subaccount);
+            };
+            return ?{owner = Principal.fromBlob(Blob.fromArray(owner)); subaccount = ?Blob.fromArray(subaccount)};
+        }else{
+            return ?{owner = Principal.fromBlob(_account); subaccount = null};
+        };
+    };
+    public type AccountType = {
+        #ICRC1Account: {owner: Principal; subaccount: ?Blob};
+        #AccountId: Blob;
+        #Other: Blob;
+    };
+    public func accountDecode(_account: Blob): AccountType{
+        let accountRaw = Blob.toArray(_account);
+        let len = accountRaw.size();
+        let form = principalForm(Principal.fromBlob(_account));
+        if (len == 0){
+            return #Other(_account);
+        }else if (len < 30 and form != #ICRC1Account and form != #NoneId){
+            return #ICRC1Account({owner = Principal.fromBlob(_account); subaccount = null});
+        }else if (len == 32 and isValidAccount(Blob.toArray(_account))){
+            return #AccountId(_account);
+        }else if (form == #ICRC1Account){
+            switch(icrc1Decode(_account)){
+                case(?(account)){ return #ICRC1Account(account); };
+                case(_){ return #Other(_account); };
+            };
+        }else{
+            return #Other(_account);
+        };
     };
 
 };

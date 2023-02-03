@@ -4,6 +4,8 @@ DRC20 Token Factory: http://ictokens.com
 
 ## Update:
 
+[2023-2-2] modify Example.  
+
 [2022-12-5] Add txnBytesHash(); Upgraded Example.  
 
 [2022-11-20] Add drc20_transferBatch() method; Modified ICPubSub and DRC202; Modify the length of _data to a maximum of 2KB.  

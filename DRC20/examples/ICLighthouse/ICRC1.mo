@@ -163,8 +163,18 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             };
             case(_){
                 var p = Principal.fromText(_address);
-                var a = AID.principalToAccountBlob(p, null);
-                return a;
+                // var a = AID.principalToAccountBlob(p, null);
+                // return a;
+                switch(AID.accountDecode(Principal.toBlob(p))){
+                    case(#ICRC1Account(account)){
+                        switch(account.subaccount){
+                            case(?(sa)){ return AID.principalToAccountBlob(account.owner, ?Blob.toArray(sa)); };
+                            case(_){ return AID.principalToAccountBlob(account.owner, null); };
+                        };
+                    };
+                    case(#AccountId(account)){ return account; };
+                    case(#Other(account)){ return account; };
+                };
             };
         };
     }; 
@@ -350,7 +360,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     _operation: Operation, _isAllowance: Bool): (result: TxnResult) {
         _checkNonceMode(false);
         var callerPrincipal = _msgCaller;
-        let caller = _getAccountIdFromPrincipal(_msgCaller, _sa);
+        let caller = AID.icrc1Encode({owner = _msgCaller; subaccount = switch(_sa){ case(?(sa)){ ?Blob.fromArray(sa) }; case(_){ null }; }}); // _getAccountIdFromPrincipal(_msgCaller, _sa);
         let txid = _getTxid(caller);
         let from = _from;
         let to = _to;
@@ -773,8 +783,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             {name = "ICRC-2"; url = "https://github.com/dfinity/ICRC-1/tree/main/standards/ICRC-2"}
         ];
     };
-    public query func icrc1_minting_account() : async Account{
-        return {owner = installMsg.caller; subaccount = null;};
+    public query func icrc1_minting_account() : async ?Account{
+        return null; // {owner = installMsg.caller; subaccount = null;};
     };
     public query func icrc1_name() : async Text{
         return name_;

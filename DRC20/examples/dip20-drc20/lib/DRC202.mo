@@ -214,9 +214,9 @@ module {
         };
         private func insertTxnRecord(_txn: TxnRecord): (){
             var txid = _txn.txid;
-            assert(Blob.toArray(txid).size() == 32);
-            assert(Blob.toArray(_txn.caller).size() == 32);
-            assert(Blob.toArray(_txn.transaction.from).size() == 32 and Blob.toArray(_txn.transaction.to).size() == 32);
+            assert(Blob.toArray(txid).size() >= 4);
+            // assert(Blob.toArray(_txn.caller).size() == 32);
+            // assert(Blob.toArray(_txn.transaction.from).size() == 32 and Blob.toArray(_txn.transaction.to).size() == 32);
             txnRecords := Trie.put(txnRecords, keyb(txid), Blob.equal, _txn).0;
             storeRecords := List.push((txid, 0), storeRecords);
             pushGlobalTxns(txid);
