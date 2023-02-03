@@ -72,12 +72,12 @@ DRC205Bucket did: https://github.com/iclighthouse/DRC_standards/tree/main/DRC205
 
     **Step 1**. Get the bucket canister-id where the transaction record is stored by querying DRC205Proxy
 
-    Specify the trading pair's appId (canister-id) and the txid of the transaction record, call `DRC205Proxy.bucket()` method to query the bucket canister-id where the record is stored, if it returns `null`, it means the record does not exist.  
-    Note: Due to the use of BloomFilter technology, there is a very small probability (about 1‰) that the record does not exist in the returned bucket, which requires you to continue calling the `DRC205Proxy.bucket()` method using the `_step` parameter + 1. If `null` is returned it means the record must not exist.
+    Specify the trading pair's appId (canister-id) and the txid of the transaction record, call `DRC205Proxy.bucket()` or `DRC205Proxy.bucket()` method to query the bucket canister-id where the record is stored, if it returns `null`, it means the record does not exist.  
+    Note: Due to the use of BloomFilter technology, there is a very small probability (about 1‰) that the record does not exist in the returned bucket, which requires you to continue calling the `DRC205Proxy.bucket()` or `DRC205Proxy.bucket()` method using the `_step` parameter + 1. If `null` is returned it means the record must not exist.
 
     **Step 2**. Query the transaction record via DRC205Bucket
 
-    1) If the trading pair uses the DRC205 TxnRecord type, call the `DRC205Bucket.txn()` or `DRC205Bucket.txnHistory()` method to look up the record based on the Bucket canister-id obtained in the previous step. If `null` is returned, there is a very small chance that the record exists in another bucket and you can let the `_step` parameter +1 and continue back to the previous step for the operation.
+    1) If the trading pair uses the DRC205 TxnRecord type, call the `DRC205Bucket.txn()`, `DRC205Bucket.txnHistory()` or `DRC205Bucket.txnByIndex()` method to look up the record based on the Bucket canister-id obtained in the previous step. If `null` is returned, there is a very small chance that the record exists in another bucket and you can let the `_step` parameter +1 and continue back to the previous step for the operation.
 
     2) If the trading pair uses a custom type for records, call the `DRC205Bucket.txnBytes()` or `DRC205Bucket.txnBytesHistory()` method to look up the record based on the Bucket canister-id obtained in the previous step. If `null` is returned, there is a very small chance that the record exists in another bucket, and you can let the `_step` parameter + 1 and continue back to the previous step for the operation.
 

@@ -37,6 +37,7 @@ TODO: Standard drafting and motoko example implementation
 2022-11-20: Upgrade store() for batch storage of records into Bucket of DRC202.  
 2022-11-28: Add txnHash().  
 2022-12-5: Add txnBytesHash(); Modify Example.  
+2023-2-2: Fix type description; Modify Example.  
 
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC202](https://github.com/iclighthouse/DRC_standards/tree/main/DRC202)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse)  
@@ -60,6 +61,7 @@ TODO: Standard drafting and motoko example implementation
 2022-11-20: Upgrade store() for batch storage of records into Bucket of DRC205.  
 2022-11-28: Add txnHash(); fix bugs.  
 2022-12-5: Add txnBytesHash(); Modify Example.  
+2023-2-2: Fix type description; Modify Example.  
 
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC205](https://github.com/iclighthouse/DRC_standards/tree/main/DRC205)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/examples/ICLighthouse)  

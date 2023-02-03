@@ -120,6 +120,7 @@ type ProxyActor =
  service {
    appInfo: (AppId) -> (opt AppInfo) query;
    bucket: (AppId, Txid, nat, opt nat8) -> (opt principal) query;
+   bucketByIndex: (AppId, nat, nat, opt nat8) -> (opt Bucket) query;
    bucketInfo: (opt Bucket) -> (Bucket, BucketInfo);
    fee: () -> (nat) query;
    generateTxid: (AppId, AccountId, nat) -> (Txid) query;

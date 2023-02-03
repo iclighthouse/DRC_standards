@@ -66,6 +66,8 @@ shared(installMsg) actor class ProxyActor() = this {
     private stable var lastCheckCyclesTime: Time.Time = 0;
     private var blooms = TrieMap.TrieMap<Bucket, BloomFilter>(Principal.equal, Principal.hash);
     private stable var bloomsEntries : [(Bucket, [[Nat8]])] = []; // for upgrade
+    private var blooms2 = TrieMap.TrieMap<Bucket, BloomFilter>(Principal.equal, Principal.hash);
+    private stable var blooms2Entries : [(Bucket, [[Nat8]])] = []; // for upgrade
     private stable var apps: Trie.Trie<AppId, AppInfo> = Trie.empty(); 
     private stable var storeTxns = List.nil<(AppId, DataType, Nat)>();
     private stable var storeErrPool = List.nil<(AppId, DataType, Nat)>();
@@ -74,6 +76,7 @@ shared(installMsg) actor class ProxyActor() = this {
     private stable var lastSessions = Deque.empty<(Principal, Nat)>(); 
     private stable var MaxTPS: Nat = 100; //100
     private stable var MaxTransPerAccount: Nat = 500; // xx trans per 1min
+    // private stable var nonces: Trie.Trie<AppId, Nat> = Trie.empty(); 
     // TODO private stable var certifications: Trie.Trie<App, [AppCertification]> = Trie.empty(); 
 
     private func _onlyOwner(_caller: Principal) : Bool {
@@ -87,6 +90,16 @@ shared(installMsg) actor class ProxyActor() = this {
     private func _natToFloat(_n: Nat) : Float{
         return Float.fromInt64(Int64.fromNat64(Nat64.fromNat(_n)));
     };
+    // private func _getNonce(_a: Principal): Nat{
+    //     switch(Trie.get(nonces, keyp(_a), Principal.equal)){
+    //         case(?(v)){ return v; };
+    //         case(_){ return 0; };
+    //     };
+    // };
+    // private func _addNonce(_a: Principal): (){
+    //     var n = _getNonce(_a);
+    //     nonces := Trie.put(nonces, keyp(_a), Principal.equal, n+1).0;
+    // };
     private func _sessionPush(_a: Principal): (){
         lastSessions := Deque.pushFront(lastSessions, (_a, _now()));
         var enLoop: Bool = true;
@@ -134,6 +147,7 @@ shared(installMsg) actor class ProxyActor() = this {
         buckets := Tools.arrayAppend(buckets, [bucket]);
         currentBucket := [(bucket, bucketInfo)];
         blooms.put(bucket, Bloom.AutoScalingBloomFilter<Blob>(100000, 0.002, Bloom.blobHash));
+        blooms2.put(bucket, Bloom.AutoScalingBloomFilter<Blob>(100000, 0.002, Bloom.blobHash));
         bucketCount += 1;
         let ic: IC.Self = actor("aaaaa-aa");
         let settings = await ic.update_settings({
@@ -253,13 +267,39 @@ shared(installMsg) actor class ProxyActor() = this {
         };
         return null;
     };
+    private func _addBloom2(_bucket: Bucket, _iid: Blob) : (){
+        switch(blooms2.get(_bucket)){
+            case(?(bloom)){
+                bloom.add(_iid);
+                blooms2.put(_bucket, bloom);
+            };
+            case(_){
+                let bloom = Bloom.AutoScalingBloomFilter<Blob>(100000, 0.002, Bloom.blobHash);
+                bloom.add(_iid);
+                blooms2.put(_bucket, bloom);
+            };
+        };
+    };
+    private func _checkBloom2(_iid: Blob, _step: Nat) : ?Bucket{
+        var step: Nat = 0;
+        for ((bucket, bloom) in blooms2.entries()){
+            if (step < _step and bloom.check(_iid)){
+                step += 1;
+            }else if (step == _step and bloom.check(_iid)){
+                return ?bucket;
+            };
+        };
+        return null;
+    };
     private func _postLog(_txns: List.List<(AppId, DataType, Nat)>) : (){
         var bucket: Bucket = currentBucket[0].0;
         for ((app, dataType, callCount) in Array.reverse(List.toArray(_txns)).vals()){
             switch(dataType){
                 case(#Txn(txn)){
                     let sid = SwapRecord.generateSid(app, txn.txid);
+                    let iid = SwapRecord.generateIid(app, txn.index);
                     _addBloom(bucket, sid);
+                    _addBloom2(bucket, iid);
                 };
                 case(#Bytes(txn)){
                     let sid = SwapRecord.generateSid(app, txn.txid);
@@ -270,6 +310,9 @@ shared(installMsg) actor class ProxyActor() = this {
             _pushLastTxns(app, dataType);
             txnCount += 1;
         };
+    };
+    private func _blobAppend(_a: Blob, _b: Blob): Blob{
+        return Blob.fromArray(Tools.arrayAppend(Blob.toArray(_a), Blob.toArray(_b)));
     };
     private func _execStorage() : async (){
         var bucket: Bucket = currentBucket[0].0;
@@ -286,7 +329,8 @@ shared(installMsg) actor class ProxyActor() = this {
             switch(dataType){
                 case(#Txn(txn)){
                     let sid = SwapRecord.generateSid(app, txn.txid);
-                    storeBatch := Tools.arrayAppend(storeBatch, [(sid, txn)]); // the first item at 0 position
+                    let iid = SwapRecord.generateIid(app, txn.index);
+                    storeBatch := Tools.arrayAppend(storeBatch, [(_blobAppend(sid, iid), txn)]); // the first item at 0 position
                     _storing := List.push((app, dataType, callCount), _storing);
                 };
                 case(#Bytes(txn)){
@@ -480,6 +524,10 @@ shared(installMsg) actor class ProxyActor() = this {
         let _sid = SwapRecord.generateSid(_app, _txid);
         return _checkBloom(_sid, _step);
     };
+    public query func bucketByIndex(_app: AppId, _blockIndex: Nat, _step: Nat, _version: ?Nat8) : async (bucket: ?Principal){
+        let _iid = SwapRecord.generateIid(_app, _blockIndex);
+        return _checkBloom2(_iid, _step);
+    };
     public query func minInterval() : async Int{ //ns
         return 60*1000000000 / MaxTransPerAccount;
     };
@@ -603,6 +651,15 @@ shared(installMsg) actor class ProxyActor() = this {
             size += 1;
         };
         bloomsEntries := Array.freeze(temp);
+
+        size := blooms2.size();
+        var temp2 : [var (Bucket, [[Nat8]])] = Array.init<(Bucket, [[Nat8]])>(size, (owner, []));
+        size := 0;
+        for ((k, v) in blooms2.entries()) {
+            temp2[size] := (k, v.getBitMap());
+            size += 1;
+        };
+        blooms2Entries := Array.freeze(temp2);
     };
 
     system func postupgrade() {
@@ -610,6 +667,12 @@ shared(installMsg) actor class ProxyActor() = this {
             let temp = Bloom.AutoScalingBloomFilter<Blob>(100000, 0.002, Bloom.blobHash);
             temp.setData(v);
             blooms.put(k, temp);
+        };
+
+        for ((k, v) in blooms2Entries.vals()) {
+            let temp = Bloom.AutoScalingBloomFilter<Blob>(100000, 0.002, Bloom.blobHash);
+            temp.setData(v);
+            blooms2.put(k, temp);
         };
     };
 }

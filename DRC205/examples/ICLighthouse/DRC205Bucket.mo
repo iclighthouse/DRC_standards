@@ -40,6 +40,7 @@ shared(installMsg) actor class BucketActor() = this {
     private stable var database2: Trie.Trie<Sid, [(TxnRecord, Time.Time)]> = Trie.empty(); 
     private stable var count: Nat = 0;
     private stable var lastStorage: (Sid, Time.Time) = (Blob.fromArray([]), 0);
+    private stable var appIndexIds: Trie.Trie<Blob, Sid> = Trie.empty(); 
 
     private func _onlyOwner(_caller: Principal) : Bool {
         return _caller == owner;
@@ -108,6 +109,35 @@ shared(installMsg) actor class BucketActor() = this {
             };
         };
     };
+    private func _get3(_sid: Sid) : [(TxnRecord, Time.Time)]{
+        switch(Trie.get(database, key(_sid), Blob.equal)){
+            case(?(values)){
+                return Array.mapFilter(values, func (item: ([Nat8], Time.Time)): ?(TxnRecord, Time.Time){
+                    let data : ?TxnRecord = from_candid(Blob.fromArray(item.0));
+                    switch(data){
+                        case(?(v)){ return ?(v, item.1); };
+                        case(_){ return null; };
+                    };
+                });
+            };
+            case(_){
+                switch(Trie.get(database2, key(_sid), Blob.equal)){
+                    case(?(values)){
+                        return values;
+                    };
+                    case(_){ return []; };
+                };
+            };
+        };
+    };
+    private func _split(_b: Blob): (_sid: Sid, _iid: ?Blob){
+        let id = Blob.toArray(_b);
+        if (id.size() <= 28){
+            return (_b, null);
+        }else{
+            return (Blob.fromArray(Tools.slice(id, 0, ?27)), ?Blob.fromArray(Tools.slice(id, 28, null)));
+        };
+    };
 
     public shared(msg) func storeBytes(_sid: Sid, _data: [Nat8]) : async (){
         assert(_onlyOwner(msg.caller));
@@ -121,14 +151,28 @@ shared(installMsg) actor class BucketActor() = this {
     };
     public shared(msg) func store(_sid: Sid, _txn: TxnRecord) : async (){
         assert(_onlyOwner(msg.caller));
-        //_store2(_sid, _txn);
-        _store(_sid, Blob.toArray(to_candid(_txn)));
+        let ids = _split(_sid);
+        //_store2(ids.0, _txn);
+        switch(ids.1){
+            case(?(iid)){
+                appIndexIds := Trie.put(appIndexIds, key(iid), Blob.equal, ids.0).0;
+            };
+            case(_){};
+        };
+        _store(ids.0, Blob.toArray(to_candid(_txn)));
     };
     public shared(msg) func storeBatch(batch: [(_sid: Sid, _txn: TxnRecord)]) : async (){
         assert(_onlyOwner(msg.caller));
         for ((_sid, _txn) in batch.vals()){
+            let ids = _split(_sid);
             //_store2(_sid, _txn);
-            _store(_sid, Blob.toArray(to_candid(_txn)));
+            switch(ids.1){
+                case(?(iid)){
+                    appIndexIds := Trie.put(appIndexIds, key(iid), Blob.equal, ids.0).0;
+                };
+                case(_){};
+            };
+            _store(ids.0, Blob.toArray(to_candid(_txn)));
         };
     };
     public query func txnBytes(_app: AppId, _txid: Txid) : async ?([Nat8], Time.Time){
@@ -153,24 +197,15 @@ shared(installMsg) actor class BucketActor() = this {
     };
     public query func txnHistory(_app: AppId, _txid: Txid) : async [(TxnRecord, Time.Time)]{
         let _sid = SwapRecord.generateSid(_app, _txid);
-        switch(Trie.get(database, key(_sid), Blob.equal)){
-            case(?(values)){
-                return Array.mapFilter(values, func (item: ([Nat8], Time.Time)): ?(TxnRecord, Time.Time){
-                    let data : ?TxnRecord = from_candid(Blob.fromArray(item.0));
-                    switch(data){
-                        case(?(v)){ return ?(v, item.1); };
-                        case(_){ return null; };
-                    };
-                });
+        return _get3(_sid);
+    };
+    public query func txnByIndex(_app: AppId, _blockIndex: Nat) : async [(TxnRecord, Time.Time)]{
+        let _iid = SwapRecord.generateIid(_app, _blockIndex);
+        switch(Trie.get(appIndexIds, key(_iid), Blob.equal)){
+            case(?(_sid)){
+                return _get3(_sid);
             };
-            case(_){
-                switch(Trie.get(database2, key(_sid), Blob.equal)){
-                    case(?(values)){
-                        return values;
-                    };
-                    case(_){ return []; };
-                };
-            };
+            case(_){ return []; };
         };
     };
     public query func txnHash(_app: AppId, _txid: Txid, _index: Nat) : async ?Hex.Hex{

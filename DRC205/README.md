@@ -3,6 +3,7 @@
 A common swap transaction record data type and scalability storage specification.
  
 ## Latest upgrade: 
+2023-2-2: fix type description; modify Example.  
 2022-12-5: add txnBytesHash(); modify Example.  
 2022-11-28: add txnHash(); fix bugs.   
 2022-11-20: upgrade store() for batch storage of records into Bucket of DRC205.  
