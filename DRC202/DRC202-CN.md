@@ -37,10 +37,10 @@ https://github.com/iclighthouse/DRC_standards/blob/main/DRC202/dev-guide-cn.md
 **NOTES**:
 
 - 以下规范使用Candid语法。
-- `Sid`是全局唯一的交易记录存储ID，32字节的Blob类型，由Proxy合约生成。
+- `Sid`是全局唯一的交易记录存储ID，28字节的Blob类型，由Proxy合约生成。
 - `Txid`是Token内唯一的交易记录ID，必须是8或32字节的Blob类型，由Token合约生成。推荐生成txid的方法是：[DRC202Types.generateTxid(_token: Principal, _caller: AccountId, _nonce: Nat)](https://github.com/iclighthouse/DRC_standards/blob/main/DRC202/examples/ICLighthouse/Example/lib/DRC202Types.mo)。
     如果你使用Nat作为txid，请将Nat转换为Nat64，然后使用大端序编码，生成8字节的bytes。
-- `AccountId`是Token用户的身份ID，必须是32字节的Blob类型，由Token合约生成。如果使用Principal、[Nat8]等数据类型，则需要转换成32字节的Blob。
+- `AccountId`是Token用户的身份ID，通常是32字节的Blob类型，由Token合约生成。如果使用Principal、[Nat8]等数据类型，则需要转换成Blob。如果是ICRC1标准的Account类型，需要按照https://github.com/dfinity/ICRC-1/tree/main/standards/ICRC-1 中的规则，将raw_bytes作为AccountId。
 
 ### Types (DID)
 

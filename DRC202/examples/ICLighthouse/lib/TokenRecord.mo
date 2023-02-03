@@ -93,6 +93,12 @@ module {
         let h224 = SHA224.sha224(Tools.arrayAppend(Blob.toArray(Principal.toBlob(token)), Blob.toArray(txid)));
         return Blob.fromArray(h224);
     };
+
+    public func generateIid(token: Token, blockIndex: Nat) : Blob{
+        let h224 = SHA224.sha224(Tools.arrayAppend(Blob.toArray(Principal.toBlob(token)), Binary.BigEndian.fromNat64(Nat64.fromIntWrap(blockIndex))));
+        return Blob.fromArray(h224);
+    };
+
     public func encode(txn: TxnRecord) : [Nat8]{
         //version: 1bytes
         var data: [Nat8] = _data;

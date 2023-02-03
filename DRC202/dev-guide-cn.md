@@ -72,12 +72,12 @@ DRC202Bucket did: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202
 
     **Step 1**. 通过DRC202Proxy查询交易记录存储所在的bucket canister-id
 
-    指定token canister-id和交易记录的txid，调用`DRC202Proxy.bucket()`方法查询得到该记录存储所在的Bucket canister-id，如果返回`null`表示记录不存在。
-    注意：由于使用了BloomFilter技术，在极小概率（约1‰）情形下，记录并不存在于返回的Bucket中，这需要你`_step`参数+1后继续调用`DRC202Proxy.bucket()`方法查询。如果返回`null`表示记录一定不存在。
+    指定token canister-id和交易记录的txid，调用`DRC202Proxy.bucket()`或`DRC202Proxy.bucketByIndex()`方法查询得到该记录存储所在的Bucket canister-id，如果返回`null`表示记录不存在。
+    注意：由于使用了BloomFilter技术，在极小概率（约1‰）情形下，记录并不存在于返回的Bucket中，这需要你`_step`参数+1后继续调用`DRC202Proxy.bucket()`或`DRC202Proxy.bucketByIndex()`方法查询。如果返回`null`表示记录一定不存在。
 
     **Step 2**. 通过DRC202Bucket查询交易记录
 
-    1) 如果这个token使用了DRC202 TxnRecord类型，根据上一步得到的Bucket canister-id调用`DRC202Bucket.txn()`或`DRC202Bucket.txnHistory()`方法查询记录。如果返回`null`，则记录有极小可能存在于其他bucket中，你可以让`_step`参数+1后继续回到上一步进行操作。
+    1) 如果这个token使用了DRC202 TxnRecord类型，根据上一步得到的Bucket canister-id调用`DRC202Bucket.txn()`、`DRC202Bucket.txnHistory()`或`DRC202Bucket.txnByIndex()`方法查询记录。如果返回`null`，则记录有极小可能存在于其他bucket中，你可以让`_step`参数+1后继续回到上一步进行操作。
 
     2) 如果这个token使用了自定义类型，根据上一步得到的Bucket canister-id调用`DRC202Bucket.txnBytes()`或`DRC202Bucket.txnBytesHistory()`方法查询记录。如果返回`null`，则记录有极小可能存在于其他bucket中，你可以让`_step`参数+1后继续回到上一步进行操作。
 

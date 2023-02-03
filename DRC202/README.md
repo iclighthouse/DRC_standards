@@ -3,6 +3,7 @@
 A standard interface for token transaction tecords scalable storage.
 
 ## Latest upgrade: 
+2023-2-2: fix type description; modify Example.  
 2022-12-5: add txnBytesHash(); modify Example.  
 2022-11-28: add txnHash().  
 2022-11-20: upgrade store() for batch storage of records into Bucket of DRC202.  

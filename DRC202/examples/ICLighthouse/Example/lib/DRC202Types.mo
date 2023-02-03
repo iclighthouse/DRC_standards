@@ -63,12 +63,14 @@ module {
     storeBytes: shared (_txid: Txid, _data: [Nat8]) -> async (); 
     storeBytesBatch: shared (_txns: [(_txid: Txid, _data: [Nat8])]) -> async (); 
     bucket : shared query (_token: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) -> async (bucket: ?Principal);
+    bucketByIndex : shared query (_token: Token, _blockIndex: Nat, _step: Nat, _version: ?Nat8) -> async (bucket: ?Principal);
   };
   public type Bucket = actor {
     txnBytes: shared query (_token: Token, _txid: Txid) -> async ?([Nat8], Time.Time);
     txnBytesHistory: shared query (_token: Token, _txid: Txid) -> async [([Nat8], Time.Time)];
     txn: shared query (_token: Token, _txid: Txid) -> async ?(TxnRecord, Time.Time);
     txnHistory: shared query (_token: Token, _txid: Txid) -> async [(TxnRecord, Time.Time)];
+    txnByIndex: shared query (_token: Token, _blockIndex: Nat) -> async [(TxnRecord, Time.Time)];
     txnHash: shared query (_token: Token, _txid: Txid, _index: Nat) -> async ?Text;
     txnBytesHash: shared query (_token: Token, _txid: Txid, _index: Nat) -> async ?Text;
   };
