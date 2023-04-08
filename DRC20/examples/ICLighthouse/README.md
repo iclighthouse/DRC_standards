@@ -4,6 +4,8 @@ DRC20 Token Factory: http://ictokens.com
 
 ## Update:
 
+[2023-3-20] modify Example.  
+
 [2023-2-2] modify Example.  
 
 [2022-12-5] Add txnBytesHash(); Upgraded Example.  

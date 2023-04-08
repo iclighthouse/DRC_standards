@@ -18,6 +18,7 @@ Specification: https://github.com/iclighthouse/DRC_standards/tree/main/CTSNC
 2022-11-20: Add drc20_transferBatch() method; Modify the length of _data to a maximum of 2KB; Modified Example.   
 2022-12-5: Modified Example.  
 2022-12-6: Stable standard.  
+2023-3-20: Modified Example.  
 
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse)  
