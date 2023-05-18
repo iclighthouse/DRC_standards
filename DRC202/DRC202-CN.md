@@ -40,7 +40,7 @@ https://github.com/iclighthouse/DRC_standards/blob/main/DRC202/dev-guide-cn.md
 - `Sid`是全局唯一的交易记录存储ID，28字节的Blob类型，由Proxy合约生成。
 - `Txid`是Token内唯一的交易记录ID，必须是8或32字节的Blob类型，由Token合约生成。推荐生成txid的方法是：[DRC202Types.generateTxid(_token: Principal, _caller: AccountId, _nonce: Nat)](https://github.com/iclighthouse/DRC_standards/blob/main/DRC202/examples/ICLighthouse/Example/lib/DRC202Types.mo)。
     如果你使用Nat作为txid，请将Nat转换为Nat64，然后使用大端序编码，生成8字节的bytes。
-- `AccountId`是Token用户的身份ID，通常是32字节的Blob类型，由Token合约生成。如果使用Principal、[Nat8]等数据类型，则需要转换成Blob。如果是ICRC1标准的Account类型，需要按照https://github.com/dfinity/ICRC-1/tree/main/standards/ICRC-1 中的规则，将raw_bytes作为AccountId。
+- `AccountId`是Token用户的身份ID，通常是32字节的Blob类型，由Token合约生成。如果使用Principal、[Nat8]等数据类型，则需要转换成AccountId (Blob)。如果是ICRC1标准的Account类型，需要转换成AccountId (Blob)。
 
 ### Types (DID)
 
@@ -186,13 +186,13 @@ OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 stats: () -> (record { bucketCount: nat; errCount: nat; storeErrPool: nat; tokenCount: nat; txnCount: nat; }) query;
 ```
 
-#### bucketInfo
+#### bucketList
 
-返回关于`_bucket`的信息。如果没有指定`_bucket`，则返回当前bucket的信息。   
+返回bucket列表.  
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 
 ``` candid
-bucketInfo: (_bucket: opt Bucket) -> (Bucket, BucketInfo);
+bucketList : () -> (vec Bucket) query;
 ```
 
 #### setStd
@@ -282,14 +282,6 @@ OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在
 bucketInfo: () -> (BucketInfo) query;
 ```
 
-#### last
-
-返回最后存储记录的sid和时间戳。   
-OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
-
-``` candid
-last: () -> (Sid, Time) query;
-```
 
 #### 3. Token Interface (Implementation)
 
