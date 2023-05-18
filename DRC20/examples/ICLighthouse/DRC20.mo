@@ -139,7 +139,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     };
     private func _dropAccount(_a: AccountId) : Bool{ // (*)
         let minValue = fee_;
-        if (_getBalance(_a) > minValue or _getNonce(_a) == 0){
+        if (_getBalance(_a) > minValue or (_getNonce(_a) == 0 and _getBalance(_a) == 0)){
             return false;
         };
         dropedAccounts := Trie.put(dropedAccounts, keyb(_getShortAccountId(_a)), Blob.equal, true).0;
@@ -1070,7 +1070,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         return _icrc1_getFee();
     };
     public query func icrc1_metadata() : async [(Text, Value)]{
-        let md1: [(Text, Value)] = [("icrc1:symbol", #Text(symbol_)), ("icrc1:name", #Text(name_)), ("icrc1:decimals", #Nat(Nat8.toNat(decimals_))), ("icrc1:fee", #Nat(_icrc1_getFee())), ("icrc1:totalSupply", #Nat(totalSupply_))];
+        let md1: [(Text, Value)] = [("icrc1:symbol", #Text(symbol_)), ("icrc1:name", #Text(name_)), ("icrc1:decimals", #Nat(Nat8.toNat(decimals_))), 
+        ("icrc1:fee", #Nat(_icrc1_getFee())), ("icrc1:total_supply", #Nat(totalSupply_)), ("icrc1:max_memo_length", #Nat(2048))];
         var md2: [(Text, Value)] = Array.map<Metadata, (Text, Value)>(metadata_, func (item: Metadata) : (Text, Value) { 
             if (item.name == "logo"){
                 ("icrc1:"#item.name, #Text(item.content))
@@ -1210,14 +1211,21 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             };
             case(_){};
         };
-        let spender = _icrc1_get_account({ owner = _args.spender; subaccount = null; });
-        var value : Nat = 0;
-        if (_args.amount > 0){
-            value := Int.abs(_args.amount);
-        };
+        let spender = _icrc1_get_account(_args.spender);
+        var value : Nat = _args.amount;
+        // if (_args.amount > 0){
+        //     value := Int.abs(_args.amount);
+        // };
         let from = _icrc1_get_account({ owner = msg.caller; subaccount = _args.from_subaccount; });
         let sub = _toSaNat8(_args.from_subaccount);
         let data = _args.memo;
+        switch(_args.expected_allowance){
+            case(?(expectedAllowance)){
+                let currentAllowance = _getAllowance(from, spender);
+                if (expectedAllowance != currentAllowance){ return #Err(#AllowanceChanged({ current_allowance = currentAllowance })) };
+            };
+            case(_){};
+        };
         let res = __approve(msg.caller, Hex.encode(Blob.toArray(spender)), value, null, sub, data);
         switch(res, _args.expires_at){
             case(#ok(txid), ?(expires_at)){
@@ -1244,7 +1252,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             };
             case(_){};
         };
-        let spender = _icrc1_get_account({ owner = msg.caller; subaccount = null; });
+        let spender = _icrc1_get_account({ owner = msg.caller; subaccount = _args.spender_subaccount; });
         let from = _icrc1_get_account(_args.from);
         let to = _icrc1_get_account(_args.to);
         let value = _args.amount;
@@ -1268,8 +1276,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     };
     public query func icrc2_allowance(_args: AllowanceArgs) : async { allowance : Nat; expires_at : ?Nat64 } {
         let owner = _icrc1_get_account(_args.account);
-        let spender = _icrc1_get_account({ owner = _args.spender; subaccount = null; });
-        return { allowance = _getAllowance(owner, spender); expires_at = null };
+        let spender = _icrc1_get_account(_args.spender);
+        let expiresAt = Int.abs(_getAllowanceExpiration(owner, spender));
+        return { allowance = _getAllowance(owner, spender); expires_at = if (expiresAt > 0){ ?Nat64.fromNat(expiresAt) }else{ null } };
     };
 
     // drc202
