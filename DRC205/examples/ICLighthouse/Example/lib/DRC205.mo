@@ -288,7 +288,7 @@ module {
                             token1 = _txn.token1;
                             fee = _txn.fee;
                             shares = _txn.shares;
-                            time = _txn.time;
+                            time = txn.time;
                             index = _txn.index;
                             nonce = _txn.nonce;
                             order = _txn.order;

@@ -21,7 +21,7 @@ DRC205标准包含三部分：
 
 * Swap交易记录数据结构（TxnRecord）：定义了一个通用型数据结构，适应AMM和OrderBook模式的Dex，兼顾数据透明和隐私保护。
 
-* 可扩展性存储接口规范：可扩展存储机制是由一个入口合约Proxy和自动扩展的多个存储合约Bucket组成。根据实际的存储需求创建Bucket（当一个Bucket满了就创建一个新的Bucket），然后将交易记录压缩并存储在Bucket中。当你想查询一个代币交易记录时，你可以先从Proxy合约中查询记录存储的BucketId（使用BloomFilter技术进行路由，https://en.wikipedia.org/wiki/Bloom_filter ），然后再从指定的Bucket中查询交易记录。
+* 可扩展性存储接口规范：可扩展存储机制是由一个入口合约Proxy和自动扩展的多个存储合约Bucket组成。根据实际的存储需求创建Bucket（当一个Bucket满了就创建一个新的Bucket），然后将交易记录压缩并存储在Bucket中。当你想查询一个交易对的交易记录时，你可以先从Proxy合约中查询记录存储的BucketId（使用BloomFilter技术进行路由，https://en.wikipedia.org/wiki/Bloom_filter ），然后再从指定的Bucket中查询交易记录。
 
 * Motoko开发包（Motoko Module）：建议Dex开发者采用的交易记录处理规范，采取“当前Canister缓存近期记录+外部Canister持久化存储历史记录”的模式，并提供查询接口。
 
@@ -40,11 +40,11 @@ https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/dev-guide-cn.md
 - `Sid`是全局唯一的交易记录存储ID，Blob类型，28字节，由Proxy合约生成。
 - `Txid`是Dex内唯一的交易记录ID，Blob类型，必须8或32字节，由Dex合约生成。推荐生成txid的方法是：[DRC205Types.generateTxid(_app: Principal, _caller: AccountId, _nonce: Nat)](https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/examples/ICLighthouse/Example/lib/DRC205Types.mo)。
     如果你使用Nat作为txid，请将Nat转换为Nat64，然后使用大端序编码，生成8字节的bytes。
-- `AccountId`是用户的身份ID，通常是32字节的Blob类型，由Token合约生成。如果使用Principal、[Nat8]等数据类型，则需要转换成Blob。如果是ICRC1标准的Account类型，需要按照https://github.com/dfinity/ICRC-1/tree/main/standards/ICRC-1 中的规则，将raw_bytes作为AccountId。
+- `AccountId`是用户的身份ID，通常是32字节的Blob类型，由Token合约生成。如果使用Principal、[Nat8]等数据类型，则需要转换成AccountId(Blob)。如果交易的token是ICRC1标准的Account类型，需要转换成AccountId(Blob)。另外，交易记录结构TxnRecord中的msgCaller字段填入交易者的`owner`, caller字段填入交易者的`subaccount`。
 
 ### Transaction Record Types (TxnRecord)
 
-这是一个建议数据结构，如果使用自定义数据结构，可以使用storeBytes和txnBytes方法满足兼容性需求。
+这是一个建议数据结构，如果使用自定义数据结构，可以使用`storeBytesBatch`满足兼容性需求。
 
 ``` candid
 type Status = variant { Failed; Pending; Completed; PartiallyCompletedAndCancelled; Cancelled; };
@@ -53,22 +53,26 @@ type TxnRecord = record {
    caller: AccountId;
    cyclesWallet: opt CyclesWallet;
    data: opt Data;
-   details: vec record { counterparty: Txid; token0Value: BalanceChange; token1Value: BalanceChange; };
+   details: vec record {
+       counterparty: Txid;
+       time: Time;
+       token0Value: BalanceChange;
+       token1Value: BalanceChange;
+     };
    fee: record { token0Fee: int; token1Fee: int; };
+   filled: record { token0Value: BalanceChange; token1Value: BalanceChange; };
    index: nat;
    msgCaller: opt principal;
    nonce: Nonce;
    operation: OperationType;
    order: record { token0Value: opt BalanceChange; token1Value: opt BalanceChange; };
    orderMode: variant { AMM; OrderBook; };
-   orderType: opt variant { LMT; FOK; FAK; MKT; };
+   orderType: opt variant { FAK; FOK; LMT; MKT; };
    shares: ShareChange;
    status: Status;
    time: Time;
    token0: TokenType;
-   token0Value: BalanceChange;
    token1: TokenType;
-   token1Value: BalanceChange;
    txid: Txid;
  };
 type Txid = blob;
@@ -191,13 +195,13 @@ OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 stats: () -> (record { bucketCount: nat; errCount: nat; storeErrPool: nat; tokenCount: nat; txnCount: nat; }) query;
 ```
 
-#### bucketInfo
+#### bucketList
 
-返回关于`_bucket`的信息。如果没有指定`_bucket`，则返回当前bucket的信息。   
+返回bucket列表.  
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 
 ``` candid
-bucketInfo: (_bucket: opt Bucket) -> (Bucket, BucketInfo);
+bucketList : () -> (vec Bucket) query;
 ```
 
 #### 2. DRC205Bucket
@@ -270,14 +274,6 @@ OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在
 bucketInfo: () -> (BucketInfo) query;
 ```
 
-#### last
-
-返回最后存储记录的sid和时间戳。   
-OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
-
-``` candid
-last: () -> (Sid, Time) query;
-```
 
 ### 开发包(Motoko Module)及指南
 
@@ -417,9 +413,22 @@ drc205_events: (opt Address) -> (vec TxnRecord) query;
 drc205_txn: (Txid) -> (opt TxnRecord) query;
 ```
 
+#### Rust开发者指南
 
+DRC205 (Main): 6ylab-kiaaa-aaaak-aacga-cai  
+DRC205 (Test): ix3cb-4iaaa-aaaak-aagbq-cai  
 
-#### 开发包(Motoko Module)及指南
+请参考Candid文件接口：
+
+https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/DRC205Proxy.did  
+https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/DRC205Bucket.did  
+
+请调用storeBatch或storeBytesBatch方法进行批量存储，注意需要添加Cycles以及调用的时间间隔。
+
+#### Motoko开发包(Motoko Module)及指南
+
+DRC205 (Main): 6ylab-kiaaa-aaaak-aacga-cai  
+DRC205 (Test): ix3cb-4iaaa-aaaak-aagbq-cai 
 
 Motoko开发示例：https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/examples/ICLighthouse/Example/Example.mo
 
@@ -542,8 +551,8 @@ private var drc205 = DRC205.DRC205({EN_DEBUG = true; MAX_CACHE_TIME = 3 * 30 * 2
 
 - Storage Canister: https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/examples/IClighthouse  
     DRC205 (Main): 6ylab-kiaaa-aaaak-aacga-cai  
-    DRC205 (Test): ix3cb-4iaaa-aaaak-aagbq-cai 
-    Notes: Use 6ylab-kiaaa-aaaak-aacga-cai to store swap records that can be queried through the ICHouse blockchain explorer (http://ic.house).
+    DRC205 (Test): ix3cb-4iaaa-aaaak-aagbq-cai  
+    **Notes**: Use 6ylab-kiaaa-aaaak-aacga-cai to store swap records that can be queried through the ICHouse blockchain explorer (http://ic.house).
 
 - Motoko Module: https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/examples/ICLighthouse/Example/lib/DRC205.mo 
 

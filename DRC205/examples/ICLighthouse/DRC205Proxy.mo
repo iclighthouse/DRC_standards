@@ -50,7 +50,7 @@ shared(installMsg) actor class ProxyActor() = this {
     };
 
     private var version_: Nat8 = 1;
-    private var bucketCyclesInit: Nat = 1000000000000;
+    private var bucketCyclesInit: Nat = 2000000000000;
     private var maxStorageTries: Nat = 3;
     private var standard_: Text = "drc205"; 
     private stable var fee_: Nat = 1000000;  //cycles
@@ -139,7 +139,7 @@ shared(installMsg) actor class ProxyActor() = this {
         };
         return (count, count * 10 / _duration);
     };
-    private func _newBucket() : async Bucket {
+    private func _newBucket() : async* Bucket {
         Cycles.add(bucketCyclesInit);
         let bucketActor = await DRC205Bucket.BucketActor();
         let bucket: Bucket = Principal.fromActor(bucketActor);
@@ -161,7 +161,7 @@ shared(installMsg) actor class ProxyActor() = this {
         });
         return bucket;
     };
-    private func _topup(_bucket: Bucket) : async (){
+    private func _topup(_bucket: Bucket) : async* (){
         let bucketActor: DRC205Bucket.BucketActor = actor(Principal.toText(_bucket));
         let bucketInfo: BucketInfo = await bucketActor.bucketInfo();
         if (_bucket == currentBucket[0].0){
@@ -174,25 +174,22 @@ shared(installMsg) actor class ProxyActor() = this {
     };
     private func _monitor() : async (){
         for (bucket in buckets.vals()){
-            let f = _topup(bucket);
+            await* _topup(bucket);
         };
     };
-    private func _getBucket() : async Bucket{
+    private func _getBucket() : async* Bucket{
         if (currentBucket.size() > 0){
             var bucket: Bucket = currentBucket[0].0;
-            if (Time.now() > lastCheckCyclesTime + 20*60*1000000000){ 
-                await _topup(bucket); 
-            };
             if (Time.now() > lastCheckCyclesTime + 4*3600*1000000000){ 
                 let f = _monitor();
                 lastCheckCyclesTime := Time.now();
             };
             if (currentBucket[0].1.memory >= maxMemory){
-                bucket := await _newBucket();
+                bucket := await* _newBucket();
             };
             return bucket;
         } else {
-            return await _newBucket();
+            return await* _newBucket();
         };
     };
     private func _pushLastTxns(_app: AppId, _data: DataType) : (){
@@ -311,13 +308,17 @@ shared(installMsg) actor class ProxyActor() = this {
             txnCount += 1;
         };
     };
-    private func _blobAppend(_a: Blob, _b: Blob): Blob{
-        return Blob.fromArray(Tools.arrayAppend(Blob.toArray(_a), Blob.toArray(_b)));
+    private func _blobAppend(_bytesArr: [Blob]): Blob{
+        var data : [Nat8] = [];
+        for (item in _bytesArr.vals()){
+            data := Tools.arrayAppend(data, Blob.toArray(item));
+        };
+        return Blob.fromArray(data);
     };
-    private func _execStorage() : async (){
+    private func _execStorage() : async* (){
         var bucket: Bucket = currentBucket[0].0;
         if (Time.now() > lastFetchBucketTime + 10*60*1000000000){
-            bucket := await _getBucket();
+            bucket := await* _getBucket();
             lastFetchBucketTime := Time.now();
         };
         let bucketActor: DRC205Bucket.BucketActor = actor(Principal.toText(bucket));
@@ -330,7 +331,7 @@ shared(installMsg) actor class ProxyActor() = this {
                 case(#Txn(txn)){
                     let sid = SwapRecord.generateSid(app, txn.txid);
                     let iid = SwapRecord.generateIid(app, txn.index);
-                    storeBatch := Tools.arrayAppend(storeBatch, [(_blobAppend(sid, iid), txn)]); // the first item at 0 position
+                    storeBatch := Tools.arrayAppend(storeBatch, [(_blobAppend([sid, iid, txn.account, Principal.toBlob(app)]), txn)]); // the first item at 0 position
                     _storing := List.push((app, dataType, callCount), _storing);
                 };
                 case(#Bytes(txn)){
@@ -397,7 +398,7 @@ shared(installMsg) actor class ProxyActor() = this {
         // };
         // storeTxns := _storeTxns;
     };
-    private func _reExecStorage() : async (){
+    private func _reExecStorage() : async* (){
         var item = List.pop(storeErrPool);
         while (Option.isSome(item.0)){
             switch(item.0){
@@ -408,7 +409,7 @@ shared(installMsg) actor class ProxyActor() = this {
             };
             item := List.pop(item.1);
         };
-        await _execStorage();
+        await* _execStorage();
     };
 
     public query func generateTxid(_app: AppId, _caller: AccountId, _nonce: Nat): async Txid{
@@ -436,16 +437,8 @@ shared(installMsg) actor class ProxyActor() = this {
             storeErrPool = List.size(storeErrPool);
         };
     };
-    public /*query*/ func bucketInfo(_bucket: ?Bucket) : async (Bucket, BucketInfo){
-        switch(_bucket){
-            case(?(bucket)){
-                let bucketActor: DRC205Bucket.BucketActor = actor(Principal.toText(bucket));
-                return (bucket, await bucketActor.bucketInfo());
-            };
-            case(_){
-                return currentBucket[0];
-            };
-        };
+    public query func bucketList() : async [Bucket]{
+        return buckets;
     };
     public query func appInfo(_app: AppId) : async ?AppInfo{
         return Trie.get(apps, keyp(_app), Principal.equal);
@@ -467,7 +460,7 @@ shared(installMsg) actor class ProxyActor() = this {
         storeTxns := List.push((app, #Txn(_txn), 0), storeTxns);
         if (Time.now() > lastStorageTime + 5*1000000000 and _tps(5, null).1 < MaxTPS*7){
             lastStorageTime := Time.now();
-            await _execStorage();
+            await* _execStorage();
         };
     };
     public shared(msg) func storeBatch(_txns: [TxnRecord]) : async (){ // the first item at 0 position
@@ -484,7 +477,7 @@ shared(installMsg) actor class ProxyActor() = this {
         };
         if (Time.now() > lastStorageTime + 5*1000000000 and _tps(5, null).1 < MaxTPS*7){
             lastStorageTime := Time.now();
-            await _execStorage();
+            await* _execStorage();
         };
     };
     public shared(msg) func storeBytes(_txid: Txid, _data: [Nat8]) : async (){
@@ -500,7 +493,7 @@ shared(installMsg) actor class ProxyActor() = this {
         storeTxns := List.push((_app, #Bytes({txid = _txid; data = _data;}), 0), storeTxns);
         if (Time.now() > lastStorageTime + 5*1000000000 and _tps(5, null).1 < MaxTPS*7){
             lastStorageTime := Time.now();
-            await _execStorage();
+            await* _execStorage();
         };
     };
     public shared(msg) func storeBytesBatch(_txns: [(_txid: Txid, _data: [Nat8])]) : async (){ // the first item at 0 position
@@ -517,7 +510,7 @@ shared(installMsg) actor class ProxyActor() = this {
         };
         if (Time.now() > lastStorageTime + 5*1000000000 and _tps(5, null).1 < MaxTPS*7){
             lastStorageTime := Time.now();
-            await _execStorage();
+            await* _execStorage();
         };
     };
     public query func bucket(_app: AppId, _txid: Txid, _step: Nat, _version: ?Nat8) : async (bucket: ?Principal){
@@ -564,7 +557,7 @@ shared(installMsg) actor class ProxyActor() = this {
     };
     public shared(msg) func reStore() : async (){  
         assert(_onlyOwner(msg.caller));
-        await _reExecStorage();
+        await* _reExecStorage();
     };
     public shared(msg) func clearStoreErrPool() : async (){  
         assert(_onlyOwner(msg.caller));

@@ -27,6 +27,7 @@ import Nat16 "mo:base/Nat16";
 import Nat64 "mo:base/Nat64";
 import Binary "Binary";
 import Buffer "mo:base/Buffer";
+import Hash "mo:base/Hash";
 //for test
 import Time "mo:base/Time";
 import Int "mo:base/Int";
@@ -39,6 +40,9 @@ module {
         #DerivedId;  //03
         #AnonymousId;  //04
         #NoneId;  //trap
+    };
+    public func natHash(n : Nat) : Hash.Hash{
+      return Blob.hash(Blob.fromArray(Binary.BigEndian.fromNat64(Nat64.fromIntWrap(n))));
     };
     public func arrayAppend<T>(a: [T], b: [T]) : [T]{
         let buffer = Buffer.Buffer<T>(1);

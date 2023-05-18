@@ -3,6 +3,7 @@
 A common swap transaction record data type and scalability storage specification.
  
 ## Latest upgrade: 
+2023-5-17: add bucketList(); del bucketInfo(); modify Example.  
 2023-2-2: fix type description; modify Example.  
 2022-12-5: add txnBytesHash(); modify Example.  
 2022-11-28: add txnHash(); fix bugs.   
