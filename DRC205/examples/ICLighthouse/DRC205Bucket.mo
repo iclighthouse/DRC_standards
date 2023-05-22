@@ -163,21 +163,18 @@ shared(installMsg) actor class BucketActor() = this {
             };
         };
     };
-    private func _split(_b: Blob): (_sid: Sid/*28Bytes*/, _iid: ?Blob/*28Bytes*/, _accountId: ?Blob/*32Bytes*/, _canisterId: ?Principal/*10-29Bytes*/){
+    private func _split(_b: Blob): (_sid: Sid/*28Bytes*/, _iid: ?Blob/*28Bytes*/, _canisterId: ?Principal/*10-29Bytes*/){
         let id = Blob.toArray(_b);
         if (id.size() <= 28){
-            return (_b, null, null, null);
+            return (_b, null, null);
         }else if (id.size() > 28 and id.size() <= 56){
-            return (Blob.fromArray(Tools.slice(id, 0, ?27)), ?Blob.fromArray(Tools.slice(id, 28, null)), null, null);
-        }else if (id.size() > 56 and id.size() <= 88){
+            return (Blob.fromArray(Tools.slice(id, 0, ?27)), ?Blob.fromArray(Tools.slice(id, 28, null)), null);
+        }else{ //  if (id.size() > 56)
             return (Blob.fromArray(Tools.slice(id, 0, ?27)), ?Blob.fromArray(Tools.slice(id, 28, ?55)), 
-            ?Blob.fromArray(Tools.slice(id, 56, null)), null);
-        }else{ //  if (id.size() > 88)
-            return (Blob.fromArray(Tools.slice(id, 0, ?27)), ?Blob.fromArray(Tools.slice(id, 28, ?55)), 
-            ?Blob.fromArray(Tools.slice(id, 56, ?87)), ?Principal.fromBlob(Blob.fromArray(Tools.slice(id, 88, null))));
+            ?Principal.fromBlob(Blob.fromArray(Tools.slice(id, 56, null))));
         };
     };
-    private func _dealWithId(_sid: Blob) : Sid{
+    private func _dealWithId(_sid: Blob, _txn: ?TxnRecord) : Sid{
         let ids = _split(_sid);
         switch(ids.1){
             case(?(iid)){
@@ -185,9 +182,9 @@ shared(installMsg) actor class BucketActor() = this {
             };
             case(_){};
         };
-        switch(ids.2, ids.3){
-            case(?(accountId), ?(canisterId)){
-                _putAccountIdLog(accountId, canisterId, ids.0);
+        switch(_txn, ids.2){
+            case(?(txn), ?(canisterId)){
+                _putAccountIdLog(txn.account, canisterId, ids.0);
             };
             case(_, _){};
         };
@@ -244,25 +241,25 @@ shared(installMsg) actor class BucketActor() = this {
 
     public shared(msg) func storeBytes(_sid: Sid, _data: [Nat8]) : async (){
         assert(_onlyOwner(msg.caller));
-        let sid = _dealWithId(_sid);
+        let sid = _dealWithId(_sid, null);
         _store(sid, _data);
     };
     public shared(msg) func storeBytesBatch(batch: [(_sid: Sid, _data: [Nat8])]) : async (){
         assert(_onlyOwner(msg.caller));
         for ((_sid, _data) in batch.vals()){
-            let sid = _dealWithId(_sid);
+            let sid = _dealWithId(_sid, null);
             _store(sid, _data);
         };
     };
     public shared(msg) func store(_sid: Sid, _txn: TxnRecord) : async (){
         assert(_onlyOwner(msg.caller));
-        let sid = _dealWithId(_sid);
+        let sid = _dealWithId(_sid, ?_txn);
         _store(sid, Blob.toArray(to_candid(_txn)));
     };
     public shared(msg) func storeBatch(batch: [(_sid: Sid, _txn: TxnRecord)]) : async (){
         assert(_onlyOwner(msg.caller));
         for ((_sid, _txn) in batch.vals()){
-            let sid = _dealWithId(_sid);
+            let sid = _dealWithId(_sid, ?_txn);
             _store(sid, Blob.toArray(to_candid(_txn)));
         };
     };
@@ -309,10 +306,10 @@ shared(installMsg) actor class BucketActor() = this {
         let page: Nat32 = Option.get(_page, 1:Nat32);
         let start = Nat32.toNat(Nat32.sub(page, 1) * size);
         let end = Nat32.toNat(Nat32.sub(page * size, 1));
-        let data = Array.map(_getAccountIdLogs(_accountId, _app), func(sid: Sid): [(TxnRecord, Time.Time)]{
+        let data = Tools.slice(_getAccountIdLogs(_accountId, _app), start, ?end);
+        return Array.map(data, func(sid: Sid): [(TxnRecord, Time.Time)]{
             return _get3(sid, true);
         });
-        return Tools.slice(data, start, ?end);
     };
     public query func txnHash(_app: AppId, _txid: Txid, _index: Nat) : async ?Hex.Hex{
         let _sid = SwapRecord.generateSid(_app, _txid);

@@ -40,7 +40,7 @@ https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/dev-guide-cn.md
 - `Sid`是全局唯一的交易记录存储ID，Blob类型，28字节，由Proxy合约生成。
 - `Txid`是Dex内唯一的交易记录ID，Blob类型，必须8或32字节，由Dex合约生成。推荐生成txid的方法是：[DRC205Types.generateTxid(_app: Principal, _caller: AccountId, _nonce: Nat)](https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/examples/ICLighthouse/Example/lib/DRC205Types.mo)。
     如果你使用Nat作为txid，请将Nat转换为Nat64，然后使用大端序编码，生成8字节的bytes。
-- `AccountId`是用户的身份ID，通常是32字节的Blob类型，由Token合约生成。如果使用Principal、[Nat8]等数据类型，则需要转换成AccountId(Blob)。如果交易的token是ICRC1标准的Account类型，需要转换成AccountId(Blob)。另外，交易记录结构TxnRecord中的msgCaller字段填入交易者的`owner`, caller字段填入交易者的`subaccount`。
+- `AccountId`是用户的身份ID，通常是32字节的Blob类型，由Token合约生成。如果使用Principal、[Nat8]等数据类型，则需要转换成AccountId(Blob)。如果交易的token是ICRC1标准的Account类型，需要转换成AccountId(Blob)，交易记录结构TxnRecord中的msgCaller字段填入交易者的`owner`, caller字段填入交易者的`subaccount`。
 
 ### Transaction Record Types (TxnRecord)
 
@@ -128,29 +128,12 @@ version: () -> (nat8) query;
 fee: () -> (_cycles: nat) query;
 ```
 
-#### store
-
-(@deprecated: 该方法将被弃用)  
-存储一条交易记录`_txn`，其中`_txn.data`的数据长度最大允许64KB，超出部分会被截取。调用该方法时需要添加cycles作为费用（通过`fee()`方法查询）。
-
-``` candid
-store: (_txn: TxnRecord) -> ();
-```
 #### storeBatch
 
 批量存储交易记录, 允许每间隔20秒以上存储一次. 调用该方法时需要添加cycles作为费用（通过`fee()`方法查询），批量存储n条消息需要支付n*fee Cycles。
 
 ``` candid
 storeBatch: (_txns: vec TxnRecord) -> ();
-```
-
-#### storeBytes
-
-(@deprecated: 该方法将被弃用)  
-以二进制数据格式存储一条交易记录`_data`, 允许的最大数据128KB。调用该方法时需要添加cycles作为费用（通过`fee()`方法查询）。
-
-``` candid
-storeBytes: (_txid: Txid, _data: vec nat8) -> ();
 ```
 
 #### storeBytesBatch
@@ -169,12 +152,12 @@ storeBytesBatch: (_txns: vec record { Txid; vec nat8 }) -> ();
 getLastTxns: () -> (vec record { index: nat; app: AppId; indexInApp: nat; txid: Txid; }) query;
 ```
 
-#### bucket
+#### location
 
-返回指定`_app`的交易记录`_txid`所在的bucket（默认`_step`为0）。由于使用BloomFilter作为路由，这个查询不一定准确。如果目标交易记录不在该bucket中，你可以按`step+1`重新查询bucket，直到返回null (表示你要查询的记录不存在)。
+返回给定的_app和_arg(可以使用txid，index，accountId进行查询)的交易记录所在的Bucket。如果不存在返回空数组；如果返回数组包含多个值，意味着交易记录可能保存在其中一个Bucket中，可遍历寻找它。
 
 ``` candid
-bucket: (_app: AppId, _txid: Txid, _step: nat, _version: opt nat8) -> (opt Bucket) query;
+location: (_app: AppId, _arg: variant{ txid: Txid; index: nat; account: AccountId}, _version: opt nat8) -> (vec Bucket) query;
 ```
 
 #### generateTxid
@@ -240,13 +223,22 @@ txnBytes: (_app: AppId, _txid: Txid) -> (opt record { vec nat8; Time; }) query;
 txnBytesHistory: (_app: AppId, _txid: Txid) -> (vec record { vec nat8; Time; }) query;
 ```
 
-#### txnBytes2
+#### txnByIndex
 
-返回指定`_sid`的交易记录的二进制数据。     
+返回指定`_token`和`_blockIndex`的交易历史记录集。     
 OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
 
 ``` candid
-txnBytes2: (_sid: Sid) -> (opt record { vec nat8; Time; }) query;
+txnByIndex: (_app: AppId, _blockIndex: nat) -> (vec record{TxnRecord; Time}) query;
+```
+
+#### txnByAccountId
+
+返回指定`_accountId`和`_token`的交易记录列表。注：_page从1开始。          
+OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
+
+``` candid
+txnByAccountId: (_accountId: AccountId, _app: opt AppId, _page: opt nat32, _size: opt nat32) -> (vec vec record{TxnRecord; Time}) query;
 ```
 
 #### txnHash

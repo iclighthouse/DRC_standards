@@ -119,8 +119,9 @@ type AccountId = blob;
 type ProxyActor = 
  service {
    appInfo: (AppId) -> (opt AppInfo) query;
-   bucket: (AppId, Txid, nat, opt nat8) -> (opt principal) query;
+   bucket: (AppId, Txid, nat, opt nat8) -> (opt Bucket) query;
    bucketByIndex: (AppId, nat, nat, opt nat8) -> (opt Bucket) query;
+   location: (AppId, variant{ txid: Txid; index: nat; account: AccountId}, opt nat8) -> (vec Bucket) query;
    bucketList : () -> (vec Bucket) query;
    fee: () -> (nat) query;
    generateTxid: (AppId, AccountId, nat) -> (Txid) query;
