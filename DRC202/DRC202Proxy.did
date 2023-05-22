@@ -64,6 +64,7 @@ type ProxyActor =
  service {
    bucket: (Token, Txid, nat, opt nat8) -> (opt Bucket) query;
    bucketByIndex: (Token, nat, nat, opt nat8) -> (opt Bucket) query;
+   location: (Token, variant{ txid: Txid; index: nat; account: AccountId}, opt nat8) -> (vec Bucket) query;
    bucketList : () -> (vec Bucket) query;
    fee: () -> (nat) query;
    generateTxid: (Token, AccountId, nat) -> (Txid) query;

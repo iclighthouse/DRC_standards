@@ -388,25 +388,37 @@ module {
             }
         };
         
+        // public func get2(_token: Principal, _txid: Txid) : async (txn: ?TxnRecord){
+        //     var step: Nat = 0;
+        //     func _getTxn(_token: Principal, _txid: Txid) : async* ?TxnRecord{
+        //         switch(await drc202().bucket(_token, _txid, step, null)){
+        //             case(?(bucketId)){
+        //                 let bucket: T.Bucket = actor(Principal.toText(bucketId));
+        //                 switch(await bucket.txn(_token, _txid)){
+        //                     case(?(txn, time)){ return ?txn; };
+        //                     case(_){
+        //                         step += 1;
+        //                         return await* _getTxn(_token, _txid);
+        //                     };
+        //                 };
+        //             };
+        //             case(_){ return null; };
+        //         };
+        //     };
+        //     return await* _getTxn(_token, _txid);
+        // };
         public func get2(_token: Principal, _txid: Txid) : async (txn: ?TxnRecord){
-            var step: Nat = 0;
-            func _getTxn(_token: Principal, _txid: Txid) : async ?TxnRecord{
-                switch(await drc202().bucket(_token, _txid, step, null)){
-                    case(?(bucketId)){
-                        let bucket: T.Bucket = actor(Principal.toText(bucketId));
-                        switch(await bucket.txn(_token, _txid)){
-                            case(?(txn, time)){ return ?txn; };
-                            case(_){
-                                step += 1;
-                                return await _getTxn(_token, _txid);
-                            };
-                        };
-                    };
-                    case(_){ return null; };
+            let buckets = await drc202().location(_token, #txid(_txid), null);
+            for (bucketId in buckets.vals()){
+                let bucket: T.Bucket = actor(Principal.toText(bucketId));
+                switch(await bucket.txn(_token, _txid)){
+                    case(?(txn, time)){ return ?txn; };
+                    case(_){};
                 };
             };
-            return await _getTxn(_token, _txid);
+            return null;
         };
+
         public func getPool() : [(Txid, Nat)]{
             return List.toArray(storeRecords);
         };

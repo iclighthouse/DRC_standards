@@ -68,18 +68,16 @@ DRC202Bucket did: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202
 
 - Other developers
 
-    Steps for query.
-
     **Step 1**. Get the bucket canister-id where the transaction record is stored by querying DRC202Proxy
 
-    Specify the token canister-id and the txid of the transaction record, call `DRC202Proxy.bucket()` or `DRC202Proxy.bucketByIndex()` method to query the bucket canister-id where the record is stored, if it returns `null`, it means the record does not exist.  
-    Note: Due to the use of BloomFilter technology, there is a very small probability (about 1‰) that the record does not exist in the returned bucket, which requires you to continue calling the `DRC202Proxy.bucket()` or `DRC202Proxy.bucketByIndex()` method using the `_step` parameter + 1. If `null` is returned it means the record must not exist.
+    Call `DRC202Proxy.bucket()` or `DRC202Proxy.bucketByIndex()` method to get the Bucket canister-id where the record is stored, if it returns `[]` means the record does not exist.  
+    Note: If the return value contains more than one Bucket, it means that the transaction record may exist in one of the Buckets, which is the case due to the BloomFilter technology.
 
     **Step 2**. Query the transaction record via DRC202Bucket
 
-    1) If the token uses the DRC202 TxnRecord type, call the `DRC202Bucket.txn()`, `DRC202Bucket.txnHistory()` or `DRC202Bucket.txnByIndex()` method to look up the record based on the Bucket canister-id obtained in the previous step. If `null` is returned, there is a very small chance that the record exists in another bucket and you can let the `_step` parameter +1 and continue back to the previous step for the operation.
+    1) If this token uses the DRC202 TxnRecord type, call `DRC202Bucket.txn()`, `DRC202Bucket.txnHistory()`, `DRC202Bucket. txnByIndex()` or `DRC202Bucket.txnByAccountId()` methods to query the record.
 
-    2) If the token uses a custom type for records, call the `DRC202Bucket.txnBytes()` or `DRC202Bucket.txnBytesHistory()` method to look up the record based on the Bucket canister-id obtained in the previous step. If `null` is returned, there is a very small chance that the record exists in another bucket, and you can let the `_step` parameter + 1 and continue back to the previous step for the operation.
+    2) If this token uses a custom type, call the `DRC202Bucket.txnBytes()` or `DRC202Bucket.txnBytesHistory()` method to query the record based on the Bucket canister-id obtained in the previous step.
 
 ## Standard specification
 

@@ -99,6 +99,11 @@ module {
         return Blob.fromArray(h224);
     };
 
+    public func generateAid(token: Token, account: AccountId) : Blob{
+        let h224 = SHA224.sha224(Tools.arrayAppend(Blob.toArray(Principal.toBlob(token)), Blob.toArray(account)));
+        return Blob.fromArray(h224);
+    };
+
     public func encode(txn: TxnRecord) : [Nat8]{
         //version: 1bytes
         var data: [Nat8] = _data;

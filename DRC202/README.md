@@ -4,6 +4,7 @@ A standard interface for token transaction tecords scalable storage.
 
 ## Latest upgrade: 
 
+2023-5-22: add location(); modify Example.  
 2023-5-17: Completed stable version.    
 2023-5-17: add bucketList(); del bucketInfo(); modify Example.  
 2023-2-2: fix type description; modify Example.  
