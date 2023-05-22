@@ -42,6 +42,7 @@ TODO: Standard drafting and motoko example implementation
 2023-2-2: Fix type description; Modify Example.  
 2023-5-17: Add bucketList(); del bucketInfo(); modify Example.  
 2023-5-17: Completed stable version.   
+2023-5-22: Add location(); modify Example.  
 
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC202](https://github.com/iclighthouse/DRC_standards/tree/main/DRC202)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse)  
@@ -67,6 +68,7 @@ TODO: Standard drafting and motoko example implementation
 2022-12-5: Add txnBytesHash(); Modify Example.  
 2023-2-2: Fix type description; Modify Example.  
 2023-5-17: Add bucketList(); del bucketInfo(); modify Example.  
+2023-5-22: Add location(); modify Example.  
 
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC205](https://github.com/iclighthouse/DRC_standards/tree/main/DRC205)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/examples/ICLighthouse)  

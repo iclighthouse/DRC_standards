@@ -18,6 +18,7 @@ module {
   public type Time = Time.Time;
   public type Txid = Blob;
   public type Token = Principal;
+  public type BucketId = Principal;
   public type Gas = { #token : Nat; #cycles : Nat; #noFee };
   public type Operation = {
     #approve : { allowance : Nat };
@@ -62,13 +63,18 @@ module {
     storeBatch : shared (_txns: [TxnRecord]) -> async (); 
     storeBytes: shared (_txid: Txid, _data: [Nat8]) -> async (); 
     storeBytesBatch: shared (_txns: [(_txid: Txid, _data: [Nat8])]) -> async (); 
-    bucket : shared query (_token: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) -> async (bucket: ?Principal);
+    bucket : shared query (_token: Principal, _txid: Txid, _step: Nat, _version: ?Nat8) -> async (bucket: ?BucketId);
+    bucketByIndex : shared query (_token: Token, _blockIndex: Nat, _step: Nat, _version: ?Nat8) -> async (bucket: ?BucketId);
+    location : shared query (_token: Token, _arg: {#txid: Txid; #index: Nat; #account: AccountId}, _version: ?Nat8) -> async [BucketId];
+    bucketList : shared query () -> async [BucketId];
   };
   public type Bucket = actor {
     txnBytes: shared query (_token: Token, _txid: Txid) -> async ?([Nat8], Time.Time);
     txnBytesHistory: shared query (_token: Token, _txid: Txid) -> async [([Nat8], Time.Time)];
     txn: shared query (_token: Token, _txid: Txid) -> async ?(TxnRecord, Time.Time);
     txnHistory: shared query (_token: Token, _txid: Txid) -> async [(TxnRecord, Time.Time)];
+    txnByIndex: shared query (_token: Token, _blockIndex: Nat) -> async [(TxnRecord, Time.Time)];
+    txnByAccountId: shared query (_accountId: AccountId, _token: ?Token, _page: ?Nat32/*start from 1*/, _size: ?Nat32) -> async [[(TxnRecord, Time.Time)]];
     txnHash: shared query (_token: Token, _txid: Txid, _index: Nat) -> async ?Text;
     txnBytesHash: shared query (_token: Token, _txid: Txid, _index: Nat) -> async ?Text;
   };
