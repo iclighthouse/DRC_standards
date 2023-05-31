@@ -74,7 +74,7 @@ module {
     txn: shared query (_token: Token, _txid: Txid) -> async ?(TxnRecord, Time.Time);
     txnHistory: shared query (_token: Token, _txid: Txid) -> async [(TxnRecord, Time.Time)];
     txnByIndex: shared query (_token: Token, _blockIndex: Nat) -> async [(TxnRecord, Time.Time)];
-    txnByAccountId: shared query (_accountId: AccountId, _token: ?Token, _page: ?Nat32/*start from 1*/, _size: ?Nat32) -> async [[(TxnRecord, Time.Time)]];
+    txnByAccountId: shared query (_accountId: AccountId, _token: ?Token, _page: ?Nat32/*start from 1*/, _size: ?Nat32) -> async {data: [[(TxnRecord, Time.Time)]]; totalPage: Nat; total: Nat};
     txnHash: shared query (_token: Token, _txid: Txid, _index: Nat) -> async ?Text;
     txnBytesHash: shared query (_token: Token, _txid: Txid, _index: Nat) -> async ?Text;
   };
