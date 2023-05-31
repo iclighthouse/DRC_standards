@@ -247,7 +247,7 @@ txnByIndex: (_token: Token, _blockIndex: nat) -> (vec record{TxnRecord; Time}) q
 OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
 
 ``` candid
-txnByAccountId: (_accountId: AccountId, _token: opt Token, _page: opt nat32, _size: opt nat32) -> (record{data: vec vec record{TxnRecord; Time}; totalPage: nat; total: nat}) query;
+txnByAccountId: (_accountId: AccountId, _token: opt Token, _page: opt nat32, _size: opt nat32) -> (record{data: vec record{Token; vec record{TxnRecord; Time}}; totalPage: nat; total: nat}) query;
 ```
 
 #### txnHash

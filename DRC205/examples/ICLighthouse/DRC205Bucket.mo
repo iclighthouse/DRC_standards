@@ -207,14 +207,14 @@ shared(installMsg) actor class BucketActor() = this {
             };
         };
     };
-    private func _getAccountIdLogs(_a: AccountId, _canisterId: ?Principal) : [Sid]{
+    private func _getAccountIdLogs(_a: AccountId, _canisterId: ?Principal) : [(Principal, Sid)]{
         switch(Trie.get(appAccountIds, key(_a), Blob.equal)){
             case(?(items)){
                 switch(_canisterId){
                     case(?(canisterId)){
                         switch(Trie.get(items, keyp(canisterId), Principal.equal)){
                             case(?(sids)){
-                                return List.toArray(sids);
+                                return Array.map<Sid, (Principal, Sid)>(List.toArray(sids), func (x: Sid): (Principal, Sid){ (canisterId, x) });
                             };
                             case(_){
                                 return [];
@@ -222,9 +222,9 @@ shared(installMsg) actor class BucketActor() = this {
                         };
                     };
                     case(_){
-                        var res: [Sid] = [];
+                        var res: [(Principal, Sid)] = [];
                         for ((k, v) in Trie.iter(items)){
-                            res := Tools.arrayAppend(res, List.toArray(v));
+                            res := Tools.arrayAppend(res, Array.map<Sid, (Principal, Sid)>(List.toArray(v), func (x: Sid): (Principal, Sid){ (k, x) }));
                         };
                         return res;
                     };
@@ -302,17 +302,18 @@ shared(installMsg) actor class BucketActor() = this {
         };
     };
     public query func txnByAccountId(_accountId: AccountId, _app: ?AppId, _page: ?Nat32/*start from 1*/, _size: ?Nat32) : async 
-    {data: [[(TxnRecord, Time.Time)]]; totalPage: Nat; total: Nat} {
+    {data: [(AppId, [(TxnRecord, Time.Time)])]; totalPage: Nat; total: Nat} {
         let size: Nat32 = Option.get(_size, 100:Nat32);
         let page: Nat32 = Option.get(_page, 1:Nat32);
         let start = Nat32.toNat(Nat32.sub(page, 1) * size);
         let end = Nat32.toNat(Nat32.sub(page * size, 1));
-        let sids = _getAccountIdLogs(_accountId, _app);
-        let length = sids.size();
-        let data = Tools.slice(sids, start, ?end);
+        var items = _getAccountIdLogs(_accountId, _app);
+        let length = items.size();
+        items := Tools.slice(items, start, ?end);
         return {
-            data = Array.map(data, func(sid: Sid): [(TxnRecord, Time.Time)]{
-                return _get3(sid, true);
+            data = Array.map<(Principal,Sid), (AppId, [(TxnRecord, Time.Time)])>(items, 
+            func(t: (Principal,Sid)): (AppId, [(TxnRecord, Time.Time)]){
+                return (t.0, _get3(t.1, true));
             });
             totalPage = (length + Nat32.toNat(size) - 1) / Nat32.toNat(size);
             total = length;
