@@ -58,7 +58,7 @@ drc202_txn: (Txid) -> (opt TxnRecord) query;
 
 ## 4. 如何查询交易记录
 
-无论你是Rust、Motoko、还是前端开发者，需要查询在DRC202中的交易记录，需要提供token的canister-id和txid。无法遍历查询所有记录。
+无论你是Rust、Motoko、还是前端开发者，需要查询在DRC202中的交易记录，需要提供token的canister-id和txid。无法遍历查询所有记录。  
 DRC202Proxy did: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/DRC202Proxy.did   
 DRC202Bucket did: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/DRC202Bucket.did   
 

@@ -229,15 +229,22 @@ shared(installMsg) actor class BucketActor() = this {
             case(_){ return []; };
         };
     };
-    public query func txnByAccountId(_accountId: AccountId, _token: ?Token, _page: ?Nat32/*start from 1*/, _size: ?Nat32) : async [[(TxnRecord, Time.Time)]]{
+    public query func txnByAccountId(_accountId: AccountId, _token: ?Token, _page: ?Nat32/*start from 1*/, _size: ?Nat32) : async 
+    {data: [[(TxnRecord, Time.Time)]]; totalPage: Nat; total: Nat} {
         let size: Nat32 = Option.get(_size, 100:Nat32);
         let page: Nat32 = Option.get(_page, 1:Nat32);
         let start = Nat32.toNat(Nat32.sub(page, 1) * size);
         let end = Nat32.toNat(Nat32.sub(page * size, 1));
-        let data = Tools.slice(_getAccountIdLogs(_accountId, _token), start, ?end);
-        return Array.map(data, func(sid: Sid): [(TxnRecord, Time.Time)]{
-            return _get3(sid);
-        });
+        let sids = _getAccountIdLogs(_accountId, _token);
+        let length = sids.size();
+        let data = Tools.slice(sids, start, ?end);
+        return {
+            data = Array.map(data, func(sid: Sid): [(TxnRecord, Time.Time)]{
+                return _get3(sid);
+            });
+            totalPage = (length + Nat32.toNat(size) - 1) / Nat32.toNat(size);
+            total = length;
+        };
     };
     public query func txnHash(_token: Token, _txid: Txid, _index: Nat) : async ?Hex.Hex{
         let _sid = TokenRecord.generateSid(_token, _txid);

@@ -58,7 +58,7 @@ drc202_txn: (Txid) -> (opt TxnRecord) query;
 
 ## 4. How to query transaction records
 
-Whether you are a Rust, Motoko, or front-end developer, you need to provide the token's canister-id and txid if you want to query the transaction records in DRC202. It is not possible to iterate through and query all records.
+Whether you are a Rust, Motoko, or front-end developer, you need to provide the token's canister-id and txid if you want to query the transaction records in DRC202. It is not possible to iterate through and query all records.  
 DRC202Proxy did: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/DRC202Proxy.did   
 DRC202Bucket did: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/DRC202Bucket.did   
 
