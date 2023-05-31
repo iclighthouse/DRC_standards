@@ -103,7 +103,7 @@ type BucketActor =
    last: () -> (Sid, Time) query;
    txn: (AppId, Txid) -> (opt record { TxnRecord; Time; }) query;
    txnHistory: (AppId, Txid) -> (vec record { TxnRecord; Time; }) query;
-   txnByAccountId: (AccountId, opt AppId, opt nat32, opt nat32) -> (vec vec record{ TxnRecord; Time; }) query;
+   txnByAccountId: (AccountId, opt AppId, opt nat32, opt nat32) -> (record{data: vec vec record{TxnRecord; Time}; totalPage: nat; total: nat}) query;
    txnByIndex: (AppId, nat) -> (vec record { TxnRecord; Time; }) query;
    txnHash: (AppId, Txid, nat) -> (opt Hex) query;
    txnBytes: (AppId, Txid) -> (opt record { vec nat8; Time; }) query;
