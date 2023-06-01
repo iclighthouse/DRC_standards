@@ -1399,7 +1399,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                 };
             };
         };
-        if (Trie.size(droppedAccounts) == 0){
+        if (Trie.size(droppedAccounts) == 0 and NonceMode == 0){
             droppedAccounts := dropedAccounts;
         };
     };
