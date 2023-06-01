@@ -100,7 +100,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     /* 
     * For storage saving mode
     */
-    private stable var dropedAccounts: Trie.Trie<Blob, Bool> = Trie.empty(); 
+    private stable var dropedAccounts: Trie.Trie<Blob, Bool> = Trie.empty(); // @deprecated
+    private stable var droppedAccounts: Trie.Trie<Blob, Bool> = Trie.empty(); 
     private func _checkNonceMode(_upgrade: Bool) : (){
         if (NonceMode == 0 and (_upgrade or Prim.rts_memory_size() > MAX_MEMORY)){
             NonceMode := 1;
@@ -115,11 +116,11 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             totalCoinSeconds := { coinSeconds = 0; updateTime = 0; };
             coinSeconds := Trie.empty(); // Disable the CoinSeconds function
             nonces := Trie.empty(); // Clearing nonces
-            dropedAccounts := Trie.empty();  // Clearing dropedAccounts
+            droppedAccounts := Trie.empty();  // Clearing droppedAccounts
         }else if (NonceMode > 0 and NonceMode < 200 and (_upgrade or Prim.rts_memory_size() > MAX_MEMORY)){
             NonceMode += 1;
             nonces := Trie.empty();
-            dropedAccounts := Trie.empty(); 
+            droppedAccounts := Trie.empty(); 
         };
     };
     private func _checkAllowanceLimit(_a: AccountId) : Bool{
@@ -131,8 +132,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private func _getShortAccountId(_a: AccountId) : Blob{
         return Blob.fromArray(AID.slice(Blob.toArray(_a), 0, ?15));
     };
-    private func _inDropedAccount(_a: AccountId) : Bool{
-        switch(Trie.get(dropedAccounts, keyb(_getShortAccountId(_a)), Blob.equal)){ 
+    private func _inDroppedAccount(_a: AccountId) : Bool{
+        switch(Trie.get(droppedAccounts, keyb(_getShortAccountId(_a)), Blob.equal)){ 
             case(?(bool)){ return bool; };
             case(_){ return false; };
         };
@@ -142,7 +143,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
         if (_getBalance(_a) > minValue or (_getNonce(_a) == 0 and _getBalance(_a) == 0)){
             return false;
         };
-        dropedAccounts := Trie.put(dropedAccounts, keyb(_getShortAccountId(_a)), Blob.equal, true).0;
+        droppedAccounts := Trie.put(droppedAccounts, keyb(_getShortAccountId(_a)), Blob.equal, true).0;
         //balances
         balances := Trie.remove(balances, keyb(_a), Blob.equal).0;
         //coinSeconds
@@ -408,7 +409,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
             allowed := _getAllowance(from, caller);
         };
         let data = Option.get(_data, Blob.fromArray([]));
-        if (_inDropedAccount(from) or _inDropedAccount(to)){
+        if (_inDroppedAccount(from) or _inDroppedAccount(to)){
             return #err({ code=#UndefinedError; message="This account has been dropped"; });
         };
         if (data.size() > 2048){
@@ -965,8 +966,8 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     public shared(msg) func drc20_dropAccount(_sa: ?Sa) : async Bool{
         return _dropAccount(_getAccountIdFromPrincipal(msg.caller, _sa));
     };
-    public query func drc20_holdersCount() : async (balances: Nat, nonces: Nat, dropedAccounts: Nat){
-        return (Trie.size(balances), Trie.size(nonces), Trie.size(dropedAccounts));
+    public query func drc20_holdersCount() : async (balances: Nat, nonces: Nat, droppedAccounts: Nat){
+        return (Trie.size(balances), Trie.size(nonces), Trie.size(droppedAccounts));
     };
 
     // icrc1 standard (https://github.com/dfinity/ICRC-1)
@@ -1368,16 +1369,10 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
     private stable var __pubsubData: [ICPubSub.DataTemp<MsgType>] = [];
     private stable var __pubsubDataNew: ?ICPubSub.DataTemp<MsgType> = null;
     system func preupgrade() {
-        //__drc202Data := [drc202.getData()];
         __drc202DataNew := ?drc202.getData();
-        //__pubsubData := [pubsub.getData()];
         __pubsubDataNew := ?pubsub.getData();
     };
     system func postupgrade() {
-        // if (__drc202Data.size() > 0){
-        //     drc202.setData(__drc202Data[0]);
-        //     __drc202Data := [];
-        // };
         switch(__drc202DataNew){
             case(?(data)){
                 drc202.setData(data);
@@ -1391,10 +1386,6 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                 };
             };
         };
-        // if (__pubsubData.size() > 0){
-        //     pubsub.setData(__pubsubData[0]);
-        //     __pubsubData := [];
-        // };
         switch(__pubsubDataNew){
             case(?(data)){
                 pubsub.setData(data);
@@ -1407,6 +1398,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs) = this {
                     __pubsubData := [];
                 };
             };
+        };
+        if (Trie.size(droppedAccounts) == 0){
+            droppedAccounts := dropedAccounts;
         };
     };
 

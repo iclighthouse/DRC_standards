@@ -4,6 +4,10 @@ DRC20 Token Factory: http://ictokens.com
 
 ## Update:
 
+[2023-6-1] fix Example.  
+
+[2023-5-31] fix DRC202.  
+
 [2023-5-17] modify Example (support ICRC2).  
 
 [2023-3-20] modify Example.  
