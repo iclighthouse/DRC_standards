@@ -251,20 +251,20 @@ shared(installMsg) actor class BucketActor() = this {
         let _sid = TokenRecord.generateSid(_token, _txid);
         switch(Trie.get(database, key(_sid), Blob.equal)){
             case(?(values)){
-                return ?Hex.encode(Hash256.hash(null, Blob.toArray(to_candid(TokenRecord.decode(values[_index].0)))));
-            };
-            case(_){ return null; };
-        };
-    };
-    public query func txnBytesHash(_token: Token, _txid: Txid, _index: Nat) : async ?Hex.Hex{
-        let _sid = TokenRecord.generateSid(_token, _txid);
-        switch(Trie.get(database, key(_sid), Blob.equal)){
-            case(?(values)){
                 return ?Hex.encode(Hash256.hash(null, values[_index].0));
             };
             case(_){ return null; };
         };
     };
+    // public query func txnBytesHash(_token: Token, _txid: Txid, _index: Nat) : async ?Hex.Hex{
+    //     let _sid = TokenRecord.generateSid(_token, _txid);
+    //     switch(Trie.get(database, key(_sid), Blob.equal)){
+    //         case(?(values)){
+    //             return ?Hex.encode(Hash256.hash(null, values[_index].0));
+    //         };
+    //         case(_){ return null; };
+    //     };
+    // };
 
     public query func bucketInfo() : async BucketInfo{
         return {

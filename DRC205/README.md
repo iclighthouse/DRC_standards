@@ -4,6 +4,7 @@ A common swap transaction record data type and scalability storage specification
  
 ## Latest upgrade: 
 
+2023-6-1: del txnBytesHash().  
 2023-5-31: fix txnByAccountId().  
 2023-5-22: add location(); modify Example.  
 2023-5-17: add bucketList(); del bucketInfo(); modify Example.  

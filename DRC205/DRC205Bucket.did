@@ -105,10 +105,11 @@ type BucketActor =
    txnHistory: (AppId, Txid) -> (vec record { TxnRecord; Time; }) query;
    txnByAccountId: (AccountId, opt AppId, opt nat32, opt nat32) -> (record{data: vec record{AppId; vec record{TxnRecord; Time}}; totalPage: nat; total: nat}) query;
    txnByIndex: (AppId, nat) -> (vec record { TxnRecord; Time; }) query;
-   txnHash: (AppId, Txid, nat) -> (opt Hex) query;
+   txnHash: (AppId, Txid, _index: nat) -> (opt Hex) query;
+   txnHash2: (AppId, Txid, _merge: bool) -> (vec Hex) query;
    txnBytes: (AppId, Txid) -> (opt record { vec nat8; Time; }) query;
    txnBytes2: (Sid) -> (opt record { vec nat8; Time; }) query;
    txnBytesHistory: (AppId, Txid) -> (vec record { vec nat8; Time; }) query;
-   txnBytesHash: (AppId, Txid, nat) -> (opt Hex) query;
+   // txnBytesHash: (AppId, Txid, nat) -> (opt Hex) query;
  };
 service : () -> BucketActor

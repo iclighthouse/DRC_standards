@@ -249,12 +249,12 @@ OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在
 txnHash: (_app: AppId, _txid: Txid, _index: nat) -> (opt text) query;
 ```
 
-#### txnBytesHash
+#### txnHash2
 
-计算指定Bytes数据记录的Hash值。     
+计算指定交易记录历史的所有Hash值。指定`_merge`为true表示将同一个交易的多个成交合并成一个交易记录，然后计算Hash值。      
 OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
 ``` candid
-txnBytesHash: (_app: AppId, _txid: Txid, _index: nat) -> (opt text) query;
+txnHash2: (AppId, Txid, _merge: bool) -> (vec Hex) query;
 ```
 
 #### bucketInfo 

@@ -342,15 +342,15 @@ shared(installMsg) actor class BucketActor() = this {
             return Hex.encode(Hash256.hash(null, Blob.toArray(to_candid(t.0))));
         });
     };
-    public query func txnBytesHash(_app: AppId, _txid: Txid, _index: Nat) : async ?Hex.Hex{
-        let _sid = SwapRecord.generateSid(_app, _txid);
-        switch(Trie.get(database, key(_sid), Blob.equal)){
-            case(?(values)){
-                return ?Hex.encode(Hash256.hash(null, values[_index].0));
-            };
-            case(_){ return null; };
-        };
-    };
+    // public query func txnBytesHash(_app: AppId, _txid: Txid, _index: Nat) : async ?Hex.Hex{
+    //     let _sid = SwapRecord.generateSid(_app, _txid);
+    //     switch(Trie.get(database, key(_sid), Blob.equal)){
+    //         case(?(values)){
+    //             return ?Hex.encode(Hash256.hash(null, values[_index].0));
+    //         };
+    //         case(_){ return null; };
+    //     };
+    // };
 
     public query func bucketInfo() : async BucketInfo{
         return {

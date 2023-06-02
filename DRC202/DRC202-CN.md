@@ -258,14 +258,6 @@ OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在
 txnHash: (_token: Token, _txid: Txid, _index: nat) -> (opt text) query;
 ```
 
-#### txnBytesHash
-
-计算指定Bytes数据记录的Hash值。     
-OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
-``` candid
-txnBytesHash: (_token: Token, _txid: Txid, _index: nat) -> (opt text) query;
-```
-
 #### bucketInfo 
 
 返回关于当前bucket的信息。    

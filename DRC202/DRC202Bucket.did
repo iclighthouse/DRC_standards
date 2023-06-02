@@ -67,6 +67,5 @@ type BucketActor =
    txnBytes: (Token, Txid) -> (opt record { vec nat8; Time; }) query;
    txnBytes2: (Sid) -> (opt record { vec nat8; Time; }) query;
    txnBytesHistory: (Token, Txid) -> (vec record { vec nat8; Time; }) query;
-   txnBytesHash: (Token, Txid, nat) -> (opt Hex) query;
  };
 service : () -> BucketActor
