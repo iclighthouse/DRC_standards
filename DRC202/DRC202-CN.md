@@ -369,30 +369,6 @@ drc202_events_filter: (opt Address, opt Time, opt Time) -> (vec TxnRecord, bool)
 drc202_txn: (Txid) -> (opt TxnRecord) query;
 ```
 
-#### drc202_txn2
-
-返回指定`Txid`的交易记录。这是一个composite query，如果缓存中没有记录则从DRC202存档数据中查找。
-
-``` candid
-drc202_txn2 : (_txid: Txid) -> (opt TxnRecord) composite_query
-```
-
-#### drc202_archived_txns
-
-返回存档的交易记录列表。这是一个composite query，从指定BlockIndex `_start_desc`的降序开始查找。
-
-``` candid
-drc202_archived_txns : (_start_desc: nat, _length: nat) -> (vec TxnRecord) composite_query;
-```
-
-#### drc202_archived_account_txns
-
-返回指定`AccountId`的存档的交易记录列表。这是一个composite query, 可以通过指定`_buckets_offset`和`_buckets_length`从哪些buckets查询, buckets的排序是降序的。
-
-``` candid
-drc202_archived_account_txns : (_buckets_offset: opt nat, _buckets_length: nat, _account: AccountId, _page: opt nat32, _size: opt nat32) -> ({data: vec record{principal; vec record{TxnRecord; Time}}; totalPage: nat; total: nat}) composite_query;
-```
-
 
 ### 开发包(Motoko Module)及指南
 
@@ -616,14 +592,11 @@ private var drc202 = DRC202.DRC202({EN_DEBUG = true; MAX_CACHE_TIME = 3 * 30 * 2
 
 建议在你的dapp中实现以下方法：（方便ic.house浏览器查询记录）
 
-* drc202_getConfig : () -> DRC202.Setting query
-* drc202_canisterId : () -> principal query
-* drc202_events : (_account: opt DRC202.Address) -> vec DRC202.TxnRecord query
+* drc202_getConfig : () -> DRC202.Setting query;
+* drc202_canisterId : () -> principal query;
+* drc202_events : (_account: opt DRC202.Address) -> vec DRC202.TxnRecord query;
 * drc202_events_filter: (opt Address, opt Time, opt Time) -> (vec TxnRecord, bool) query;
-* drc202_txn : (_txid: DRC202.Txid) -> opt DRC202.TxnRecord query
-* drc202_txn2 : (_txid: DRC202.Txid) -> opt DRC202.TxnRecord composite_query
-* drc202_archived_txns : (_start_desc: nat, _length: nat) -> (vec DRC202.TxnRecord) composite_query;
-* drc202_archived_account_txns : (_buckets_offset: opt nat, _buckets_length: nat, _account: AccountId, _page: opt nat32, _size: opt nat32) -> ({data: vec record{principal; vec record{DRC202.TxnRecord; Time}}; totalPage: nat; total: nat}) composite_query;
+* drc202_txn : (_txid: DRC202.Txid) -> opt DRC202.TxnRecord query;
 
 如：
 https://github.com/iclighthouse/DRC_standards/blob/main/DRC202/examples/ICLighthouse/Example/Example.mo

@@ -362,30 +362,6 @@ drc205_events_filter: (opt Address, opt Time, opt Time) -> (vec TxnRecord, bool)
 drc205_txn: (Txid) -> (opt TxnRecord) query;
 ```
 
-#### drc205_txn2
-
-返回指定`Txid`的交易记录。这是一个composite query，如果缓存中没有记录则从DRC205存档数据中查找。
-
-``` candid
-drc205_txn2 : (_txid: Txid) -> (opt TxnRecord) composite_query
-```
-
-#### drc205_archived_txns
-
-返回存档的交易记录列表。这是一个composite query，从指定BlockIndex `_start_desc`的降序开始查找。
-
-``` candid
-drc205_archived_txns : (_start_desc: nat, _length: nat) -> (vec TxnRecord) composite_query;
-```
-
-#### drc205_archived_account_txns
-
-返回指定`AccountId`的存档的交易记录列表。这是一个composite query, 可以通过指定`_buckets_offset`和`_buckets_length`从哪些buckets查询, buckets的排序是降序的。
-
-``` candid
-drc205_archived_account_txns : (_buckets_offset: opt nat, _buckets_length: nat, _account: AccountId, _page: opt nat32, _size: opt nat32) -> ({data: vec record{principal; vec record{TxnRecord; Time}}; totalPage: nat; total: nat}) composite_query;
-```
-
 
 ### 开发包(Motoko Module)及指南
 
@@ -587,15 +563,12 @@ private var drc205 = DRC205.DRC205({EN_DEBUG = true; MAX_CACHE_TIME = 3 * 30 * 2
 
 建议在你的dapp中实现以下方法：（方便ic.house浏览器查询记录）
 
-* drc205_getConfig : () -> (Setting) query
-* drc205_canisterId : () -> (principal) query
-* drc205_dexInfo : () -> (DexInfo) query
-* drc205_events : (_account: opt DRC205.Address) -> (vec TxnRecord) query
+* drc205_getConfig : () -> (Setting) query;
+* drc205_canisterId : () -> (principal) query;
+* drc205_dexInfo : () -> (DexInfo) query;
+* drc205_events : (_account: opt DRC205.Address) -> (vec TxnRecord) query;
 * drc205_events_filter: (opt Address, opt Time, opt Time) -> (vec TxnRecord, bool) query;
-* drc205_txn : (_txid: Txid) -> (opt TxnRecord) query
-* drc205_txn2 : (_txid: Txid) -> (opt TxnRecord) composite_query
-* drc205_archived_txns : (_start_desc: nat, _length: nat) -> (vec TxnRecord) composite_query;
-* drc205_archived_account_txns : (_buckets_offset: opt nat, _buckets_length: nat, _account: AccountId, _page: opt nat32, _size: opt nat32) -> ({data: vec record{principal; vec record{TxnRecord; Time}}; totalPage: nat; total: nat}) composite_query;
+* drc205_txn : (_txid: Txid) -> (opt TxnRecord) query;
 
 如：https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/examples/ICLighthouse/Example/Example.mo
 
