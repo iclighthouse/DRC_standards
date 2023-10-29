@@ -1,4 +1,4 @@
-import DRC207 "DRC207";
+import DRC207 "mo:icl/DRC207";
 import Principal "mo:base/Principal";
 import Cycles "mo:base/ExperimentalCycles";
 
@@ -24,5 +24,8 @@ actor Monitor {
             };
             case(_){};
         };
+        // TODO
+        // call canister.timer_tick() 
+        // This feature is for early Motoko versions, when there was no Timer library and no heartbeat.
     };
 };

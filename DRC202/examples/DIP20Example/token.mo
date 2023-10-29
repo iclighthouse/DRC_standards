@@ -23,7 +23,7 @@ import Cap "./cap/Cap";
 import Root "./cap/Root";
 import Buffer "mo:base/Buffer";
 // DRC202
-import DRC202 "lib/DRC202";
+import DRC202 "mo:icl/DRC202";
 
 shared(msg) actor class Token(
     _logo: Text,
@@ -154,8 +154,19 @@ shared(msg) actor class Token(
     /// returns events
     public query func drc202_events(_account: ?DRC202.Address) : async [DRC202.TxnRecord]{
         switch(_account){
-            case(?(account)){ return drc202.getEvents(?drc202.getAccountId(Principal.fromText(account), null)); };
-            case(_){return drc202.getEvents(null);}
+            case(?(account)){ return drc202.getEvents(?drc202.getAccountId(Principal.fromText(account), null), null, null).0; };
+            case(_){return drc202.getEvents(null,null,null).0;}
+        };
+    };
+    /// returns events filtered by time
+    public query func drc202_events_filter(_account: ?DRC202.Address, _startTime: ?Time.Time, _endTime: ?Time.Time) : async (data: [DRC202.TxnRecord], mayHaveArchived: Bool){
+        switch(_account){
+            case(?(account)){ 
+                return drc202.getEvents(?drc202.getAccountId(Principal.fromText(account), null), _startTime, _endTime);
+            };
+            case(_){
+                return drc202.getEvents(null, _startTime, _endTime);
+            }
         };
     };
     /// returns txn record. It's an query method that will try to find txn record in token canister cache.
@@ -163,14 +174,22 @@ shared(msg) actor class Token(
         return drc202.get(_txid);
     };
     /// returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in this canister.
-    public shared func drc202_txn2(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
-        switch(drc202.get(_txid)){
-            case(?(txn)){ return ?txn; };
-            case(_){
-                return await drc202.get2(Principal.fromActor(this), _txid);
-            };
-        };
-    };
+    // public shared composite query func drc202_txn2(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
+    //     switch(drc202.get(_txid)){
+    //         case(?(txn)){ return ?txn; };
+    //         case(_){
+    //             let buckets = await drc202.drc202().location(Principal.fromActor(this), #txid(_txid), null);
+    //             for (bucketId in buckets.vals()){
+    //                 let bucket: T.Bucket = actor(Principal.toText(bucketId));
+    //                 switch(await bucket.txn(Principal.fromActor(this), _txid)){
+    //                     case(?(txn, time)){ return ?txn; };
+    //                     case(_){};
+    //                 };
+    //             };
+    //             return null;
+    //         };
+    //     };
+    // };
     /// returns drc202 pool
     public query func drc202_pool() : async [(DRC202.Txid, Nat)]{
         return drc202.getPool();

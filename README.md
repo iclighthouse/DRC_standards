@@ -2,6 +2,10 @@
 # DRC_standards
 Dfinity Request for Comments
 
+It is recommended to upgrade Tokens or Dexs that use DRC20, DRC202, DRC205 codes to the latest version. 
+
+Note: Check the data structure before upgrading to prevent data loss.
+
 ## Compatibility Token Standard Namespace Convention
 2022-3-2: Drafted.  
 2022-12-5: Stable standard.  
@@ -22,6 +26,7 @@ Specification: https://github.com/iclighthouse/DRC_standards/tree/main/CTSNC
 2023-5-17: Modify Example (support ICRC2).  
 2023-5-31: Fix DRC202.  
 2023-6-1: Fix Example.  
+2023-10-20: Upgrade DRC202.  
 
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse)  
@@ -47,18 +52,12 @@ TODO: Standard drafting and motoko example implementation
 2023-5-22: Add location(); modify Example.  
 2023-5-31: Fix txnByAccountId().  
 2023-6-1: del txnBytesHash().  
+2023-10-20: add ICRC1 record syncing; modify DRC202 Module; support composite queries (moc 0.9.4).  
 
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC202](https://github.com/iclighthouse/DRC_standards/tree/main/DRC202)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse)  
 Comments: [https://github.com/iclighthouse/DRC_standards/issues/4](https://github.com/iclighthouse/DRC_standards/issues/4);  
 
-## DRC203: Token Mining Standard
-
-TODO: Standard drafting and motoko example implementation
-
-## DRC204: Token Swap Standard
-
-TODO: Standard drafting and motoko example implementation
 
 ## DRC205: Swap Transaction Records Storage Standard
 
@@ -75,15 +74,16 @@ TODO: Standard drafting and motoko example implementation
 2023-5-22: Add location(); modify Example.  
 2023-5-31: Fix txnByAccountId().  
 2023-6-1: del txnBytesHash().  
+2023-10-20: modify DRC202 Module; support composite queries (moc 0.9.4).  
 
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC205](https://github.com/iclighthouse/DRC_standards/tree/main/DRC205)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/examples/ICLighthouse)  
 
 
-
 ## DRC207: Monitorable Canister standards
 
 2022-9-20: Implemented the example with motoko.   
+2023-10-20: Drafted standard.  
 
 ## Community
 

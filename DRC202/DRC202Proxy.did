@@ -65,7 +65,7 @@ type ProxyActor =
    bucket: (Token, Txid, nat, opt nat8) -> (opt Bucket) query;
    bucketByIndex: (Token, nat, nat, opt nat8) -> (opt Bucket) query;
    location: (Token, variant{ txid: Txid; index: nat; account: AccountId}, opt nat8) -> (vec Bucket) query;
-   bucketList : () -> (vec Bucket) query;
+   bucketListSorted : () -> (vec record {Bucket, Time, nat}) query;
    fee: () -> (nat) query;
    generateTxid: (Token, AccountId, nat) -> (Txid) query;
    getLastTxns: () -> (vec record { nat; Token; nat; Txid; }) query;
@@ -83,5 +83,10 @@ type ProxyActor =
    storeBytesBatch: (vec record { Txid; vec nat8; }) -> ();
    tokenInfo: (Token) -> (opt text, opt TokenInfo) query;
    version: () -> (nat8) query;
+  //  txnHistory: (Token, Txid) -> (vec record { TxnRecord; Time; }) composite_query;
+  //  txnByAccountId: (AccountId, opt Token, opt nat32, opt nat32) -> (record{data: vec record{Token; vec record{TxnRecord; Time}}; totalPage: nat; total: nat}) composite_query;
+  //  txnByIndex: (Token, nat) -> (vec record { TxnRecord; Time; }) composite_query;
+  //  txnHash: (Token, Txid, nat) -> (opt Hex) composite_query;
+  //  txnBytesHistory: (Token, Txid) -> (vec record { vec nat8; Time; }) composite_query;
  };
-service : () -> ProxyActor
+service : (nat, principal) -> ProxyActor

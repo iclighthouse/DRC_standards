@@ -10,21 +10,23 @@ import Debug "mo:base/Debug";
 import Principal "mo:base/Principal";
 import Array "mo:base/Array";
 import Blob "mo:base/Blob";
+import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
 import Nat64 "mo:base/Nat64";
 import Time "mo:base/Time";
 import Trie "mo:base/Trie";
 import Cycles "mo:base/ExperimentalCycles";
-import CyclesWallet "./sys/CyclesWallet";
+import CyclesWallet "mo:icl/CyclesWallet";
 import TokenRecord "./lib/TokenRecord";
-import DRC207 "./lib/DRC207";
-import Tools "./lib/Tools";
-import Hex "./lib/Hex";
-import Hash256 "./lib/Hash256";
+import DRC207 "mo:icl/DRC207";
+import Tools "mo:icl/Tools";
+import Hex "mo:icl/Hex";
+import Hash256 "lib/Hash256";
 import List "mo:base/List";
 import Option "mo:base/Option";
 
 shared(installMsg) actor class BucketActor() = this {
+    // Debug.trap("HERE");
     type Bucket = TokenRecord.Bucket;
     type BucketInfo = TokenRecord.BucketInfo;
     type Token = TokenRecord.Token;
@@ -44,17 +46,19 @@ shared(installMsg) actor class BucketActor() = this {
     private stable var appAccountIds: Trie.Trie2D<AccountId, Token, List.List<Sid>> = Trie.empty(); 
 
     private func _onlyOwner(_caller: Principal) : Bool {
-        return _caller == owner;
+        return Principal.isController(_caller);
     };
     private func key(t: Sid) : Trie.Key<Sid> { return { key = t; hash = Blob.hash(t) }; };
     private func keyp(t: Principal) : Trie.Key<Principal> { return { key = t; hash = Principal.hash(t) }; };
 
-    private func _store(_sid: Sid, _data: [Nat8]) : (){
+    private func _store(_sid: Sid, _data: [Nat8], _replace: Bool) : (){
         let now = Time.now();
         var values : [([Nat8], Time.Time)] = [(_data, now)];
-        switch(Trie.get(database, key(_sid), Blob.equal)){
-            case(?(items)){ values := Tools.arrayAppend(items, values); };
-            case(_){};
+        if (not(_replace)){
+            switch(Trie.get(database, key(_sid), Blob.equal)){
+                case(?(items)){ values := Tools.arrayAppend(items, values); };
+                case(_){};
+            };
         };
         let res = Trie.put(database, key(_sid), Blob.equal, values);
         database := res.0;
@@ -115,11 +119,16 @@ shared(installMsg) actor class BucketActor() = this {
         };
         switch(_txn, ids.2){
             case(?(txn), ?(canisterId)){
-                if (txn.caller != txn.transaction.from and txn.caller != txn.transaction.to){
+                // let tokenSelf = Tools.principalToAccountBlob(canisterId, null);
+                if (txn.caller != txn.transaction.from and txn.caller != txn.transaction.to and txn.caller != Tools.blackhole()){
                     _putAccountIdLog(txn.caller, canisterId, ids.0);
                 };
-                _putAccountIdLog(txn.transaction.from, canisterId, ids.0);
-                _putAccountIdLog(txn.transaction.to, canisterId, ids.0);
+                if (txn.transaction.from != txn.transaction.to and txn.transaction.from != Tools.blackhole()){
+                    _putAccountIdLog(txn.transaction.from, canisterId, ids.0);
+                };
+                if (txn.transaction.to != Tools.blackhole()){
+                    _putAccountIdLog(txn.transaction.to, canisterId, ids.0);
+                };
             };
             case(_, _){};
         };
@@ -130,7 +139,12 @@ shared(installMsg) actor class BucketActor() = this {
             case(?(items)){
                 switch(Trie.get(items, keyp(_canisterId), Principal.equal)){
                     case(?(sids)){
-                        appAccountIds := Trie.put2D(appAccountIds, key(_a), Blob.equal, keyp(_canisterId), Principal.equal, List.push(_sid, sids));
+                        var _sids = sids;
+                        // var count: Nat = 0;
+                        // _sids := List.filter(sids, func (t: Sid): Bool{ 
+                        //     if (t != _sid and count < 5000){ count += 1; return true } else { return false };
+                        // });
+                        appAccountIds := Trie.put2D(appAccountIds, key(_a), Blob.equal, keyp(_canisterId), Principal.equal, List.push(_sid, _sids));
                     };
                     case(_){
                         appAccountIds := Trie.put2D(appAccountIds, key(_a), Blob.equal, keyp(_canisterId), Principal.equal, List.push(_sid, null));
@@ -142,17 +156,37 @@ shared(installMsg) actor class BucketActor() = this {
             };
         };
     };
-    private func _getAccountIdLogs(_a: AccountId, _canisterId: ?Principal) : [(Principal, Sid)]{
+    private func _getAccountIdLogs(_a: AccountId, _canisterId: ?Principal, _start: ?Nat, _length: ?Nat) : ([(Principal, Sid)], total: Nat){
+        let start = Option.get(_start, 0);
+        let length = Option.get(_length, 1000);
         switch(Trie.get(appAccountIds, key(_a), Blob.equal)){
             case(?(items)){
                 switch(_canisterId){
                     case(?(canisterId)){
                         switch(Trie.get(items, keyp(canisterId), Principal.equal)){
                             case(?(sids)){
-                                return Array.map<Sid, (Principal, Sid)>(List.toArray(sids), func (x: Sid): (Principal, Sid){ (canisterId, x) });
+                                var temp = sids;
+                                var res: [Sid] = [];
+                                var count: Nat = 0;
+                                var i : Nat = 0;
+                                while(Option.isSome(temp) and count < length){
+                                    let (optItem, list) = List.pop(temp);
+                                    switch(optItem){
+                                        case(?item){
+                                            if (i >= start){
+                                                res := Tools.arrayAppend(res, [item]);
+                                                count += 1;
+                                            };
+                                        };
+                                        case(_){};
+                                    };
+                                    i += 1;
+                                    temp := list;
+                                };
+                                return (Array.map<Sid, (Principal, Sid)>(res, func (x: Sid): (Principal, Sid){ (canisterId, x) }), List.size(sids));
                             };
                             case(_){
-                                return [];
+                                return ([], 0);
                             };
                         };
                     };
@@ -161,12 +195,12 @@ shared(installMsg) actor class BucketActor() = this {
                         for ((k, v) in Trie.iter(items)){
                             res := Tools.arrayAppend(res, Array.map<Sid, (Principal, Sid)>(List.toArray(v), func (x: Sid): (Principal, Sid){ (k, x) }));
                         };
-                        return res;
+                        return (Tools.slice(res, start, ?Nat.sub(Nat.max(start+length, 1), 1)), res.size());
                     };
                 };
             };
             case(_){
-                return [];
+                return ([], 0);
             };
         };
     };
@@ -174,26 +208,33 @@ shared(installMsg) actor class BucketActor() = this {
     public shared(msg) func storeBytes(_sid: Sid, _data: [Nat8]) : async (){
         assert(_onlyOwner(msg.caller));
         let sid = _dealWithId(_sid, null);
-        _store(sid, _data);
+        _store(sid, _data, false);
     };
     public shared(msg) func storeBytesBatch(batch: [(_sid: Sid, _data: [Nat8])]) : async (){
         assert(_onlyOwner(msg.caller));
         for ((_sid, _data) in batch.vals()){
             let sid = _dealWithId(_sid, null);
-            _store(sid, _data);
+            _store(sid, _data, false);
         };
     };
     public shared(msg) func store(_sid: Sid, _txn: TxnRecord) : async (){
         assert(_onlyOwner(msg.caller));
         let sid = _dealWithId(_sid, ?_txn);
         let _data = TokenRecord.encode(_txn);
-        _store(sid, _data);
+        _store(sid, _data, false);
     };
     public shared(msg) func storeBatch(batch: [(_sid: Sid, _txn: TxnRecord)]) : async (){
         assert(_onlyOwner(msg.caller));
         for ((_sid, _txn) in batch.vals()){
             let sid = _dealWithId(_sid, ?_txn);
-            _store(sid, TokenRecord.encode(_txn));
+            _store(sid, TokenRecord.encode(_txn), false);
+        };
+    };
+    public shared(msg) func storeBatch2(batch: [(_sid: Sid, _txn: TxnRecord)], replace: Bool) : async (){
+        assert(_onlyOwner(msg.caller));
+        for ((_sid, _txn) in batch.vals()){
+            let sid = _dealWithId(_sid, ?_txn);
+            _store(sid, TokenRecord.encode(_txn), replace);
         };
     };
     public query func txnBytes(_token: Token, _txid: Txid) : async ?([Nat8], Time.Time){
@@ -229,15 +270,13 @@ shared(installMsg) actor class BucketActor() = this {
             case(_){ return []; };
         };
     };
-    public query func txnByAccountId(_accountId: AccountId, _token: ?Token, _page: ?Nat32/*start from 1*/, _size: ?Nat32) : async 
+    public query func txnByAccountId(_accountId: AccountId, _token: ?Token, _page: ?Nat32/*base 1*/, _size: ?Nat32) : async 
     {data: [(Token, [(TxnRecord, Time.Time)])]; totalPage: Nat; total: Nat} {
         let size: Nat32 = Option.get(_size, 100:Nat32);
         let page: Nat32 = Option.get(_page, 1:Nat32);
         let start = Nat32.toNat(Nat32.sub(page, 1) * size);
         let end = Nat32.toNat(Nat32.sub(page * size, 1));
-        var items = _getAccountIdLogs(_accountId, _token);
-        let length = items.size();
-        items := Tools.slice(items, start, ?end);
+        let (items, length) = _getAccountIdLogs(_accountId, _token, ?start, ?Nat32.toNat(size));
         return {
             data = Array.map<(Principal,Sid), (Token, [(TxnRecord, Time.Time)])>(items, 
             func(t: (Principal,Sid)): (Token, [(TxnRecord, Time.Time)]){
@@ -247,13 +286,15 @@ shared(installMsg) actor class BucketActor() = this {
             total = length;
         };
     };
-    public query func txnHash(_token: Token, _txid: Txid, _index: Nat) : async ?Hex.Hex{
+    public query func txnHash(_token: Token, _txid: Txid) : async [Hex.Hex]{
         let _sid = TokenRecord.generateSid(_token, _txid);
         switch(Trie.get(database, key(_sid), Blob.equal)){
             case(?(values)){
-                return ?Hex.encode(Hash256.hash(null, values[_index].0));
+                return Array.map<([Nat8], Time.Time), Hex.Hex>(values, func(t: ([Nat8], Time.Time)): Hex.Hex{
+                    Hex.encode(Hash256.hash(null, t.0))
+                });
             };
-            case(_){ return null; };
+            case(_){ return []; };
         };
     };
     // public query func txnBytesHash(_token: Token, _txid: Txid, _index: Nat) : async ?Hex.Hex{
@@ -324,8 +365,8 @@ shared(installMsg) actor class BucketActor() = this {
     // };
 
     // system func postupgrade() {
-    //     for ((k, v) in Trie.iter(data)) {
-    //         database := Trie.put(database, key(k), Blob.equal, [v]).0;
-    //     };
+    //     // for ((k, v) in Trie.iter(data)) {
+    //     //     database := Trie.put(database, key(k), Blob.equal, [v]).0;
+    //     // };
     // };
 }

@@ -2,7 +2,7 @@
 DRC: 20  
 Title: Dfinity Fungible Token Standard  
 Author: Avida <avida.life@hotmail.com>, Simpson <icpstaking-wei@hotmail.com>  
-Status: Stable version 
+Status: Stable version  
 Category: Token DRC  
 Created: 2021-11-03
 ***
@@ -205,7 +205,7 @@ type DRC20 = service {
    drc20_dropAccount : (opt Sa) -> bool;
    drc20_holdersCount : () -> (nat, nat, nat) query;
  };
-service : (InitArgs) -> DRC20
+service : (args: InitArgs, enDebug: Bool) -> DRC20
 ```
 
 ### Methods

@@ -40,10 +40,9 @@ import ICRC1 "mo:icl/ICRC1";
 import ICRC3 "./lib/ICRC3";
 import AccountIdCaches "./lib/AccountIdCaches";
 import Timer "mo:base/Timer";
-import Error "mo:base/Error";
 
-// 0, principal "bcetv-nqaaa-aaaak-ae3bq-cai", vec{} //Test
-// 0, principal "bffvb-aiaaa-aaaak-ae3ba-cai", vec{}
+// 0, principal "bcetv-nqaaa-aaaak-ae3bq-cai" //Test
+// 1007421, principal "bffvb-aiaaa-aaaak-ae3ba-cai", vec{}
 shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Principal, initSNSTokens: [(Principal, Nat)]) = this {
     type Bucket = TokenRecord.Bucket;
     type BucketInfo = TokenRecord.BucketInfo;
@@ -64,8 +63,8 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
     type ArchivedCanister = Principal;
     
     let app_debug: Bool = false; /*config*/ 
-    // let is_default_proxy: Bool = true; /*config*/ 
-    var bucketCyclesInit: Nat = 10_000_000_000_000; //10T
+    let is_default_proxy: Bool = true; /*config*/ 
+    var bucketCyclesInit: Nat = 5_000_000_000_000; //5T
     if (app_debug){
         bucketCyclesInit := 1_000_000_000_000; //1.0T
     };
@@ -80,26 +79,34 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
     private stable var proxyRoot: Principal = initProxyRoot;
     private stable var fee_: Nat = 1000000;  //cycles
     private stable var owner: Principal = installMsg.caller;
-    private stable var maxMemory: Nat = 3800*1000*1000; // 3.8G
-    private stable var bucketCount: Nat = 0;
-    private stable var tokenCount: Nat = 0;
+    private stable var maxMemory: Nat = 31*1024*1024*1024; // 31G
+    private stable var bucketCount: Nat = 1; //*
+    private stable var tokenCount: Nat = 42; //*
     private stable var txnCount: Nat = initStartIndex;
     private stable var errCount: Nat = 0;
     private stable var lastTxns = Deque.empty<(index: Nat, token: Token, indexInToken: Nat, txid: Txid)>();
-    private stable var currentBucket: [(Bucket, BucketInfo)] = [];
-    private stable var buckets2: [(Bucket, startTime: Time.Time, startIndex: Nat)] = [];
+    private stable var currentBucket: [(Bucket, BucketInfo)] = []; //*
+    currentBucket := [(Principal.fromText("juxlh-iqaaa-aaaak-aagha-cai"), {
+        cycles = 20000000000000;
+        memory = 1_544_814_592;
+        heap = 1_240_637_112;
+        stableMemory = 0; // M
+        count = 683_529;
+    })];
+    private stable var buckets2: [(Bucket, startTime: Time.Time, startIndex: Nat)] = []; //*
+    buckets2 := [(Principal.fromText("juxlh-iqaaa-aaaak-aagha-cai"), 0, 0)];
     private stable var lastCheckCyclesTime: Time.Time = 0;
-    private var blooms = TrieMap.TrieMap<Bucket, BloomFilter>(Principal.equal, Principal.hash); 
+    private var blooms = TrieMap.TrieMap<Bucket, BloomFilter>(Principal.equal, Principal.hash);
     private stable var bloomsEntries : [(Bucket, [[Nat8]])] = []; // for upgrade
     private var blooms2 = TrieMap.TrieMap<Bucket, BloomFilter>(Principal.equal, Principal.hash);
     private stable var blooms2Entries : [(Bucket, [[Nat8]])] = []; // for upgrade
     private var blooms3 = TrieMap.TrieMap<Bucket, BloomFilter>(Principal.equal, Principal.hash);
     private stable var blooms3Entries : [(Bucket, [[Nat8]])] = []; // for upgrade
-    private stable var tokens: Trie.Trie<Token, TokenInfo> = Trie.empty(); 
+    private stable var tokens: Trie.Trie<Token, TokenInfo> = Trie.empty();  //*
     private stable var storeTxns = List.nil<(Token, DataType, Nat)>();
     private stable var icrc1_storeTxns = List.nil<(Token, DataType, Nat)>();
     private stable var storeErrPool = List.nil<(Token, DataType, Nat)>();
-    private stable var tokenStd: Trie.Trie<Token, Text> = Trie.empty(); 
+    private stable var tokenStd: Trie.Trie<Token, Text> = Trie.empty();  //*
     private stable var lastFetchBucketTime: Int = 0; 
     private stable var lastStorageTime: Int = 0;
     private stable var lastSessions = Deque.empty<(Principal, Nat)>(); 
@@ -111,14 +118,19 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
     private stable var cyclesMonitor: CyclesMonitor.MonitoredCanisters = Trie.empty(); 
     private stable var lastMonitorTime: Time.Time = 0;
     private let sa_zero : [Nat8] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
-    private var NumberOfBatchAtOnce: Nat = 200;
-    private var lastError : Text = "";
 
     private func _onlyOwner(_caller: Principal) : Bool {
-        return Principal.isController(_caller) or _caller == proxyRoot;
+        return _caller == owner or _caller == proxyRoot;
     };
     private func keyb(t: Blob) : Trie.Key<Blob> { return { key = t; hash = Blob.hash(t) }; };
     private func keyp(t: Principal) : Trie.Key<Principal> { return { key = t; hash = Principal.hash(t) }; };
+
+    tokenStd := Trie.put(tokenStd, keyp(Principal.fromText("5573k-xaaaa-aaaak-aacnq-cai")), Principal.equal, "drc20").0;
+    tokenStd := Trie.put(tokenStd, keyp(Principal.fromText("imeri-bqaaa-aaaai-qnpla-cai")), Principal.equal, "drc20").0;
+    tokenStd := Trie.put(tokenStd, keyp(Principal.fromText("jwcfb-hyaaa-aaaaj-aac4q-cai")), Principal.equal, "icrc1").0;
+    tokenStd := Trie.put(tokenStd, keyp(Principal.fromText("rd6wb-lyaaa-aaaaj-acvla-cai")), Principal.equal, "dip20").0;
+    tokenStd := Trie.put(tokenStd, keyp(Principal.fromText("mxzaz-hqaaa-aaaar-qaada-cai")), Principal.equal, "icrc1").0;
+
     private func _now() : Nat{
         return Int.abs(Time.now() / 1000000000);
     };
@@ -335,7 +347,7 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
                 return ?bucket;
             };
         };
-        return null; // if (is_default_proxy) {?defaultBucket} else {null};
+        return if (is_default_proxy) {?defaultBucket} else {null};
     };
     private func _checkBloom_all(_sid: Blob) : [Bucket]{
         var res: [Bucket] = [];
@@ -348,9 +360,9 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
                 res := Tools.arrayAppend(res, [bucket]);
             };
         };
-        // if (is_default_proxy and res.size() == 0){
-        //     res := [defaultBucket];
-        // };
+        if (is_default_proxy and res.size() == 0){
+            res := [defaultBucket];
+        };
         return res;
     };
     private func _addBloom2(_bucket: Bucket, _iid: Blob) : (){
@@ -381,7 +393,7 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
                 return ?bucket;
             };
         };
-        return null; // if (is_default_proxy) {?defaultBucket} else {null};
+        return if (is_default_proxy) {?defaultBucket} else {null};
     };
     private func _checkBloom2_all(_iid: Blob) : [Bucket]{
         var res: [Bucket] = [];
@@ -394,9 +406,9 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
                 res := Tools.arrayAppend(res, [bucket]);
             };
         };
-        // if (is_default_proxy and res.size() == 0){
-        //     res := [defaultBucket];
-        // };
+        if (is_default_proxy and res.size() == 0){
+            res := [defaultBucket];
+        };
         return res;
     };
     private func _addBloom3(_bucket: Bucket, _aid: Blob) : (){
@@ -425,9 +437,9 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
                 res := Tools.arrayAppend(res, [bucket]);
             };
         };
-        // if (is_default_proxy and res.size() == 0){
-        //     res := [defaultBucket];
-        // };
+        if (is_default_proxy and res.size() == 0){
+            res := [defaultBucket];
+        };
         return res;
     };
     private func _postLog(_txns: List.List<(Token, DataType, Nat)>) : (){
@@ -463,13 +475,12 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
         };
         return Blob.fromArray(data);
     };
-    private func _execStorage(_type: {#original; #sync}, _number: ?Nat) : async* (){
+    private func _execStorage(_type: {#original; #sync}) : async* (){
         var bucket: Bucket = currentBucket[0].0;
         if (Time.now() > lastFetchBucketTime + 10*60*1000000000){
             bucket := await* _getBucket();
             lastFetchBucketTime := Time.now();
         };
-        let number = Option.get(_number, NumberOfBatchAtOnce);
         
         var _storeTxns = storeTxns;
         if (_type == #sync){
@@ -483,7 +494,7 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
         var storeBytesBatch: [(_sid: Sid, _data: [Nat8])] = [];
         var i: Nat = 0;
         for ((token, dataType, callCount) in List.toArray(List.reverse(_storeTxns)).vals()){
-            if (i < number){
+            if (i < 1500){
                 switch(dataType){
                     case(#Txn(txn)){
                         let sid = TokenRecord.generateSid(token, txn.txid);
@@ -518,8 +529,6 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
                     };
                     _postLog(_storing);
                 }catch(e){
-                    NumberOfBatchAtOnce := Nat.max(NumberOfBatchAtOnce / 2, 1);
-                    lastError := Error.message(e);
                     if (_type == #sync){
                         icrc1_storeTxns := List.append(icrc1_storeTxns, _storing);
                     }else{
@@ -548,7 +557,7 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
             };
             item := List.pop(item.1);
         };
-        await* _execStorage(#original, null);
+        await* _execStorage(#original);
     };
 
     public query func generateTxid(_token: Token, _caller: AccountId, _nonce: Nat): async Txid{
@@ -615,7 +624,7 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
         storeTxns := List.push((token, #Txn(_txn), 0), storeTxns);
         if (Time.now() > lastStorageTime + 5*1000000000 and _tps(5, null).1 < MaxTPS*7){
             lastStorageTime := Time.now();
-            await* _execStorage(#original, null);
+            await* _execStorage(#original);
         };
     };
     public shared(msg) func storeBatch(_txns: [TxnRecord]) : async (){ // the first item at 0 position
@@ -633,7 +642,7 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
         };
         if (Time.now() > lastStorageTime + 5*1000000000 and _tps(5, null).1 < MaxTPS*7){
             lastStorageTime := Time.now();
-            await* _execStorage(#original, null);
+            await* _execStorage(#original);
         };
     };
     // @deprecated: This method will be deprecated
@@ -650,7 +659,7 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
         storeTxns := List.push((token, #Bytes({txid = _txid; data = _data;}), 0), storeTxns);
         if (Time.now() > lastStorageTime + 5*1000000000 and _tps(5, null).1 < MaxTPS*7){
             lastStorageTime := Time.now();
-            await* _execStorage(#original, null);
+            await* _execStorage(#original);
         };
     };
     public shared(msg) func storeBytesBatch(_txns: [(_txid: Txid, _data: [Nat8])]) : async (){ // the first item at 0 position
@@ -668,7 +677,7 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
         };
         if (Time.now() > lastStorageTime + 5*1000000000 and _tps(5, null).1 < MaxTPS*7){
             lastStorageTime := Time.now();
-            await* _execStorage(#original, null);
+            await* _execStorage(#original);
         };
     };
     // @deprecated: This method will be deprecated
@@ -926,51 +935,15 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
     };
     private func _icrc3Sync() : async* (){
         for ((_token, (_fee, _index)) in Trie.iter(ICRC3Tokens)){
-            if (List.size(icrc1_storeTxns) < 5000){
-                try{
-                    let data = await* _fetch_icrc3Txns(_token, _index, 500, _fee);
-                    icrc1_storeTxns := List.append(icrc1_storeTxns, List.fromArray(data.txns));
-                    _updateIcrc3Token(_token, _index + data.txns.size());
-                    if (data.accounts.size() > 0){
-                        let f = _putAccounts(data.accounts);
-                    };
-                    for (x in Iter.range(0, 500 / NumberOfBatchAtOnce + 1)){
-                        await* _execStorage(#sync, null);
-                    };
-                }catch(e){
-                    var start = _index;
-                    for (i in Iter.range(1, 10)){
-                        try{
-                            let data = await* _fetch_icrc3Txns(_token, start, 50, _fee);
-                            icrc1_storeTxns := List.append(icrc1_storeTxns, List.fromArray(data.txns));
-                            _updateIcrc3Token(_token, start + data.txns.size());
-                            if (data.accounts.size() > 0){
-                                let f = _putAccounts(data.accounts);
-                            };
-                            start += data.txns.size();
-                        }catch(e){
-                            for (i in Iter.range(1, 50)){
-                                try{
-                                    let data = await* _fetch_icrc3Txns(_token, start, 1, _fee);
-                                    icrc1_storeTxns := List.append(icrc1_storeTxns, List.fromArray(data.txns));
-                                    _updateIcrc3Token(_token, start + data.txns.size());
-                                    if (data.accounts.size() > 0){
-                                        let f = _putAccounts(data.accounts);
-                                    };
-                                    start += data.txns.size();
-                                }catch(e){
-                                    start += 1;
-                                };
-                            };
-                        };
-                    };
-                    for (x in Iter.range(0, 500 / NumberOfBatchAtOnce + 1)){
-                        await* _execStorage(#sync, null);
-                    };
+            try{
+                let data = await* _fetch_icrc3Txns(_token: Principal, _index, 1000, _fee);
+                icrc1_storeTxns := List.append(icrc1_storeTxns, List.fromArray(data.txns));
+                _updateIcrc3Token(_token, _index + data.txns.size());
+                if (data.accounts.size() > 0){
+                    let f = _putAccounts(data.accounts);
                 };
-            }else{
-                await* _execStorage(#sync, null);
-            };
+                await* _execStorage(#sync);
+            }catch(e){};
         };
     };
     public shared(msg) func debug_fetchIcrc1Txns(_token: Principal, _start: Nat, _length: Nat, _fee: Nat): async Nat{
@@ -980,9 +953,7 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
         if (data.accounts.size() > 0){
             let f = _putAccounts(data.accounts);
         };
-        for (x in Iter.range(0, _length / NumberOfBatchAtOnce + 1)){
-            await* _execStorage(#sync, null);
-        };
+        await* _execStorage(#sync);
         return data.txns.size();
     };
     public shared(msg) func debug_resetIcrc1TokensIndex() : async (){
@@ -1031,17 +1002,6 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
     public shared(msg) func icrc3sync() : async (){
         assert(_onlyOwner(msg.caller));
         await* _icrc3Sync();
-    };
-    public query func getPoolSize() : async (Nat, Nat){
-        return (List.size(storeTxns), List.size(icrc1_storeTxns));
-    };
-    public shared(msg) func debug_execStorage(_number: ?Nat): async (){
-        assert(_onlyOwner(msg.caller));
-        await* _execStorage(#sync, _number);
-    };
-    public shared(msg) func debug_lastError(): async Text{
-        assert(_onlyOwner(msg.caller));
-        return lastError;
     };
     
     /* 
@@ -1168,18 +1128,9 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
     //     //
     // };
 
-    private var isIcrc3Syncing : Bool = false;
-    private var lastIcrc3SyncTime : Nat = 0;
     private func timerLoop() : async (){
-        if (not(isStopped) and (not(isIcrc3Syncing) or _now() > lastIcrc3SyncTime + 900)){
-            isIcrc3Syncing := true;
-            lastIcrc3SyncTime := _now();
-            try{
-                await* _execStorage(#sync, null);
-                await* _execStorage(#original, null);
-                await* _icrc3Sync();
-            }catch(e){};
-            isIcrc3Syncing := false;
+        if (not(isStopped)){
+            await* _icrc3Sync();
         };
     };
     private var timerId: Nat = 0;
@@ -1252,7 +1203,7 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
             blooms3.put(k, temp);
         };
 
-        timerId := Timer.recurringTimer(#seconds(60), timerLoop);
+        timerId := Timer.recurringTimer(#seconds(180), timerLoop);
         
     };
 }

@@ -1,10 +1,10 @@
 # DRC202 Development Guide
 
-DRC202Proxy Canister-id: y5a36-liaaa-aaaak-aacqa-cai  
-ICHouse Explorer: https://637g5-siaaa-aaaaj-aasja-cai.raw.ic0.app/tokens
+DRC202Proxy Root: bffvb-aiaaa-aaaak-ae3ba-cai  
+ICHouse Explorer: https://ic.house/tokens
 
-DRC202Proxy Canister-id (Test): iq2ev-rqaaa-aaaak-aagba-cai  
-ICHouse Explorer (Test): https://637g5-siaaa-aaaaj-aasja-cai.raw.ic0.app/TokensTest
+DRC202Proxy Root(Test): bcetv-nqaaa-aaaak-ae3bq-cai  
+ICHouse Explorer (Test): https://ic.house/TokensTest
 
 About Txid: txid is a blob type, it is the key of a transaction record. if your txid is a nat type or other type, it needs to be converted to a blob type.
 
@@ -16,8 +16,7 @@ If you are developing a Dapp with Motoko and just need to query the transaction 
 
 ## 2. Developing a Token in Rust
 
-If you are a Rust developer developing a token, such as DRC20, DIP20, ICRC1 standard tokens, you can call the DRC202Proxy and DRC202Bucket APIs to implement it.
-DRC202Proxy did: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/DRC202Proxy.did   
+If you are a Rust developer developing a token, such as DRC20, DIP20, ICRC1 standard tokens, you can call DRC202Root, DRC202Proxy and DRC202Bucket APIs to implement it. 
 
 **Storage of transaction records from your Token to DRC202 Cansiter**
 
@@ -52,21 +51,44 @@ If you need to query Token's transaction records in canister, refer to the `How 
 drc202_canisterId: () -> (principal) query;
 /// returns events. Address (Text type) is Principal or AccountId. If Address is not specified means to query all latest transaction records.
 drc202_events: (opt Address) -> (vec TxnRecord) query;
+/// returns events. Filters and returns the records from start `Time` to end `Time`.
+drc202_events_filter: (opt Address, opt Time, opt Time) -> (vec TxnRecord, bool) query;
 /// returns txn record. Query txn record in token canister cache.
 drc202_txn: (Txid) -> (opt TxnRecord) query;
+/// returns txn record. It's an composite query method that will try to find txn record in the DRC202 canister if the record does not exist in this canister.
+drc202_txn2 : (_txid: Txid) -> (opt TxnRecord) composite_query
+/// Returns archived records. It's an composite query method.
+drc202_archived_txns : (_start_desc: nat, _length: nat) -> (vec TxnRecord) composite_query;
+/// Returns archived records based on AccountId. This is a composite query method that returns data for only the specified number of buckets.
+drc202_archived_account_txns : (_buckets_offset: opt nat, _buckets_length: nat, _account: AccountId, _page: opt nat32, _size: opt nat32) -> ({data: vec record{principal; vec record{TxnRecord; Time}}; totalPage: nat; total: nat}) composite_query;
 ```
 
 ## 4. How to query transaction records
 
-Whether you are a Rust, Motoko, or front-end developer, you need to provide the token's canister-id and txid if you want to query the transaction records in DRC202. It is not possible to iterate through and query all records.  
+Whether you are a Rust, Motoko, or front-end developer, you need to provide the token's canister-id and txid, index or accountId if you want to query the transaction records in DRC202.   
+DRC202Root did: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/DRC202Root.did   
 DRC202Proxy did: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/DRC202Proxy.did   
 DRC202Bucket did: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/DRC202Bucket.did   
 
 - Motoko Developers
 
-    If you are a Motoko developer, you can use the get/get2 method of the `DRC202 Module` to query transaction records.
+    Use the get()/getEvents() method of the `DRC202 Module` to query the local cache of recent transaction records, and use the get2() method to query both cached and archived records.
 
-- Other developers
+- For all developers
+
+    1. **Method 1**
+
+    Querying transaction records by Token with DRC202 implemented:.
+    - drc202_events(), drc202_events_filter, drc202_txn(): Queries the latest transaction history of the current Dex cached.
+    - drc202_txn2(), drc202_archived_txns(), drc202_archived_account_txns(): Queries the transaction history of the external Canister archives.
+
+    2. **Method 2**
+
+    Query the transaction records through the composite_query methods provided by DRC202Root:
+    - getArchivedTxn(), getArchivedTxnByIndex(), getArchivedDexTxns(), getArchivedAccountTxns().
+    - If custom types are used, use getArchivedTxnBytes().
+
+    3. **Method 3**
 
     **Step 1**. Get the bucket canister-id where the transaction record is stored by querying DRC202Proxy
 

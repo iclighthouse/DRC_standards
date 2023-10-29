@@ -4,6 +4,7 @@ A standard interface for token transaction tecords scalable storage.
 
 ## Latest upgrade: 
 
+2023-10-20: add ICRC1 record syncing; modify DRC202 Module; support composite queries (moc 0.9.4).  
 2023-6-1: del txnBytesHash().  
 2023-5-31: fix txnByAccountId().  
 2023-5-22: add location(); modify Example.  
@@ -34,10 +35,10 @@ Comments: [https://github.com/iclighthouse/DRC_standards/issues/4](https://githu
 
 **Public Storage Canister**
   
-DRC202Proxy: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse/   
-Main: y5a36-liaaa-aaaak-aacqa-cai    
-Test: iq2ev-rqaaa-aaaak-aagba-cai   
-Notes: Use y5a36-liaaa-aaaak-aacqa-cai to store token records that can be queried through the ICHouse blockchain explorer (http://ic.house).
+DRC202Root: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse/   
+Main: bffvb-aiaaa-aaaak-ae3ba-cai    
+Test: bcetv-nqaaa-aaaak-ae3bq-cai   
+Notes: Use DRC202 to store token records that can be queried through the ICHouse blockchain explorer (http://ic.house).
 
 **Motoko Module Package For Token Developer**
 

@@ -2,7 +2,7 @@
 DRC: 20  
 Title: Dfinity Fungible Token Standard  
 Author: Avida <avida.life@hotmail.com>, Simpson <icpstaking-wei@hotmail.com>  
-Status: Stable version 
+Status: Stable version  
 Category: Token DRC  
 Created: 2021-11-03
 ***
@@ -46,7 +46,7 @@ DRC20是一个用于Dfinity代币的标准接口。该标准符合[ERC20](https:
 
 * 防止canister cycles余额不足攻击
 
-    根据IC网络规则，Canister的调用者不需要支付gas，而是由Canister支付gas，这可能会导致DDOS攻击。所以代币Canister应该要求caller支付gas，支持以cycles和token方式支付。本标准增加了**gas()**方法，以帮助调用者查询gas成本。setGas方法不包括在标准中，由开发者决定，它可以是一个固定的费用，也可以通过外部治理设置。
+    根据IC网络规则，Canister的调用者不需要支付gas，而是由Canister支付gas，这可能会导致DDOS攻击。所以代币Canister应该要求caller支付gas。本标准增加了**gas()**方法，以帮助调用者查询gas成本。setGas方法不包括在标准中，由开发者决定，它可以是一个固定的费用，也可以通过外部治理设置。
 
 * 解决恶意利用approve的问题
 
@@ -205,7 +205,7 @@ type DRC20 = service {
    drc20_dropAccount : (opt Sa) -> bool;
    drc20_holdersCount : () -> (nat, nat, nat) query;
  };
-service : (InitArgs) -> DRC20
+service : (args: InitArgs, enDebug: Bool) -> DRC20
 ```
 
 ### Methods

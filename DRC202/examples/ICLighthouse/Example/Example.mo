@@ -1,8 +1,9 @@
 import Array "mo:base/Array";
 import Principal "mo:base/Principal";
 import Time "mo:base/Time";
-import DRC202 "lib/DRC202";
-import T "lib/DRC202Types";
+import DRC202 "mo:icl/DRC202";
+import AID "mo:icl/AID";
+import T "mo:icl/DRC202Types";
 
 shared actor class Example() = this {
     // DRC202: Records Storage for Token Canister
@@ -12,6 +13,21 @@ shared actor class Example() = this {
     ///   Set EN_DEBUG=false in the production environment.
     private var drc202 = DRC202.DRC202({EN_DEBUG = true; MAX_CACHE_TIME = 3 * 30 * 24 * 3600 * 1000000000; MAX_CACHE_NUMBER_PER = 100; MAX_STORAGE_TRIES = 2; }, "drc20");
     private stable var drc202_lastStorageTime : Time.Time = 0;
+
+    type Address = Text;
+    type AccountId = Blob;
+    private func _getAccountId(_address: Address): AccountId{
+        switch (AID.accountHexToAccountBlob(_address)){
+            case(?(a)){
+                return a;
+            };
+            case(_){
+                var p = Principal.fromText(_address);
+                var a = AID.principalToAccountBlob(p, null);
+                return a;
+            };
+        };
+    }; 
 
     /********************
     * your token codes
@@ -66,23 +82,47 @@ shared actor class Example() = this {
     /// returns events
     public query func drc202_events(_account: ?DRC202.Address) : async [DRC202.TxnRecord]{
         switch(_account){
-            case(?(account)){ return drc202.getEvents(?drc202.getAccountId(Principal.fromText(account), null)); };
-            case(_){return drc202.getEvents(null);}
+            case(?(account)){ return drc202.getEvents(?_getAccountId(account), null, null).0; };
+            case(_){return drc202.getEvents(null, null, null).0;}
+        };
+    };
+    /// returns events filtered by time
+    public query func drc202_events_filter(_account: ?DRC202.Address, _startTime: ?Time.Time, _endTime: ?Time.Time) : async (data: [DRC202.TxnRecord], mayHaveArchived: Bool){
+        switch(_account){
+            case(?(account)){ 
+                return drc202.getEvents(?_getAccountId(account), _startTime, _endTime);
+            };
+            case(_){
+                return drc202.getEvents(null, _startTime, _endTime);
+            }
         };
     };
     /// returns txn record. It's an query method that will try to find txn record in token canister cache.
     public query func drc202_txn(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
         return drc202.get(_txid);
     };
-    /// returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in this canister.
-    public shared func drc202_txn2(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
-        switch(drc202.get(_txid)){
-            case(?(txn)){ return ?txn; };
-            case(_){
-                return await drc202.get2(Principal.fromActor(this), _txid);
-            };
-        };
-    };
+    // /// returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in this canister.
+    // public shared composite query func drc202_txn2(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
+    //     switch(drc202.get(_txid)){
+    //         case(?(txn)){ return ?txn; };
+    //         case(_){
+    //             let res = await drc202.root().getArchivedTxn(Principal.fromActor(this), _txid);
+    //             if (res.size() > 0){
+    //                 return res[res.size() - 1].0;
+    //             };
+    //             return null;
+    //         };
+    //     };
+    // };
+    // /// Returns archived records. It's an composite query method.
+    // public shared composite query func drc202_archived_txns(_start_desc: Nat, _length: Nat) : async [DRC202.TxnRecord]{
+    //     return await drc202.root().getArchivedDexTxns(Principal.fromActor(this), _start_desc, _length);
+    // };
+    // /// Returns archived records based on AccountId. This is a composite query method that returns data for only the specified number of buckets.
+    // public shared composite query func drc202_archived_account_txns(_buckets_offset: ?Nat, _buckets_length: Nat, _account: AccountId, _page: ?Nat32/*base 1*/, _size: ?Nat32) : async 
+    // {data: [(Principal, [(DRC202.TxnRecord, Time.Time)])]; totalPage: Nat; total: Nat}{
+    //     return await drc202.root().getArchivedAccountTxns(_buckets_offset, _buckets_length, _account, Principal.fromActor(this), _page, _size);
+    // };
     /// drc202 pool
     public query func drc202_pool() : async [(DRC202.Txid, Nat)]{
         return drc202.getPool();

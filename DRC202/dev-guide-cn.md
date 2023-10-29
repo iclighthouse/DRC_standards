@@ -1,10 +1,10 @@
 # DRC202开发指南
 
-DRC202Proxy Canister-id: y5a36-liaaa-aaaak-aacqa-cai  
-ICHouse浏览器: https://637g5-siaaa-aaaaj-aasja-cai.raw.ic0.app/tokens
+DRC202Proxy Root: bffvb-aiaaa-aaaak-ae3ba-cai  
+ICHouse浏览器: https://ic.house/tokens
 
-DRC202Proxy Canister-id(测试): iq2ev-rqaaa-aaaak-aagba-cai  
-ICHouse浏览器(测试): https://637g5-siaaa-aaaaj-aasja-cai.raw.ic0.app/TokensTest
+DRC202Proxy Root(Test): bcetv-nqaaa-aaaak-ae3bq-cai  
+ICHouse浏览器(Test): https://ic.house/TokensTest
 
 关于Txid：txid是blob类型，属于每条交易记录的key。如果你的txid是nat类型或其他类型，需转换成blob类型。
 
@@ -16,8 +16,7 @@ ICHouse浏览器(测试): https://637g5-siaaa-aaaaj-aasja-cai.raw.ic0.app/Tokens
 
 ## 2. Rust开发者开发一个Token
 
-如果你是一个Rust开发者，正在开发一个Token Canister，例如DRC20、DIP20、ICRC1标准的代币，你可以调用DRC202Proxy和DRC202Bucket的API来实现。  
-DRC202Proxy did: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/DRC202Proxy.did   
+如果你是一个Rust开发者，正在开发一个Token Canister，例如DRC20、DIP20、ICRC1标准的代币，你可以调用DRC202Root, DRC202Proxy和DRC202Bucket的API来实现。  
 
 **从你的Token将交易记录存储到DRC202 Cansiter中**
 
@@ -52,21 +51,44 @@ DRC202Proxy did: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/
 drc202_canisterId: () -> (principal) query;
 /// returns events. Address (Text type) is Principal or AccountId. If Address is not specified means to query all latest transaction records.
 drc202_events: (opt Address) -> (vec TxnRecord) query;
+/// returns events. Filters and returns the records from start `Time` to end `Time`.
+drc202_events_filter: (opt Address, opt Time, opt Time) -> (vec TxnRecord, bool) query;
 /// returns txn record. Query txn record in token canister cache.
 drc202_txn: (Txid) -> (opt TxnRecord) query;
+/// returns txn record. It's an composite query method that will try to find txn record in the DRC202 canister if the record does not exist in this canister.
+drc202_txn2 : (_txid: Txid) -> (opt TxnRecord) composite_query
+/// Returns archived records. It's an composite query method.
+drc202_archived_txns : (_start_desc: nat, _length: nat) -> (vec TxnRecord) composite_query;
+/// Returns archived records based on AccountId. This is a composite query method that returns data for only the specified number of buckets.
+drc202_archived_account_txns : (_buckets_offset: opt nat, _buckets_length: nat, _account: AccountId, _page: opt nat32, _size: opt nat32) -> ({data: vec record{principal; vec record{TxnRecord; Time}}; totalPage: nat; total: nat}) composite_query;
 ```
 
 ## 4. 如何查询交易记录
 
-无论你是Rust、Motoko、还是前端开发者，需要查询在DRC202中的交易记录，需要提供token的canister-id和txid。无法遍历查询所有记录。  
+无论你是Rust、Motoko、还是前端开发者，需要查询在DRC202中的交易记录，需要提供token的canister-id和txid、index或accountId。  
+DRC202Root did: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/DRC202Root.did   
 DRC202Proxy did: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/DRC202Proxy.did   
 DRC202Bucket did: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/DRC202Bucket.did   
 
 - Motoko开发者
 
-    如果你是Motoko开发者，可以使用`DRC202 Module`的get/get2方法查询交易记录。
+    使用`DRC202 Module`的get()/getEvents()方法查询本地缓存的近期交易记录，使用get2()方法查询可以同时查询缓存和存档的记录。
 
-- 其他开发者
+- 适用所有开发者
+
+    1. **方式1**
+
+    通过实现了DRC202的Token查询交易记录:
+    - drc202_events(), drc202_events_filter, drc202_txn(): 查询当前Token缓存的最新的交易记录。
+    - drc202_txn2(), drc202_archived_txns(), drc202_archived_account_txns(): 查询外部Canister存档的交易记录。
+
+    2. **方式2**
+
+    通过DRC202Root提供的composite_query方法查询交易记录：
+    - getArchivedTxn(), getArchivedTxnByIndex(), getArchivedDexTxns(), getArchivedAccountTxns().
+    - 如果使用了自定义类型，使用getArchivedTxnBytes().
+
+    3. **方式3**
 
     **Step 1**. 通过DRC202Proxy查询交易记录存储所在的bucket canister-id
 

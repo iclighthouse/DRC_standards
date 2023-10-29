@@ -15,7 +15,7 @@ import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
 import Nat8 "mo:base/Nat8";
 import Principal "mo:base/Principal";
-import SHA224 "SHA224";
+import SHA224 "mo:sha224/SHA224";
 import Buffer "mo:base/Buffer";
 
 module {
@@ -105,8 +105,15 @@ module {
         /// Returns:
         ///   A boolean indicating set membership.
         public func check(item: S) : Bool {
+            let hashs = f(item, k_);
             for (filter in Iter.fromArray(filters)) {
-                if (filter.check(item)) { return true; };
+                if (filter.check(hashs)) { return true; };
+            };
+            false
+        };
+        public func check2(hashs: [Hash]) : Bool {
+            for (filter in Iter.fromArray(filters)) {
+                if (filter.check(hashs)) { return true; };
             };
             false
         };
@@ -161,8 +168,8 @@ module {
             numItems += 1;
         };
 
-        public func check(item: S) : Bool {
-            for (h in Iter.fromArray(f(item, k))) {
+        public func check(hashs: [Hash]) : Bool { // item: S
+            for (h in Iter.fromArray(hashs)) { // f(item, k)
                 let pos = Nat32.toNat((h-1) % m);
                 let mapPos = pos / 8;
                 let bitPos = pos % 8;

@@ -21,7 +21,7 @@ DRC205标准包含三部分：
 
 * Swap交易记录数据结构（TxnRecord）：定义了一个通用型数据结构，适应AMM和OrderBook模式的Dex，兼顾数据透明和隐私保护。
 
-* 可扩展性存储接口规范：可扩展存储机制是由一个入口合约Proxy和自动扩展的多个存储合约Bucket组成。根据实际的存储需求创建Bucket（当一个Bucket满了就创建一个新的Bucket），然后将交易记录压缩并存储在Bucket中。当你想查询一个交易对的交易记录时，你可以先从Proxy合约中查询记录存储的BucketId（使用BloomFilter技术进行路由，https://en.wikipedia.org/wiki/Bloom_filter ），然后再从指定的Bucket中查询交易记录。
+* 可扩展性存储接口规范：可扩展存储机制是由一个Root合约，自动扩展的入口合约Proxy（存储布隆过滤器数据）和自动扩展的多个存储合约Bucket（存储交易记录数据）组成。根据实际的存储需求创建Bucket（当一个Bucket满了就创建一个新的Bucket），然后将交易记录压缩并存储在Bucket中。当你想查询一个交易对的交易记录时，你可以先从Proxy合约中查询记录存储的BucketId（使用BloomFilter技术进行路由，https://en.wikipedia.org/wiki/Bloom_filter ），然后再从指定的Bucket中查询交易记录。
 
 * Motoko开发包（Motoko Module）：建议Dex开发者采用的交易记录处理规范，采取“当前Canister缓存近期记录+外部Canister持久化存储历史记录”的模式，并提供查询接口。
 
@@ -96,7 +96,73 @@ Types in Motoko:  https://github.com/iclighthouse/DRC_standards/blob/main/DRC205
 
 字段解释见开发示例批注：https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/examples/ICLighthouse/Example/Example.mo
 
-### 通用存储接口（Proxy和Bucket）
+### 通用存储接口 (Root, Proxy和Bucket)
+
+#### 0. DRC205Root
+
+#### proxyList
+
+返回Proxy列表及当前Proxy。    
+
+``` candid
+proxyList : () -> (record {root: principal; list: vec record {principal; Time, nat}; current: opt record {principal; Time, nat} }) query;
+```
+
+#### getTxnHash (composite_query)
+
+返回交易记录的Hash值。由于一个订单可能存在多次匹配成交的情况，可能一个`_txid`存在多次记录副本，指定`_merge`为true，意味着将同一个订单的多个成交进行合并。如果存在多个订单记录，则返回多个Hash值。    
+OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
+
+``` candid
+getTxnHash : (_app: AppId, _txid: Txid, _merge: bool) -> (vec Hex) composite_query;
+```
+
+#### getArchivedTxnBytes (composite_query)
+
+返回指定交易对和Txid的存档交易记录的二进制值。如果存在多个记录，则返回多个值。      
+OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
+
+``` candid
+getArchivedTxnBytes : (_app: AppId, _txid: Txid) -> (vec record{ vec nat8; Time }) composite_query;
+```
+
+#### getArchivedTxn (composite_query)
+
+返回指定交易对和Txid的存档交易记录。 如果存在多个记录，则返回多个值。     
+OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
+
+``` candid
+getArchivedTxn : (_app: AppId, _txid: Txid) -> (vec record{ TxnRecord; Time }) composite_query;
+```
+
+#### getArchivedTxnByIndex (composite_query)
+
+返回指定交易对及其区块索引的存档交易记录。 如果存在多个记录，则返回多个值。     
+OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
+
+``` candid
+getArchivedTxnByIndex : (_app: AppId, _tokenBlockIndex: nat) -> (vec record{ TxnRecord; Time }) composite_query;
+```
+
+#### getArchivedDexTxns (composite_query)
+
+返回指定交易对的交易记录列表，`_start_desc`表示开始的区块索引号，降序进行查询，`_length`表示每次获取的条数。        
+OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
+
+``` candid
+getArchivedDexTxns : (_app: AppId, _start_desc: nat, _length: nat) -> (vec TxnRecord) composite_query;
+```
+
+#### getArchivedAccountTxns (composite_query)
+
+返回指定`AccountId`的交易记录列表。因为记录可能保存在不同的Proxy和Bucket中，它将从最新的Proxy中的最新的Bucket进行查找，`_buckets_offset`表示跳过开始的多少个bucket，`_buckets_length`表示一次查找多少个bucket，`_app`可选指定交易对，`_page`(从1开始)和`_size`对查询到的数据集进行分页。        
+OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
+
+``` candid
+getArchivedAccountTxns : (_buckets_offset: opt nat, _buckets_length: nat, _account: AccountId, _app: opt AppId, _page: opt nat32, _size: opt nat32)
+ -> (record {data: vec record{ principal; vec record{ TxnRecord; Time } }; totalPage: nat; total: nat});
+```
+
 
 #### 1. DRC205Proxy
 
@@ -178,14 +244,15 @@ OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 stats: () -> (record { bucketCount: nat; errCount: nat; storeErrPool: nat; tokenCount: nat; txnCount: nat; }) query;
 ```
 
-#### bucketList
+#### bucketListSorted
 
 返回bucket列表.  
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 
 ``` candid
-bucketList : () -> (vec Bucket) query;
+bucketListSorted : () -> (vec record {Bucket, Time, nat}) query;
 ```
+
 
 #### 2. DRC205Bucket
 
@@ -243,18 +310,10 @@ txnByAccountId: (_accountId: AccountId, _app: opt AppId, _page: opt nat32, _size
 
 #### txnHash
 
-计算指定交易记录的Hash值。     
-OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
-``` candid
-txnHash: (_app: AppId, _txid: Txid, _index: nat) -> (opt text) query;
-```
-
-#### txnHash2
-
 计算指定交易记录历史的所有Hash值。指定`_merge`为true表示将同一个交易的多个成交合并成一个交易记录，然后计算Hash值。      
 OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
 ``` candid
-txnHash2: (AppId, Txid, _merge: bool) -> (vec Hex) query;
+txnHash: (AppId, Txid, _merge: bool) -> (vec Hex) query;
 ```
 
 #### bucketInfo 
@@ -267,26 +326,103 @@ bucketInfo: () -> (BucketInfo) query;
 ```
 
 
+#### 3. Trading Pair Interface (Implementation)
+
+Dex开发者需要在交易对中实现以下接口，方便查询交易记录。
+
+#### drc205_canisterId
+
+返回Root的canister-id。
+
+``` candid
+drc205_canisterId: () -> (principal) query;
+```
+
+#### drc205_events
+
+返回指定账户`Address`的交易记录，如果未指定则返回全局的最近交易记录。Address是Text类型， 是Principal或者AccountId，如"tqnrp-pjc3b-jzsc2-fg5tr-...-ts5ax-lbebt-uae", "1af2d0af449ab5a13e30...ee1f99a9ece5ceaf8fe4"。
+
+``` candid
+drc205_events: (opt Address) -> (vec TxnRecord) query;
+```
+
+#### drc205_events_filter
+
+返回指定账户`Address`, 并且过滤指定开始时间`Time`到结束时间`Time`(纳秒)的交易记录，如果未指定则返回全局的最近交易记录。Address是Text类型， 是Principal或者AccountId，如"tqnrp-pjc3b-jzsc2-fg5tr-...-ts5ax-lbebt-uae", "1af2d0af449ab5a13e30...ee1f99a9ece5ceaf8fe4"。
+
+``` candid
+drc205_events_filter: (opt Address, opt Time, opt Time) -> (vec TxnRecord, bool) query;
+```
+
+#### drc205_txn
+
+返回指定`Txid`的缓存的交易记录，如果要查询DRC205中存储的交易记录，使用[开发指南](https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/dev-guide-cn.md)中的查询方法。
+
+``` candid
+drc205_txn: (Txid) -> (opt TxnRecord) query;
+```
+
+#### drc205_txn2
+
+返回指定`Txid`的交易记录。这是一个composite query，如果缓存中没有记录则从DRC205存档数据中查找。
+
+``` candid
+drc205_txn2 : (_txid: Txid) -> (opt TxnRecord) composite_query
+```
+
+#### drc205_archived_txns
+
+返回存档的交易记录列表。这是一个composite query，从指定BlockIndex `_start_desc`的降序开始查找。
+
+``` candid
+drc205_archived_txns : (_start_desc: nat, _length: nat) -> (vec TxnRecord) composite_query;
+```
+
+#### drc205_archived_account_txns
+
+返回指定`AccountId`的存档的交易记录列表。这是一个composite query, 可以通过指定`_buckets_offset`和`_buckets_length`从哪些buckets查询, buckets的排序是降序的。
+
+``` candid
+drc205_archived_account_txns : (_buckets_offset: opt nat, _buckets_length: nat, _account: AccountId, _page: opt nat32, _size: opt nat32) -> ({data: vec record{principal; vec record{TxnRecord; Time}}; totalPage: nat; total: nat}) composite_query;
+```
+
+
 ### 开发包(Motoko Module)及指南
 
 #### DRC205 Module
 
 import DRC205 "lib/DRC205";
 
-#### drc205
+#### root
 
-返回DRC205Proxy Canister对象。  
+返回DRC205Root actor。  
 
 ``` candid
-drc205: () -> DRC205Types.Self;
+root: () -> DRC205Types.Root;
+```
+
+#### proxy
+
+返回DRC205Proxy actor。  
+
+``` candid
+proxy: () -> DRC205Types.Proxy;
 ```
 
 #### drc205CanisterId
 
-返回DRC205Proxy canister-id。 
+返回Root canister-id。 
 
 ``` candid
 drc205CanisterId: () -> principal;
+```
+
+#### getProxyList
+
+返回Proxy列表。 
+
+``` candid
+getProxyList: () -> vec {principal; Time; nat};
 ```
 
 #### config
@@ -342,7 +478,7 @@ store : () -> ();
 从当前canister缓存查找指定`_txid`的记录，不存在则从外部扩展canister中查找记录。这是一个异步方法。  
 
 ``` candid
-get : (_txid: Txid) -> opt TxnRecord;
+get2 : (_txid: Txid) -> opt TxnRecord;
 ```
 
 #### getLastTxns
@@ -358,7 +494,7 @@ getLastTxns : (_account: opt AccountId) -> vec Txid;
 返回用户`_account`最近发生的记录详情列表。  
 
 ``` candid
-getEvents : (_account: opt AccountId) -> vec TxnRecord;
+getEvents : (_account: opt AccountId, _startTime: opt Time, _endTime: opt Time) -> (vec TxnRecord, bool);
 ```
 
 #### getData
@@ -377,41 +513,15 @@ getData : () -> DataTemp;
 setData : (_data: DataTemp) -> ();
 ```
 
-#### 3. Trading Pair Interface (Implementation)
-
-Dex开发者需要在交易对中实现以下接口，方便查询交易记录。
-
-#### drc205_canisterId
-
-返回DRC205Proxy的canister-id。
-
-``` candid
-drc205_canisterId: () -> (principal) query;
-```
-
-#### drc205_events
-
-返回指定账户`Address`的交易记录，如果未指定则返回全局的最近交易记录。Address是Text类型， 是Principal或者AccountId，如"tqnrp-pjc3b-jzsc2-fg5tr-...-ts5ax-lbebt-uae", "1af2d0af449ab5a13e30...ee1f99a9ece5ceaf8fe4"。
-
-``` candid
-drc205_events: (opt Address) -> (vec TxnRecord) query;
-```
-
-#### drc205_txn
-
-返回指定`Txid`的缓存的交易记录，如果要查询DRC205中存储的交易记录，使用[开发指南](https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/dev-guide-cn.md)中的查询方法。
-
-``` candid
-drc205_txn: (Txid) -> (opt TxnRecord) query;
-```
 
 #### Rust开发者指南
 
-DRC205 (Main): 6ylab-kiaaa-aaaak-aacga-cai  
-DRC205 (Test): ix3cb-4iaaa-aaaak-aagbq-cai  
+DRC205 Root (Main): lw5dr-uiaaa-aaaak-ae2za-cai   
+DRC205 Root (Test): lr4ff-zqaaa-aaaak-ae2zq-cai  
 
 请参考Candid文件接口：
 
+https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/DRC205Root.did  
 https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/DRC205Proxy.did  
 https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/DRC205Bucket.did  
 
@@ -419,14 +529,14 @@ https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/DRC205Bucket.did
 
 #### Motoko开发包(Motoko Module)及指南
 
-DRC205 (Main): 6ylab-kiaaa-aaaak-aacga-cai  
-DRC205 (Test): ix3cb-4iaaa-aaaak-aagbq-cai 
+DRC205 Root (Main): lw5dr-uiaaa-aaaak-ae2za-cai   
+DRC205 Root (Test): lr4ff-zqaaa-aaaak-ae2zq-cai  
 
 Motoko开发示例：https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/examples/ICLighthouse/Example/Example.mo
 
 **Step1** 引入Module文件
 
-将https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/examples/ICLighthouse/Example/lib/文件导入项目所在目录。在你的代码文件中引入：
+将https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/examples/ICLighthouse/Example/lib/ 文件导入项目所在目录。在你的代码文件中引入：
 ``` motoko
 import Array "mo:base/Array";
 import Principal "mo:base/Principal";
@@ -477,74 +587,23 @@ private var drc205 = DRC205.DRC205({EN_DEBUG = true; MAX_CACHE_TIME = 3 * 30 * 2
 
 建议在你的dapp中实现以下方法：（方便ic.house浏览器查询记录）
 
-* drc205_getConfig : () -> DRC205.Setting query
-* drc205_canisterId : () -> principal query
-* drc205_dexInfo : () -> async DRC205.DexInfo query
-* drc205_events : (_account: opt DRC205.Address) -> vec DRC205.TxnRecord query
-* drc205_txn : (_txid: DRC205.Txid) -> opt DRC205.TxnRecord query
-* drc205_txn2 : (_txid: DRC205.Txid) -> opt DRC205.TxnRecord
+* drc205_getConfig : () -> (Setting) query
+* drc205_canisterId : () -> (principal) query
+* drc205_dexInfo : () -> (DexInfo) query
+* drc205_events : (_account: opt DRC205.Address) -> (vec TxnRecord) query
+* drc205_events_filter: (opt Address, opt Time, opt Time) -> (vec TxnRecord, bool) query;
+* drc205_txn : (_txid: Txid) -> (opt TxnRecord) query
+* drc205_txn2 : (_txid: Txid) -> (opt TxnRecord) composite_query
+* drc205_archived_txns : (_start_desc: nat, _length: nat) -> (vec TxnRecord) composite_query;
+* drc205_archived_account_txns : (_buckets_offset: opt nat, _buckets_length: nat, _account: AccountId, _page: opt nat32, _size: opt nat32) -> ({data: vec record{principal; vec record{TxnRecord; Time}}; totalPage: nat; total: nat}) composite_query;
 
-如：
-``` motoko
-    /// returns setting
-    public query func drc205_getConfig() : async DRC205.Setting{
-        return drc205.getConfig();
-    };
-    public query func drc205_canisterId() : async Principal{
-        return drc205.drc205CanisterId();
-    };
-    public query func drc205_dexInfo() : async DRC205.DexInfo{
-        return {
-            canisterId = Principal.fromActor(this);
-            dexName = "icswap"; // your dex name
-            pairName = "TEKENA/TOKENB"; // pair name
-            token0 = (#Token(Principal.fromText("ueghb-uqaaa-aaaak-aaioa-cai")), #drc20); // token0 info
-            token1 = (#Token(Principal.fromText("udhbv-ziaaa-aaaak-aaioq-cai")), #dip20); // token1 info
-            feeRate = 0.005; // fee rate
-        };
-    };
-    /// config
-    // public shared(msg) func drc205_config(config: DRC205.Config) : async Bool{ 
-    //     assert(msg.caller == owner);
-    //     return drc205.config(config);
-    // };
-    /// returns events
-    public query func drc205_events(_account: ?DRC205.Address) : async [DRC205.TxnRecord]{
-        switch(_account){
-            case(?(account)){ return drc205.getEvents(?drc205.getAccountId(Principal.fromText(account), null)); };
-            case(_){return drc205.getEvents(null);}
-        };
-    };
-    /// returns txn record. This is a query method that looks for record from this canister cache.
-    public query func drc205_txn(_txid: DRC205.Txid) : async (txn: ?DRC205.TxnRecord){
-        return drc205.get(_txid);
-    };
-    /// returns txn record. It's an update method that will try to find txn record in the DRC205 canister if the record does not exist in this canister.
-    public shared func drc205_txn2(_txid: DRC205.Txid) : async (txn: ?DRC205.TxnRecord){
-        return await drc205.get2(Principal.fromActor(this), _txid);
-    };
-    // upgrade
-    private stable var __drc205Data: [DRC205.DataTemp] = [];
-    system func preupgrade() {
-        __drc205Data := Array.append(__drc205Data, [drc205.getData()]);
-    };
-    system func postupgrade() {
-        if (__drc205Data.size() > 0){
-            drc205.setData(__drc205Data[0]);
-            __drc205Data := [];
-        };
-    };
-```
-
+如：https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/examples/ICLighthouse/Example/Example.mo
 
 ## 实例
 
 #### Implementations
 
-- Storage Canister: https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/examples/IClighthouse  
-    DRC205 (Main): 6ylab-kiaaa-aaaak-aacga-cai  
-    DRC205 (Test): ix3cb-4iaaa-aaaak-aagbq-cai  
-    **Notes**: Use 6ylab-kiaaa-aaaak-aacga-cai to store swap records that can be queried through the ICHouse blockchain explorer (http://ic.house).
+- Storage Canister: https://github.com/iclighthouse/DRC_standards/tree/main/DRC205/examples/IClighthouse   
 
 - Motoko Module: https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/examples/ICLighthouse/Example/lib/DRC205.mo 
 

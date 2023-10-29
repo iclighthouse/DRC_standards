@@ -4,6 +4,7 @@ A common swap transaction record data type and scalability storage specification
  
 ## Latest upgrade: 
 
+2023-10-20: modify DRC202 Module; support composite queries (moc 0.9.4).  
 2023-6-1: del txnBytesHash().  
 2023-5-31: fix txnByAccountId().  
 2023-5-22: add location(); modify Example.  
@@ -35,10 +36,10 @@ Standard: https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/DRC205.
 
 **Public Storage Canister**
 
-DRC205Proxy: https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/examples/ICLighthouse/  
-Main: 6ylab-kiaaa-aaaak-aacga-cai   
-Test: ix3cb-4iaaa-aaaak-aagbq-cai  
-Notes: Use 6ylab-kiaaa-aaaak-aacga-cai to store swap records that can be queried through the ICHouse blockchain explorer (http://ic.house).
+DRC205Root: https://github.com/iclighthouse/DRC_standards/blob/main/DRC205/examples/ICLighthouse/  
+Main: lw5dr-uiaaa-aaaak-ae2za-cai   
+Test: lr4ff-zqaaa-aaaak-ae2zq-cai  
+Notes: Use DRC205 to store swap records that can be queried through the ICHouse blockchain explorer (http://ic.house).
 
 **Motoko Module Package For Dex Developer**
 

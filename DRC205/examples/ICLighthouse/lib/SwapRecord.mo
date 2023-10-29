@@ -4,7 +4,7 @@
  * Stability  : Experimental
  */
 import Array "mo:base/Array";
-import Binary "Binary";
+import Binary "mo:icl/Binary";
 import Blob "mo:base/Blob";
 import Nat "mo:base/Nat";
 import Nat32 "mo:base/Nat32";
@@ -15,8 +15,8 @@ import Option "mo:base/Option";
 import Prim "mo:⛔";
 import Principal "mo:base/Principal";
 import Text "mo:base/Text";
-import Types "DRC205Types";
-import SHA224 "SHA224";
+import Types "mo:icl/DRC205Types";
+import SHA224 "mo:sha224/SHA224";
 import Buffer "mo:base/Buffer";
 
 module {

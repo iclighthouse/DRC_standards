@@ -1,0 +1,102 @@
+type Time = int;
+type AccountId = blob;
+type Txid = blob;
+type AppId = principal;
+type CyclesWallet = principal;
+type Hex = text;
+type TokenType = 
+ variant {
+   Cycles;
+   Icp;
+   Token: principal;
+ };
+type BalanceChange = 
+ variant {
+   CreditRecord: nat;
+   DebitRecord: nat;
+   NoChange;
+ };
+type Status = 
+ variant {
+   Cancelled;
+   Completed;
+   Failed;
+   PartiallyCompletedAndCancelled;
+   Pending;
+ };
+type Shares = nat;
+type ShareChange = 
+ variant {
+   Burn: Shares;
+   Mint: Shares;
+   NoChange;
+ };
+type OperationType = 
+ variant {
+   AddLiquidity;
+   Claim;
+   RemoveLiquidity;
+   Swap;
+ };
+type Nonce = nat;
+type Data = blob;
+type TxnRecord = 
+ record {
+   account: AccountId;
+   caller: AccountId;
+   cyclesWallet: opt CyclesWallet;
+   data: opt Data;
+   details:
+    vec
+     record {
+       counterparty: Txid;
+       time: Time;
+       token0Value: BalanceChange;
+       token1Value: BalanceChange;
+     };
+   fee: record {
+          token0Fee: int;
+          token1Fee: int;
+        };
+   filled: record {
+             token0Value: BalanceChange;
+             token1Value: BalanceChange;
+           };
+   index: nat;
+   msgCaller: opt principal;
+   nonce: Nonce;
+   operation: OperationType;
+   order:
+    record {
+      token0Value: opt BalanceChange;
+      token1Value: opt BalanceChange;
+    };
+   orderMode: variant {
+                AMM;
+                OrderBook;
+              };
+   orderType: opt variant {
+                    FAK;
+                    FOK;
+                    LMT;
+                    MKT;
+                  };
+   shares: ShareChange;
+   status: Status;
+   time: Time;
+   token0: TokenType;
+   token1: TokenType;
+   txid: Txid;
+ };
+type ProxyRoot = 
+ service {
+    proxyList : () -> (record {root: principal; list: vec record {principal; Time; nat}; current: opt record {principal; Time; nat} }) query;
+    getTxnHash : (_app: AppId, _txid: Txid, _merge: bool) -> (vec Hex) composite_query;
+    getArchivedTxnBytes : (_app: AppId, _txid: Txid) -> (vec record{ vec nat8; Time }) composite_query;
+    getArchivedTxn : (_app: AppId, _txid: Txid) -> (vec record{ TxnRecord; Time }) composite_query;
+    getArchivedTxnByIndex : (_app: AppId, _pairBlockIndex: nat) -> (vec record{ TxnRecord; Time }) composite_query;
+    getArchivedDexTxns : (_app: AppId, _start_desc: nat, _length: nat) -> (vec TxnRecord) composite_query;
+    getArchivedAccountTxns : (_buckets_offset: opt nat, _buckets_length: nat, _account: AccountId, _app: opt AppId, _page: opt nat32, _size: opt nat32) ->  
+    (record {data: vec record{ principal; vec record{ TxnRecord; Time } }; totalPage: nat; total: nat});
+ };
+service : () -> ProxyRoot

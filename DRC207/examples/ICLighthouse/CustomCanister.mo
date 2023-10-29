@@ -1,4 +1,4 @@
-import DRC207 "DRC207";
+import DRC207 "mo:icl/DRC207";
 import Principal "mo:base/Principal";
 import Cycles "mo:base/ExperimentalCycles";
 

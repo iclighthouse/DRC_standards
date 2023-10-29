@@ -122,7 +122,7 @@ type ProxyActor =
    bucket: (AppId, Txid, nat, opt nat8) -> (opt Bucket) query;
    bucketByIndex: (AppId, nat, nat, opt nat8) -> (opt Bucket) query;
    location: (AppId, variant{ txid: Txid; index: nat; account: AccountId}, opt nat8) -> (vec Bucket) query;
-   bucketList : () -> (vec Bucket) query;
+   bucketListSorted : () -> (vec record {Bucket, Time, nat}) query;
    fee: () -> (nat) query;
    generateTxid: (AppId, AccountId, nat) -> (Txid) query;
    getLastTxns: () -> (vec record { nat; AppId; nat; Txid; }) query;
@@ -140,4 +140,4 @@ type ProxyActor =
    storeBytesBatch: (vec record { Txid; vec nat8; }) -> ();
    version: () -> (nat8) query;
  };
-service : () -> ProxyActor
+service : (nat, principal) -> ProxyActor

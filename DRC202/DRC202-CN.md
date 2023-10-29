@@ -2,7 +2,7 @@
 DRC: 202  
 Title: Token Transaction Records Storage Standard  
 Author: Avida <avida.life@hotmail.com>, Simpson <icpstaking-wei@hotmail.com>  
-Status: Draft  
+Status: Stable  
 Category: Token DRC  
 Created: 2021-12-10
 ***
@@ -21,7 +21,7 @@ DRC202标准包含三部分：
 
 * Token交易记录数据结构（TxnRecord）：定义了一个通用型数据结构，兼顾数据透明和隐私保护。
 
-* 可扩展性存储接口规范：可扩展存储机制是由一个入口合约Proxy和自动扩展的多个存储合约Bucket组成。根据实际的存储需求创建Bucket（当一个Bucket满了就创建一个新的Bucket），然后将交易记录压缩并存储在Bucket中。当你想查询一个代币交易记录时，你可以先从Proxy合约中查询记录存储的BucketId（使用BloomFilter技术进行路由，https://en.wikipedia.org/wiki/Bloom_filter ），然后再从指定的Bucket中查询交易记录。
+* 可扩展性存储接口规范：可扩展存储机制是由一个Root合约，自动扩展的入口合约Proxy（存储布隆过滤器数据）和自动扩展的多个存储合约Bucket（存储交易记录数据）组成。根据实际的存储需求创建Bucket（当一个Bucket满了就创建一个新的Bucket），然后将交易记录压缩并存储在Bucket中。当你想查询一个代币交易记录时，你可以先从Proxy合约中查询记录存储的BucketId（使用BloomFilter技术进行路由，https://en.wikipedia.org/wiki/Bloom_filter ），然后再从指定的Bucket中查询交易记录。
 
 * Motoko开发包（Motoko Module）：建议Token开发者采用的交易记录处理规范，采取“当前Canister缓存近期记录+外部Canister持久化存储历史记录”的模式，并提供查询接口。
 
@@ -88,7 +88,73 @@ Types in Motoko:  https://github.com/iclighthouse/DRC_standards/blob/main/DRC202
 
 字段解释见开发示例批注：https://github.com/iclighthouse/DRC_standards/blob/main/DRC202/examples/ICLighthouse/Example/Example.mo
 
-### 通用存储接口（Proxy和Bucket）
+### 通用存储接口（Root, Proxy和Bucket）
+
+#### 0. DRC202Root
+
+#### proxyList
+
+返回Proxy列表及当前Proxy。    
+
+``` candid
+proxyList : () -> (record {root: principal; list: vec record {principal; Time, nat}; current: opt record {principal; Time, nat} }) query;
+```
+
+#### getTxnHash (composite_query)
+
+返回交易记录的Hash值。如果存在多个存储副本，则返回多个Hash值。    
+OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
+
+``` candid
+getTxnHash : (_token: Token, _txid: Txid) -> (vec Hex) composite_query;
+```
+
+#### getArchivedTxnBytes (composite_query)
+
+返回指定代币和Txid的存档交易记录的二进制值。如果存在多个存储副本，则返回多个值。      
+OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
+
+``` candid
+getArchivedTxnBytes : (_token: Token, _txid: Txid) -> (vec record{ vec nat8; Time }) composite_query;
+```
+
+#### getArchivedTxn (composite_query)
+
+返回指定代币和Txid的存档交易记录。 如果存在多个存储副本，则返回多个值。     
+OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
+
+``` candid
+getArchivedTxn : (_token: Token, _txid: Txid) -> (vec record{ TxnRecord; Time }) composite_query;
+```
+
+#### getArchivedTxnByIndex (composite_query)
+
+返回指定代币及其区块索引的存档交易记录。 如果存在多个存储副本，则返回多个值。     
+OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
+
+``` candid
+getArchivedTxnByIndex : (_token: Token, _tokenBlockIndex: nat) -> (vec record{ TxnRecord; Time }) composite_query;
+```
+
+#### getArchivedTokenTxns (composite_query)
+
+返回指定代币的交易记录列表，`_start_desc`表示开始的区块索引号，降序进行查询，`_length`表示每次获取的条数。        
+OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
+
+``` candid
+getArchivedTokenTxns : (_token: Token, _start_desc: nat, _length: nat) -> (vec TxnRecord) composite_query;
+```
+
+#### getArchivedAccountTxns (composite_query)
+
+返回指定`AccountId`的交易记录列表。因为记录可能保存在不同的Proxy和Bucket中，它将从最新的Proxy中的最新的Bucket进行查找，`_buckets_offset`表示跳过开始的多少个bucket，`_buckets_length`表示一次查找多少个bucket，`_token`可选指定代币，`_page`(从1开始)和`_size`对查询到的数据集进行分页。        
+OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
+
+``` candid
+getArchivedAccountTxns : (_buckets_offset: opt nat, _buckets_length: nat, _account: AccountId, _token: opt Token, _page: opt nat32, _size: opt nat32)
+ -> (record {data: vec record{ principal; vec record{ TxnRecord; Time } }; totalPage: nat; total: nat});
+```
+
 
 #### 1. DRC202Proxy
 
@@ -170,13 +236,13 @@ OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 stats: () -> (record { bucketCount: nat; errCount: nat; storeErrPool: nat; tokenCount: nat; txnCount: nat; }) query;
 ```
 
-#### bucketList
+#### bucketListSorted
 
 返回bucket列表.  
 OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 
 ``` candid
-bucketList : () -> (vec Bucket) query;
+bucketListSorted : () -> (vec record {Bucket, Time, nat}) query;
 ```
 
 #### setStd
@@ -194,7 +260,6 @@ OPTIONAL - 该方法可用于提高可用性，但该方法可能不存在。
 ``` candid
 tokenInfo : (_token: Token) -> (opt text, opt TokenInfo) query;
 ```
-
 
 #### 2. DRC202Bucket
 
@@ -255,7 +320,7 @@ txnByAccountId: (_accountId: AccountId, _token: opt Token, _page: opt nat32, _si
 计算指定交易记录的Hash值。     
 OPTIONAL - 这个方法可以用来提高可用性，但该方法可能不存在。
 ``` candid
-txnHash: (_token: Token, _txid: Txid, _index: nat) -> (opt text) query;
+txnHash: (Token, Txid) -> (vec Hex) query;
 ```
 
 #### bucketInfo 
@@ -274,7 +339,7 @@ Token开发者需要实现以下接口，方便查询交易记录。
 
 #### drc202_canisterId
 
-返回DRC202Proxy的canister-id。
+返回Root的canister-id。
 
 ``` candid
 drc202_canisterId: () -> (principal) query;
@@ -288,12 +353,44 @@ drc202_canisterId: () -> (principal) query;
 drc202_events: (opt Address) -> (vec TxnRecord) query;
 ```
 
+#### drc202_events_filter
+
+返回指定账户`Address`, 并且过滤指定开始时间`Time`到结束时间`Time`(纳秒)的交易记录，如果未指定则返回全局的最近交易记录。Address是Text类型， 是Principal或者AccountId，如"tqnrp-pjc3b-jzsc2-fg5tr-...-ts5ax-lbebt-uae", "1af2d0af449ab5a13e30...ee1f99a9ece5ceaf8fe4"。
+
+``` candid
+drc202_events_filter: (opt Address, opt Time, opt Time) -> (vec TxnRecord, bool) query;
+```
+
 #### drc202_txn
 
 返回指定`Txid`的缓存的交易记录，如果要查询DRC202中存储的交易记录，使用[开发指南](https://github.com/iclighthouse/DRC_standards/blob/main/DRC202/dev-guide-cn.md)中的查询方法。
 
 ``` candid
 drc202_txn: (Txid) -> (opt TxnRecord) query;
+```
+
+#### drc202_txn2
+
+返回指定`Txid`的交易记录。这是一个composite query，如果缓存中没有记录则从DRC202存档数据中查找。
+
+``` candid
+drc202_txn2 : (_txid: Txid) -> (opt TxnRecord) composite_query
+```
+
+#### drc202_archived_txns
+
+返回存档的交易记录列表。这是一个composite query，从指定BlockIndex `_start_desc`的降序开始查找。
+
+``` candid
+drc202_archived_txns : (_start_desc: nat, _length: nat) -> (vec TxnRecord) composite_query;
+```
+
+#### drc202_archived_account_txns
+
+返回指定`AccountId`的存档的交易记录列表。这是一个composite query, 可以通过指定`_buckets_offset`和`_buckets_length`从哪些buckets查询, buckets的排序是降序的。
+
+``` candid
+drc202_archived_account_txns : (_buckets_offset: opt nat, _buckets_length: nat, _account: AccountId, _page: opt nat32, _size: opt nat32) -> ({data: vec record{principal; vec record{TxnRecord; Time}}; totalPage: nat; total: nat}) composite_query;
 ```
 
 
@@ -303,20 +400,36 @@ drc202_txn: (Txid) -> (opt TxnRecord) query;
 
 import DRC202 "lib/DRC202";
 
-#### drc202
+#### root
 
-返回DRC202Proxy Canister对象。  
+返回DRC202Root actor.
 
 ``` candid
-drc202: () -> DRC202Types.Self;
+root: () -> DRC202Types.Root;
+```
+
+#### proxy
+
+返回DRC202Proxy actor.
+
+``` candid
+proxy: () -> DRC202Types.Proxy;
 ```
 
 #### drc202CanisterId
 
-返回DRC202Proxy canister-id。 
+返回Root canister-id。 
 
 ``` candid
 drc202CanisterId: () -> principal;
+```
+
+#### getProxyList
+
+返回Proxy列表。 
+
+``` candid
+getProxyList: () -> vec {principal; Time; nat};
 ```
 
 #### config
@@ -411,7 +524,7 @@ store : () -> ();
 从当前canister缓存查找指定`_txid`的记录，不存在则从外部扩展的DRC202 canister中查找记录。这是一个异步方法。  
 
 ``` candid
-get : (_txid: Txid) -> opt TxnRecord;
+get2 : (_txid: Txid) -> opt TxnRecord;
 ```
 
 #### getLastTxns
@@ -427,7 +540,7 @@ getLastTxns : (_account: opt AccountId) -> vec Txid;
 返回用户`_account`最近发生的记录详情列表。  
 
 ``` candid
-getEvents : (_account: opt AccountId) -> vec TxnRecord;
+getEvents : (_account: opt AccountId, _startTime: opt Time, _endTime: opt Time) -> (vec TxnRecord, bool);
 ```
 
 #### getData
@@ -506,58 +619,20 @@ private var drc202 = DRC202.DRC202({EN_DEBUG = true; MAX_CACHE_TIME = 3 * 30 * 2
 * drc202_getConfig : () -> DRC202.Setting query
 * drc202_canisterId : () -> principal query
 * drc202_events : (_account: opt DRC202.Address) -> vec DRC202.TxnRecord query
+* drc202_events_filter: (opt Address, opt Time, opt Time) -> (vec TxnRecord, bool) query;
 * drc202_txn : (_txid: DRC202.Txid) -> opt DRC202.TxnRecord query
-* drc202_txn2 : (_txid: DRC202.Txid) -> opt DRC202.TxnRecord
+* drc202_txn2 : (_txid: DRC202.Txid) -> opt DRC202.TxnRecord composite_query
+* drc202_archived_txns : (_start_desc: nat, _length: nat) -> (vec DRC202.TxnRecord) composite_query;
+* drc202_archived_account_txns : (_buckets_offset: opt nat, _buckets_length: nat, _account: AccountId, _page: opt nat32, _size: opt nat32) -> ({data: vec record{principal; vec record{DRC202.TxnRecord; Time}}; totalPage: nat; total: nat}) composite_query;
 
 如：
-``` motoko
-    public query func drc202_getConfig() : async DRC202.Setting{
-        return drc202.getConfig();
-    };
-    public query func drc202_canisterId() : async Principal{
-        return drc202.drc202CanisterId();
-    };
-    /// config
-    // public shared(msg) func drc202_config(config: DRC202.Config) : async Bool{ 
-    //     assert(msg.caller == owner);
-    //     return drc202.config(config);
-    // };
-    /// returns events
-    public query func drc202_events(_account: ?DRC202.Address) : async [DRC202.TxnRecord]{
-        switch(_account){
-            case(?(account)){ return drc202.getEvents(?drc202.getAccountId(Principal.fromText(account), null)); };
-            case(_){return drc202.getEvents(null);}
-        };
-    };
-    /// returns txn record. It's an query method that will try to find txn record in token canister cache.
-    public query func drc202_txn(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
-        return drc202.get(_txid);
-    };
-    /// returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in this canister.
-    public shared func drc202_txn2(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
-        return await drc202.get2(Principal.fromActor(this), _txid);
-    };
-    // upgrade
-    private stable var __drc202Data: [DRC202.DataTemp] = [];
-    system func preupgrade() {
-        __drc202Data := Array.append(__drc202Data, [drc202.getData()]);
-    };
-    system func postupgrade() {
-        if (__drc202Data.size() > 0){
-            drc202.setData(__drc202Data[0]);
-            __drc202Data := [];
-        };
-    };
-```
+https://github.com/iclighthouse/DRC_standards/blob/main/DRC202/examples/ICLighthouse/Example/Example.mo
 
 ## 实例
 
 #### Example implementations
 
-- Storage Canister: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse  
-    ICTokens DRC202 (Main): y5a36-liaaa-aaaak-aacqa-cai  
-    ICTokens DRC202 (Test): iq2ev-rqaaa-aaaak-aagba-cai  
-    Notes: Use y5a36-liaaa-aaaak-aacqa-cai to store token records that can be queried through the ICHouse blockchain explorer (http://ic.house).
+- Storage Canister: https://github.com/iclighthouse/DRC_standards/tree/main/DRC202/examples/ICLighthouse   
 
 - Motoko Module: https://github.com/iclighthouse/DRC_standards/blob/main/DRC202/examples/ICLighthouse/Example/lib/DRC202.mo 
 

@@ -8,8 +8,8 @@
 import Blob "mo:base/Blob";
 import Buffer "mo:base/Buffer";
 import Option "mo:base/Option";
-import SHA224 "SHA224";
-import CRC32 "CRC32";
+import SHA224 "mo:sha224/SHA224";
+import CRC32 "mo:icl/CRC32";
 
 module {
     public func arrayAppend<T>(a: [T], b: [T]) : [T]{
