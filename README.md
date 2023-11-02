@@ -27,6 +27,7 @@ Specification: https://github.com/iclighthouse/DRC_standards/tree/main/CTSNC
 2023-5-31: Fix DRC202.  
 2023-6-1: Fix Example.  
 2023-10-20: Upgrade DRC202.  
+2023-11-2: Fix ICRC2.  
 
 Standard: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20)  
 Example: [https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse](https://github.com/iclighthouse/DRC_standards/tree/main/DRC20/examples/ICLighthouse)  

@@ -456,7 +456,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs, enDebug: Bool) = 
                     case(#send){
                         if (not(_send(from, to, value, true))){
                             return #err({ code=#InsufficientBalance; message="Insufficient Balance"; });
-                        } else if (_isAllowance and allowed < spendValue){
+                        } else if (_isAllowance and (allowed < spendValue or allowed == 0)){
                             return #err({ code=#InsufficientAllowance; message="Insufficient Allowance"; });
                         };
                         ignore _send(from, to, value, false);
@@ -478,7 +478,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs, enDebug: Bool) = 
                     case(#burn){
                         if (not(_burn(from, value, true))){
                             return #err({ code=#InsufficientBalance; message="Insufficient Balance"; });
-                        } else if (_isAllowance and allowed < spendValue){
+                        } else if (_isAllowance and (allowed < spendValue or allowed == 0)){
                             return #err({ code=#InsufficientAllowance; message="Insufficient Allowance"; });
                         };
                         ignore _burn(from, value, false);
@@ -496,7 +496,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs, enDebug: Bool) = 
                 spendValue := operation.locked;
                 if (not(_lock(from, operation.locked, true))){
                     return #err({ code=#InsufficientBalance; message="Insufficient Balance"; });
-                } else if (_isAllowance and allowed < spendValue){
+                } else if (_isAllowance and (allowed < spendValue or allowed == 0)){
                     return #err({ code=#InsufficientAllowance; message="Insufficient Allowance"; });
                 };
                 ignore _lock(from, operation.locked, false);
@@ -1263,11 +1263,11 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs, enDebug: Bool) = 
         let to = _icrc1_get_account(_args.to);
         let value = _args.amount;
         let data = _args.memo;
-        switch(_icrc1_idempotency(_args.created_at_time, msg.caller, from, to, value, null, null, data, true)){
+        switch(_icrc1_idempotency(_args.created_at_time, msg.caller, from, to, value, null, _toSaNat8(_args.spender_subaccount), data, true)){
             case(#TransferFromErr(err)){ return #Err(err); };
             case(_){};
         };
-        let res = __transferFrom(msg.caller, from, to, value, null, null, data, true);
+        let res = __transferFrom(msg.caller, from, to, value, null, _toSaNat8(_args.spender_subaccount), data, true);
         // publish
         if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
             icps_lastPublishTime := Time.now();

@@ -21,6 +21,8 @@ A standard interface for Dfinity tokens
 2023-5-17: modify Example (support ICRC2).  
 
 2023-10-20: Upgrade DRC202.  
+
+2023-11-2: Fix ICRC2.  
  
 ## Abstract
 A standard interface for Dfinity tokens. The standard complies with ERC20 interface specification, and has some improvements to match IC network features.
