@@ -409,7 +409,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs, enDebug: Bool) = 
         let value = _value; 
         var gas: Gas = #token(fee_);
         var allowed: Nat = 0; // *
-        var spendValue = _value; // *
+        var spendValue = _value + fee_; // *
         if (_isAllowance){
             allowed := _getAllowance(from, caller);
         };
@@ -493,7 +493,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs, enDebug: Bool) = 
                 };
             };
             case(#lockTransfer(operation)){
-                spendValue := operation.locked;
+                spendValue := operation.locked + fee_;
                 if (not(_lock(from, operation.locked, true))){
                     return #err({ code=#InsufficientBalance; message="Insufficient Balance"; });
                 } else if (_isAllowance and (allowed < spendValue or allowed == 0)){
