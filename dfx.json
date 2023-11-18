@@ -1,0 +1,125 @@
+{
+  "canisters": {
+    "DRC20": {
+      "main": "./DRC20/examples/IClighthouse/DRC20.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DIP20DRC20": {
+      "main": "./DRC20/examples/dip20-drc20/DIP20DRC20.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "ICRC1": {
+      "main": "./DRC20/examples/IClighthouse/ICRC1.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DIP20Example": {
+      "main": "./DRC202/examples/DIP20Example/token.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC202": {
+      "main": "./DRC202/examples/IClighthouse/DRC202Proxy.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC202Test": {
+      "main": "./DRC202/examples/IClighthouse/DRC202Proxy.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC202Root": {
+      "main": "./DRC202/examples/IClighthouse/DRC202Root.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC202TestRoot": {
+      "main": "./DRC202/examples/IClighthouse/DRC202Root.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC202Bucket": {
+      "main": "./DRC202/examples/IClighthouse/DRC202Bucket.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC202TestBucket": {
+      "main": "./DRC202/examples/IClighthouse/DRC202Bucket.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC202Example": {
+      "main": "./DRC202/examples/IClighthouse/Example/Example.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC205Root": {
+      "main": "./DRC205/examples/IClighthouse/DRC205Root.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC205TestRoot": {
+      "main": "./DRC205/examples/IClighthouse/DRC205Root.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC205": {
+      "main": "./DRC205/examples/IClighthouse/DRC205Proxy.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC205Bucket": {
+      "main": "./DRC205/examples/IClighthouse/DRC205Bucket.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC205Test": {
+      "main": "./DRC205/examples/IClighthouse/DRC205Proxy.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC205TestBucket": {
+      "main": "./DRC205/examples/IClighthouse/DRC205Bucket.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC205TestBucket2": {
+      "main": "./DRC205/examples/IClighthouse/DRC205Bucket.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC205Example": {
+      "main": "./DRC205/examples/IClighthouse/Example/Example.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "DRC207": {
+      "main": "./DRC207/examples/IClighthouse/CustomCanister.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    },
+    "AccountId": {
+      "main": "./DRC202/examples/IClighthouse/AccountId.mo",
+      "type": "motoko",
+      "args" : "--compacting-gc"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "--compacting-gc",
+      "packtool": "vessel sources"
+    }
+  },
+  "networks": {
+    "ic": {
+      "providers": ["https://ic0.app"],
+      "type": "persistent"
+    },
+    "local": {
+      "bind": "0.0.0.0:8000",
+      "type": "ephemeral"
+    }
+  }
+}
