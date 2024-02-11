@@ -71,7 +71,7 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs, enDebug: Bool) = 
     private stable var NonceStartBase: Nat = 10000000;
     private stable var NonceMode: Nat = 0; // Nonce mode is turned on when there is not enough storage space or when the nonce value of a single user exceeds `NonceStartBase`.
     private stable var AllowanceLimit: Nat = 50;
-    private let MAX_MEMORY: Nat = 2*1000*1000*1000; // 2G
+    private let MAX_MEMORY: Nat = 1500*1000*1000; // 1.5G
 
     /* 
     * State Variables 
@@ -121,6 +121,10 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs, enDebug: Bool) = 
             NonceMode += 1;
             nonces := Trie.empty();
             droppedAccounts := Trie.empty(); 
+            if (NonceMode > 3 and Trie.size(allowances) > 10000){ // After cleaning it 4 times and cleaning the allowances data as well, the impact was low.
+                allowances := Trie.empty(); 
+                allowanceExpirations := Trie.empty(); 
+            };
         };
     };
     private func _checkAllowanceLimit(_a: AccountId) : Bool{
@@ -705,6 +709,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs, enDebug: Bool) = 
         let from = _getAccountIdFromPrincipal(__caller, _sa);
         let to = _getAccountId(_spender);
         let operation: Operation = #approve({ allowance = _value; });
+        if (_value >= 2 ** 128){
+            return #err({ code=#UndefinedError; message="The value is too big."; });
+        };
         if (not(_checkAllowanceLimit(from))){
             return #err({ code=#UndefinedError; message="The number of allowance records exceeds the limit"; });
         };

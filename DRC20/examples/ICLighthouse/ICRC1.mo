@@ -116,6 +116,10 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs, enDebug: Bool) = 
             NonceMode += 1;
             nonces := Trie.empty();
             droppedAccounts := Trie.empty(); 
+            if (NonceMode > 3 and Trie.size(allowances) > 10000){ // After cleaning it 4 times and cleaning the allowances data as well, the impact was low.
+                allowances := Trie.empty(); 
+                allowanceExpirations := Trie.empty(); 
+            };
         };
     };
     private func _checkAllowanceLimit(_a: AccountId) : Bool{
@@ -665,6 +669,9 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs, enDebug: Bool) = 
         let from = _getAccountIdFromPrincipal(__caller, _sa);
         let to = _getAccountId(_spender);
         let operation: Operation = #approve({ allowance = _value; });
+        if (_value >= 2 ** 128){
+            return #err({ code=#UndefinedError; message="The value is too big."; });
+        };
         if (not(_checkAllowanceLimit(from))){
             return #err({ code=#UndefinedError; message="The number of allowance records exceeds the limit"; });
         };
@@ -973,83 +980,83 @@ shared(installMsg) actor class DRC20(initArgs: Types.InitArgs, enDebug: Bool) = 
             };
         };
     };
-    // public shared(msg) func icrc2_approve(_args: ApproveArgs) : async { #Ok : Nat; #Err : ApproveError }{
-    //     // arg `created_at_time` is invalid.
-    //     switch(_args.fee){
-    //         case(?(icrc1_fee)){
-    //             if (icrc1_fee < fee_){ return #Err(#BadFee({ expected_fee = fee_ })) };
-    //         };
-    //         case(_){};
-    //     };
-    //     let spender = _icrc1_get_account(_args.spender);
-    //     var value : Nat = _args.amount;
-    //     // if (_args.amount > 0){
-    //     //     value := Int.abs(_args.amount);
-    //     // };
-    //     let from = _icrc1_get_account({ owner = msg.caller; subaccount = _args.from_subaccount; });
-    //     let sub = _toSaNat8(_args.from_subaccount);
-    //     let data = _args.memo;
-    //     switch(_args.expected_allowance){
-    //         case(?(expectedAllowance)){
-    //             let currentAllowance = _getAllowance(from, spender);
-    //             if (expectedAllowance != currentAllowance){ return #Err(#AllowanceChanged({ current_allowance = currentAllowance })) };
-    //         };
-    //         case(_){};
-    //     };
-    //     let res = __approve(msg.caller, Hex.encode(Blob.toArray(spender)), value, null, sub, data);
-    //     switch(res, _args.expires_at){
-    //         case(#ok(txid), ?(expires_at)){
-    //             _setAllowanceExpiration(from, spender, Nat64.toNat(expires_at));
-    //         };
-    //         case(_, _){};
-    //     };
-    //     // publish
-    //     if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
-    //         icps_lastPublishTime := Time.now();
-    //         ignore pubsub.pub();
-    //     };
-    //     // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
-    //     if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
-    //         drc202_lastStorageTime := Time.now();
-    //         ignore drc202.store(); 
-    //     };
-    //     return _icrc2_approve_receipt(res, from);
-    // };
-    // public shared(msg) func icrc2_transfer_from(_args: TransferFromArgs) : async { #Ok : Nat; #Err : TransferFromError } {
-    //     switch(_args.fee){
-    //         case(?(icrc1_fee)){
-    //             if (icrc1_fee < fee_){ return #Err(#BadFee({ expected_fee = fee_ })) };
-    //         };
-    //         case(_){};
-    //     };
-    //     let spender = _icrc1_get_account({ owner = msg.caller; subaccount = _args.spender_subaccount; });
-    //     let from = _icrc1_get_account(_args.from);
-    //     let to = _icrc1_get_account(_args.to);
-    //     let value = _args.amount;
-    //     let data = _args.memo;
-    //     switch(_icrc1_idempotency(_args.created_at_time, msg.caller, from, to, value, null, _toSaNat8(_args.spender_subaccount), data, true)){
-    //         case(#TransferFromErr(err)){ return #Err(err); };
-    //         case(_){};
-    //     };
-    //     let res = __transferFrom(msg.caller, from, to, value, null, _toSaNat8(_args.spender_subaccount), data, true);
-    //     // publish
-    //     if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
-    //         icps_lastPublishTime := Time.now();
-    //         ignore pubsub.pub();
-    //     };
-    //     // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
-    //     if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
-    //         drc202_lastStorageTime := Time.now();
-    //         ignore drc202.store(); 
-    //     };
-    //     return _icrc2_transfer_from_receipt(res, from, spender);
-    // };
-    // public query func icrc2_allowance(_args: AllowanceArgs) : async { allowance : Nat; expires_at : ?Nat64 } {
-    //     let owner = _icrc1_get_account(_args.account);
-    //     let spender = _icrc1_get_account(_args.spender);
-    //     let expiresAt = Int.abs(_getAllowanceExpiration(owner, spender));
-    //     return { allowance = _getAllowance(owner, spender); expires_at = if (expiresAt > 0){ ?Nat64.fromNat(expiresAt) }else{ null } };
-    // };
+    public shared(msg) func icrc2_approve(_args: ApproveArgs) : async { #Ok : Nat; #Err : ApproveError }{
+        // arg `created_at_time` is invalid.
+        switch(_args.fee){
+            case(?(icrc1_fee)){
+                if (icrc1_fee < fee_){ return #Err(#BadFee({ expected_fee = fee_ })) };
+            };
+            case(_){};
+        };
+        let spender = _icrc1_get_account(_args.spender);
+        var value : Nat = _args.amount;
+        // if (_args.amount > 0){
+        //     value := Int.abs(_args.amount);
+        // };
+        let from = _icrc1_get_account({ owner = msg.caller; subaccount = _args.from_subaccount; });
+        let sub = _toSaNat8(_args.from_subaccount);
+        let data = _args.memo;
+        switch(_args.expected_allowance){
+            case(?(expectedAllowance)){
+                let currentAllowance = _getAllowance(from, spender);
+                if (expectedAllowance != currentAllowance){ return #Err(#AllowanceChanged({ current_allowance = currentAllowance })) };
+            };
+            case(_){};
+        };
+        let res = __approve(msg.caller, Hex.encode(Blob.toArray(spender)), value, null, sub, data);
+        switch(res, _args.expires_at){
+            case(#ok(txid), ?(expires_at)){
+                _setAllowanceExpiration(from, spender, Nat64.toNat(expires_at));
+            };
+            case(_, _){};
+        };
+        // publish
+        // if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
+        //     icps_lastPublishTime := Time.now();
+        //     ignore pubsub.pub();
+        // };
+        // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
+        if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
+            drc202_lastStorageTime := Time.now();
+            ignore drc202.store(); 
+        };
+        return _icrc2_approve_receipt(res, from);
+    };
+    public shared(msg) func icrc2_transfer_from(_args: TransferFromArgs) : async { #Ok : Nat; #Err : TransferFromError } {
+        switch(_args.fee){
+            case(?(icrc1_fee)){
+                if (icrc1_fee < fee_){ return #Err(#BadFee({ expected_fee = fee_ })) };
+            };
+            case(_){};
+        };
+        let spender = _icrc1_get_account({ owner = msg.caller; subaccount = _args.spender_subaccount; });
+        let from = _icrc1_get_account(_args.from);
+        let to = _icrc1_get_account(_args.to);
+        let value = _args.amount;
+        let data = _args.memo;
+        switch(_icrc1_idempotency(_args.created_at_time, msg.caller, from, to, value, null, _toSaNat8(_args.spender_subaccount), data, true)){
+            case(#TransferFromErr(err)){ return #Err(err); };
+            case(_){};
+        };
+        let res = __transferFrom(msg.caller, from, to, value, null, _toSaNat8(_args.spender_subaccount), data, true);
+        // publish
+        // if (pubsub.threads() == 0 or Time.now() > icps_lastPublishTime + 60*1000000000){
+        //     icps_lastPublishTime := Time.now();
+        //     ignore pubsub.pub();
+        // };
+        // Store data to the DRC202 scalable bucket, requires a 20 second interval to initiate a batch store, and may be rejected if you store frequently.
+        if (Time.now() > drc202_lastStorageTime + 20*1000000000) { 
+            drc202_lastStorageTime := Time.now();
+            ignore drc202.store(); 
+        };
+        return _icrc2_transfer_from_receipt(res, from, spender);
+    };
+    public query func icrc2_allowance(_args: AllowanceArgs) : async { allowance : Nat; expires_at : ?Nat64 } {
+        let owner = _icrc1_get_account(_args.account);
+        let spender = _icrc1_get_account(_args.spender);
+        let expiresAt = Int.abs(_getAllowanceExpiration(owner, spender));
+        return { allowance = _getAllowance(owner, spender); expires_at = if (expiresAt > 0){ ?Nat64.fromNat(expiresAt) }else{ null } };
+    };
 
     // drc202
     public query func drc202_getConfig() : async DRC202.Setting{

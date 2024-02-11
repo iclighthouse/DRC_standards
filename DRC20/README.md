@@ -25,6 +25,8 @@ A standard interface for Dfinity tokens
 2023-11-2: Fix ICRC2.  
 
 2023-11-18: Fix allowance.  
+
+2024-02-11: Upgrade DRC20 Example. 
  
 ## Abstract
 A standard interface for Dfinity tokens. The standard complies with ERC20 interface specification, and has some improvements to match IC network features.
