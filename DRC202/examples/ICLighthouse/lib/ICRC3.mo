@@ -33,26 +33,18 @@ module {
     #Expired : { ledger_time : Nat64 };
     #InsufficientFunds : { balance : Nat };
   };
-  public type ArchiveOptions = {
-    num_blocks_to_archive : Nat64;
-    max_transactions_per_response : ?Nat64;
-    trigger_threshold : Nat64;
-    max_message_size_bytes : ?Nat64;
-    cycles_for_archive_creation : ?Nat64;
-    node_max_memory_size_bytes : ?Nat64;
-    controller_id : Principal;
-  };
   public type ArchivedRange = {
-    callback : shared query GetBlocksRequest -> async BlockRange;
+    callback : shared query GetBlocksRequest -> async { blocks : [Value] };
     start : Nat;
     length : Nat;
   };
   public type ArchivedRange_1 = {
-    callback : shared query GetBlocksRequest -> async TransactionRange;
+    callback : shared query GetBlocksRequest -> async {
+        transactions : [Transaction];
+      };
     start : Nat;
     length : Nat;
   };
-  public type BlockRange = { blocks : [Value] };
   public type Burn = {
     from : Account;
     memo : ?Blob;
@@ -60,9 +52,7 @@ module {
     amount : Nat;
     spender : ?Account;
   };
-  public type ChangeFeeCollector = { #SetTo : Account; #Unset };
   public type DataCertificate = { certificate : ?Blob; hash_tree : Blob };
-  public type FeatureFlags = { icrc2 : Bool };
   public type GetBlocksRequest = { start : Nat; length : Nat };
   public type GetBlocksResponse = {
     certificate : ?Blob;
@@ -77,22 +67,17 @@ module {
     transactions : [Transaction];
     archived_transactions : [ArchivedRange_1];
   };
-  public type InitArgs = {
-    decimals : ?Nat8;
-    token_symbol : Text;
-    transfer_fee : Nat;
-    metadata : [(Text, MetadataValue)];
-    minting_account : Account;
-    initial_balances : [(Account, Nat)];
-    maximum_number_of_accounts : ?Nat64;
-    accounts_overflow_trim_quantity : ?Nat64;
-    fee_collector_account : ?Account;
-    archive_options : ArchiveOptions;
-    max_memo_length : ?Nat16;
-    token_name : Text;
-    feature_flags : ?FeatureFlags;
+  public type HttpRequest = {
+    url : Text;
+    method : Text;
+    body : Blob;
+    headers : [(Text, Text)];
   };
-  public type LedgerArgument = { #Upgrade : ?UpgradeArgs; #Init : InitArgs };
+  public type HttpResponse = {
+    body : Blob;
+    headers : [(Text, Text)];
+    status_code : Nat16;
+  };
   public type MetadataValue = {
     #Int : Int;
     #Nat : Nat;
@@ -117,7 +102,6 @@ module {
     timestamp : Nat64;
     transfer : ?Transfer;
   };
-  public type TransactionRange = { transactions : [Transaction] };
   public type Transfer = {
     to : Account;
     fee : ?Nat;
@@ -165,17 +149,6 @@ module {
     #TooOld;
     #InsufficientFunds : { balance : Nat };
   };
-  public type UpgradeArgs = {
-    token_symbol : ?Text;
-    transfer_fee : ?Nat;
-    metadata : ?[(Text, MetadataValue)];
-    maximum_number_of_accounts : ?Nat64;
-    accounts_overflow_trim_quantity : ?Nat64;
-    change_fee_collector : ?ChangeFeeCollector;
-    max_memo_length : ?Nat16;
-    token_name : ?Text;
-    feature_flags : ?FeatureFlags;
-  };
   public type Value = {
     #Int : Int;
     #Map : [(Text, Value)];
@@ -200,6 +173,7 @@ module {
     get_blocks : shared query GetBlocksRequest -> async GetBlocksResponse;
     get_data_certificate : shared query () -> async DataCertificate;
     get_transactions : shared query GetBlocksRequest -> async GetTransactionsResponse;
+    http_request : shared query HttpRequest -> async HttpResponse;
     icrc1_balance_of : shared query Account -> async Nat;
     icrc1_decimals : shared query () -> async Nat8;
     icrc1_fee : shared query () -> async Nat;

@@ -4,6 +4,7 @@ A standard interface for token transaction tecords scalable storage.
 
 ## Latest upgrade: 
 
+2024-02-11: fix Bloom issue and getArchivedTokenTxns().  
 2023-10-20: add ICRC1 record syncing; modify DRC202 Module; support composite queries (moc 0.9.4).  
 2023-6-1: del txnBytesHash().  
 2023-5-31: fix txnByAccountId().  

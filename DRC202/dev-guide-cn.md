@@ -55,12 +55,6 @@ drc202_events: (opt Address) -> (vec TxnRecord) query;
 drc202_events_filter: (opt Address, opt Time, opt Time) -> (vec TxnRecord, bool) query;
 /// returns txn record. Query txn record in token canister cache.
 drc202_txn: (Txid) -> (opt TxnRecord) query;
-/// returns txn record. It's an composite query method that will try to find txn record in the DRC202 canister if the record does not exist in this canister.
-drc202_txn2 : (_txid: Txid) -> (opt TxnRecord) composite_query
-/// Returns archived records. It's an composite query method.
-drc202_archived_txns : (_start_desc: nat, _length: nat) -> (vec TxnRecord) composite_query;
-/// Returns archived records based on AccountId. This is a composite query method that returns data for only the specified number of buckets.
-drc202_archived_account_txns : (_buckets_offset: opt nat, _buckets_length: nat, _account: AccountId, _page: opt nat32, _size: opt nat32) -> ({data: vec record{principal; vec record{TxnRecord; Time}}; totalPage: nat; total: nat}) composite_query;
 ```
 
 ## 4. 如何查询交易记录

@@ -101,28 +101,16 @@ shared actor class Example() = this {
     public query func drc202_txn(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
         return drc202.get(_txid);
     };
-    // /// returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in this canister.
-    // public shared composite query func drc202_txn2(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
-    //     switch(drc202.get(_txid)){
-    //         case(?(txn)){ return ?txn; };
-    //         case(_){
-    //             let res = await drc202.root().getArchivedTxn(Principal.fromActor(this), _txid);
-    //             if (res.size() > 0){
-    //                 return res[res.size() - 1].0;
-    //             };
-    //             return null;
-    //         };
-    //     };
-    // };
-    // /// Returns archived records. It's an composite query method.
-    // public shared composite query func drc202_archived_txns(_start_desc: Nat, _length: Nat) : async [DRC202.TxnRecord]{
-    //     return await drc202.root().getArchivedDexTxns(Principal.fromActor(this), _start_desc, _length);
-    // };
-    // /// Returns archived records based on AccountId. This is a composite query method that returns data for only the specified number of buckets.
-    // public shared composite query func drc202_archived_account_txns(_buckets_offset: ?Nat, _buckets_length: Nat, _account: AccountId, _page: ?Nat32/*base 1*/, _size: ?Nat32) : async 
-    // {data: [(Principal, [(DRC202.TxnRecord, Time.Time)])]; totalPage: Nat; total: Nat}{
-    //     return await drc202.root().getArchivedAccountTxns(_buckets_offset, _buckets_length, _account, Principal.fromActor(this), _page, _size);
-    // };
+    /// returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in this canister.
+    public shared func drc202_txn2(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
+        switch(drc202.get(_txid)){
+            case(?(txn)){ return ?txn; };
+            case(_){
+                return await* drc202.get2(Principal.fromActor(this), _txid);
+            };
+        };
+    };
+
     /// drc202 pool
     public query func drc202_pool() : async [(DRC202.Txid, Nat)]{
         return drc202.getPool();

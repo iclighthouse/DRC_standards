@@ -66,6 +66,13 @@ module {
         let k: Float = Float.ceil(0.7 * m / Float.fromInt(n));
         let k_: Nat32 = Nat32.fromNat(Int.abs(Float.toInt(k)));
 
+        public func getN() : Nat {
+            return n;
+        };
+        public func getP() : Float {
+            return p;
+        };
+
         public func getM() : Nat32 {
             return m_;
         };
@@ -122,24 +129,25 @@ module {
             return numItems;
         };
 
-        public func getBitMap() : [[Nat8]] {
+        public func getData() : [([Nat8], Nat)] {
             var size = filters.size();
-            if (size ==0 ) { return [] };
-            let bitMaps = Array.init<[Nat8]>(size, []);
+            if (size == 0 ) { return [] };
+            let bitMaps = Array.init<([Nat8], Nat)>(size, ([], 0));
             for (i in Iter.range(0, size-1)){
-                bitMaps[i] := filters[i].getBitMap();
+                bitMaps[i] := (filters[i].getBitMap(), filters[i].getNumItems());
             };
             return Array.freeze(bitMaps);
         };
 
-        public func setData(data: [[Nat8]]) {
+        public func setData(data: [([Nat8], Nat)], num: Nat) {
             var size = data.size();
             if (size ==0 ) { return () };
-            let filters_ = Array.init<BloomFilter<S>>(size, BloomFilter<S>(m_, k_, f));
+            numItems := num;
             for (i in Iter.range(0, size-1)){
-                filters_[i].setData(data[i]);
+                let filter = BloomFilter<S>(m_, k_, f);
+                filter.setData(data[i].0, data[i].1);
+                filters := arrayAppend<BloomFilter<S>>(filters, [filter]);
             };
-            filters := Array.freeze(filters_);
         };
 
     };
@@ -186,8 +194,9 @@ module {
             return Array.freeze(bitMap_);
         };
 
-        public func setData(data: [Nat8]) {
+        public func setData(data: [Nat8], num: Nat) {
             assert(data.size() == mapSize);
+            numItems := num;
             for (i in Iter.range(0, data.size() - 1)) {
                 bitMap_[i] := data[i];
             };

@@ -26,11 +26,11 @@ import DRC202Proxy "DRC202Proxy";
 
 shared(installMsg) actor class ProxyRoot() = this {
     let app_debug: Bool = false; /*config*/ 
-    var INIT_CYCLES: Nat = 50_000_000_000_000; //50T
+    var INIT_CYCLES: Nat = 15_000_000_000_000; //15T
     if (app_debug){
         INIT_CYCLES := 1_000_000_000_000; //1.0T
     };
-    private stable var maxMemory: Nat = 3800*1000*1000; // 3.8G /*config*/
+    private var maxMemory: Nat = 2000*1000*1000; // 2.0G /*config*/
     // Supports multiple DRC202Proxies, each of which can hold about 1 billion records.
     private stable var proxyDefault: Principal = Principal.fromText("y5a36-liaaa-aaaak-aacqa-cai"); 
     if (app_debug){
@@ -91,7 +91,7 @@ shared(installMsg) actor class ProxyRoot() = this {
         let (txnCount, snsTokens) = await proxyCurrentActor.stop(); /*config*/
             //let txnCount : Nat = 100000;
         Cycles.add(INIT_CYCLES); 
-        let proxyActor = await DRC202Proxy.ProxyActor(txnCount, Principal.fromActor(this), snsTokens);
+        let proxyActor = await DRC202Proxy.ProxyActor(txnCount, Principal.fromActor(this), snsTokens, false);
         await proxyActor.initIcrc1Tokens();
         let proxy = Principal.fromActor(proxyActor);
         let ic: IC.Self = actor("aaaaa-aa");
@@ -117,53 +117,77 @@ shared(installMsg) actor class ProxyRoot() = this {
 
     /// returns txn hash. 
     public shared composite query func getTxnHash(_token: T.Token, _txid: T.Txid) : async [Hex.Hex]{
+        var res: [Hex.Hex] = [];
+        var count: Nat = 0;
         for ((proxy, t, i) in proxies.vals()){
             let proxyActor: T.Self = actor(Principal.toText(proxy));
             let buckets = await proxyActor.location(_token, #txid(_txid), null);
             for (canisterId in buckets.vals()){
                 let bucket : T.Bucket = actor(Principal.toText(canisterId));
-                let res = await bucket.txnHash(_token, _txid);
-                if (Array.size(res) > 0) return res;
+                try{
+                    let r = await bucket.txnHash(_token, _txid);
+                    res := Tools.arrayAppend(res, r);
+                    if (r.size() > 0) count += 1;
+                    if (count >= 3) return res;
+                }catch(e){};
             };
         };
-        return [];
+        return res;
     };
     /// returns txn record. 
     public shared composite query func getArchivedTxnBytes(_token: T.Token, _txid: T.Txid) : async [([Nat8], Time.Time)]{
+        var res: [([Nat8], Time.Time)] = [];
+        var count: Nat = 0;
         for ((proxy, t, i) in proxies.vals()){
             let proxyActor: T.Self = actor(Principal.toText(proxy));
             let buckets = await proxyActor.location(_token, #txid(_txid), null);
             for (bucketId in buckets.vals()){
                 let bucket: T.Bucket = actor(Principal.toText(bucketId));
-                let res = await bucket.txnBytesHistory(_token, _txid);
-                if (Array.size(res) > 0) return res;
+                try{
+                    let r = await bucket.txnBytesHistory(_token, _txid);
+                    res := Tools.arrayAppend(res, r);
+                    if (r.size() > 0) count += 1;
+                    if (count >= 3) return res;
+                }catch(e){};
             };
         };
-        return [];
+        return res;
     };
     public shared composite query func getArchivedTxn(_token: T.Token, _txid: T.Txid) : async [(T.TxnRecord, Time.Time)]{
+        var res: [(T.TxnRecord, Time.Time)] = [];
+        var count: Nat = 0;
         for ((proxy, t, i) in proxies.vals()){
             let proxyActor: T.Self = actor(Principal.toText(proxy));
             let buckets = await proxyActor.location(_token, #txid(_txid), null);
             for (bucketId in buckets.vals()){
                 let bucket: T.Bucket = actor(Principal.toText(bucketId));
-                let res = await bucket.txnHistory(_token, _txid);
-                if (Array.size(res) > 0) return res;
+                try{
+                    let r = await bucket.txnHistory(_token, _txid);
+                    res := Tools.arrayAppend(res, r);
+                    if (r.size() > 0) count += 1;
+                    if (count >= 3) return res;
+                }catch(e){};
             };
         };
-        return [];
+        return res;
     };
     public shared composite query func getArchivedTxnByIndex(_token: T.Token, _tokenBlockIndex: Nat) : async [(T.TxnRecord, Time.Time)]{
+        var res: [(T.TxnRecord, Time.Time)] = [];
+        var count: Nat = 0;
         for ((proxy, t, i) in proxies.vals()){
             let proxyActor: T.Self = actor(Principal.toText(proxy));
             let buckets = await proxyActor.location(_token, #index(_tokenBlockIndex), null);
             for (canisterId in buckets.vals()){
                 let bucket : T.Bucket = actor(Principal.toText(canisterId));
-                let res = await bucket.txnByIndex(_token, _tokenBlockIndex);
-                if (Array.size(res) > 0) return res;
+                try{
+                    let r = await bucket.txnByIndex(_token, _tokenBlockIndex);
+                    res := Tools.arrayAppend(res, r);
+                    if (r.size() > 0) count += 1;
+                    if (count >= 3) return res;
+                }catch(e){};
             };
         };
-        return [];
+        return res;
     };
     /// Returns archived records. 
     public shared composite query func getArchivedTokenTxns(_token: T.Token, _start_desc: Nat, _length: Nat) : async [T.TxnRecord]{
@@ -179,52 +203,59 @@ shared(installMsg) actor class ProxyRoot() = this {
                 let buckets = await proxyActor.location(_token, #index(blockIndex), null);
                 for (bucketId in buckets.vals()){
                     let bucket: T.Bucket = actor(Principal.toText(bucketId));
-                    let txns = await bucket.txnByIndex(_token, blockIndex);
-                    if (txns.size() > 0){
-                        res := Tools.arrayAppend(res, [txns[txns.size() - 1].0]);
-                        blockIndex -= 1;
-                        continue FindTxnStep1;
-                    };
+                    try{
+                        let txns = await bucket.txnByIndex(_token, blockIndex);
+                        if (txns.size() > 0){
+                            res := Tools.arrayAppend(res, [txns[txns.size() - 1].0]);
+                            blockIndex -= 1;
+                            count += 1;
+                            continue FindTxnStep1;
+                        };
+                    }catch(e){};
                 };
             };
+            blockIndex -= 1;
             count += 1;
         };
         return res;
     };
+
     /// Returns archived records based on AccountId. This is a composite query method that returns data for only the specified number of buckets.
     public shared composite query func getArchivedAccountTxns(_buckets_offset: ?Nat, _buckets_length: Nat, _account: T.AccountId, _token: ?T.Token, _page: ?Nat32/*base 1*/, _size: ?Nat32) : async 
     {data: [(Principal, [(T.TxnRecord, Time.Time)])]; totalPage: Nat; total: Nat}{
+        // get buckets
         var offset = Option.get(_buckets_offset, 0);
-        let page: Nat32 = Option.get(_page, 1:Nat32);
         var buckets: [Principal] = [];
         var r: [Principal] = [];
         label ProxyLoop for ((proxy, t, i) in proxies.vals()){
             let proxyActor: T.Self = actor(Principal.toText(proxy));
-            switch(_token){
-                case(?(token)){
-                    r := await proxyActor.location(token, #account(_account), null);
-                    let length = r.size();
-                    if (offset >= length){
-                        r := [];
-                        offset -= length;
-                    }else if (offset > 0 and offset < length){
-                        r := Tools.slice(r, offset, null);
-                        offset := 0;
+            try{
+                switch(_token){
+                    case(?(token)){
+                        r := await proxyActor.location(token, #account(_account), null); // CreatedTime Desc
+                        let length = r.size();
+                        if (offset >= length){
+                            r := [];
+                            offset -= length;
+                        }else if (offset > 0 and offset < length){
+                            r := Tools.slice(r, offset, null);
+                            offset := 0;
+                        };
+                    };
+                    case(_){
+                        let temp = await proxyActor.bucketListSorted(); // CreatedTime Desc
+                        r := Array.map(temp, func(t:(Principal, Time.Time, Nat)): Principal{ t.0 });
+                        let length = r.size();
+                        if (offset >= length){
+                            r := [];
+                            offset -= length;
+                        }else if (offset > 0 and offset < length){
+                            r := Tools.slice(r, offset, null);
+                            offset := 0;
+                        };
                     };
                 };
-                case(_){
-                    let temp = await proxyActor.bucketListSorted();
-                    r := Array.map(temp, func(t:(Principal, Time.Time, Nat)): Principal{ t.0 });
-                    let length = r.size();
-                    if (offset >= length){
-                        r := [];
-                        offset -= length;
-                    }else if (offset > 0 and offset < length){
-                        r := Tools.slice(r, offset, null);
-                        offset := 0;
-                    };
-                };
-            };
+            }catch(e){};
             if (offset == 0){
                 buckets := Tools.arrayAppend(buckets, r);
                 if (buckets.size() >= _buckets_length){
@@ -233,23 +264,28 @@ shared(installMsg) actor class ProxyRoot() = this {
                 };
             };
         };
+        // query
+        let page: Nat32 = Option.get(_page, 1:Nat32);
         var totalPage: Nat = 0;
         var total: Nat = 0;
+        let size : Nat32 = Option.get(_size, 100: Nat32); 
         var pageOnes: [(bucket: Principal, {data: [(Principal, [(T.TxnRecord, Time.Time)])]; totalPage: Nat; total: Nat})] = [];
-        for (bucketId in buckets.vals()){
+        for (bucketId in buckets.vals()){ // fetch the first page of each bucket
             let bucket: T.Bucket = actor(Principal.toText(bucketId));
-            let r = await bucket.txnByAccountId(_account, _token, ?1, _size);
-            pageOnes := Tools.arrayAppend(pageOnes, [(bucketId, r)]);
-            totalPage += r.totalPage;
-            total += r.total;
+            try{
+                let r = await bucket.txnByAccountId(_account, _token, ?1, ?size);
+                pageOnes := Tools.arrayAppend(pageOnes, [(bucketId, r)]);
+                totalPage += r.totalPage;
+                total += r.total;
+            }catch(e){};
         };
         if (total > 0){
             var thisBucketIndex: Nat = 0;
             var thisBucket: Principal = pageOnes[thisBucketIndex].0;
-            var thisPage: Nat32 = page;
+            var thisPage: Nat32 = page; // the page in bucket
             var preTempTotalPage: Nat = 0;
             var tempTotalPage: Nat = 0;
-            for (index in pageOnes.keys()){
+            for (index in pageOnes.keys()){ // Locate in which bucket
                 preTempTotalPage := tempTotalPage;
                 tempTotalPage += pageOnes[index].1.totalPage;
                 if (Nat32.toNat(page) > preTempTotalPage and Nat32.toNat(page) <= tempTotalPage){
@@ -258,11 +294,16 @@ shared(installMsg) actor class ProxyRoot() = this {
                     thisPage := Nat32.sub(page, Nat32.fromNat(preTempTotalPage));
                 };
             };
-            if (thisPage == 1){
-                return pageOnes[thisBucketIndex].1;
+            if (thisPage == 1){ // The first page already exists in pageOnes
+                return {data = pageOnes[thisBucketIndex].1.data; totalPage = totalPage; total = total};
             }else{
                 let bucket: T.Bucket = actor(Principal.toText(thisBucket));
-                return await bucket.txnByAccountId(_account, _token, ?thisPage, _size);
+                try{
+                    let res = await bucket.txnByAccountId(_account, _token, ?thisPage, ?size);
+                    return {data = res.data; totalPage = totalPage; total = total};
+                }catch(e){
+                    return {data = []; totalPage = totalPage; total = total};
+                };
             };
         }else{
             return {data = []; totalPage = 0; total = 0};
@@ -280,6 +321,28 @@ shared(installMsg) actor class ProxyRoot() = this {
     };
     public query func monitor_canisters(): async [(Principal, Nat)]{
         return Iter.toArray(Trie.iter(cyclesMonitor));
+    };
+
+    /// Returns a canister's caniter_status information.
+    public shared(msg) func debug_canister_status(_canisterId: Principal): async CyclesMonitor.canister_status {
+        assert(_onlyOwner(msg.caller));
+        return await* CyclesMonitor.get_canister_status(_canisterId);
+    };
+
+    /// Perform a monitoring. Typically, monitoring is implemented in a timer.
+    public shared(msg) func debug_monitor(): async (){
+        assert(_onlyOwner(msg.caller));
+        if (Trie.size(cyclesMonitor) == 0){
+            for ((canisterId, value) in Trie.iter(cyclesMonitor)){
+                try{
+                    cyclesMonitor := await* CyclesMonitor.put(cyclesMonitor, canisterId);
+                }catch(e){};
+            };
+        };
+        let monitor = await* CyclesMonitor.monitor(Principal.fromActor(this), cyclesMonitor, INIT_CYCLES, INIT_CYCLES * 10, 0);
+        if (Trie.size(cyclesMonitor) == Trie.size(monitor)){
+            cyclesMonitor := monitor;
+        };
     };
 
     // receive cycles
@@ -307,7 +370,7 @@ shared(installMsg) actor class ProxyRoot() = this {
     
 
     private func timerLoop() : async (){
-        if (Time.now() > lastMonitorTime + 2 * 24 * 3600 * 1000000000){
+        if (Time.now() > lastMonitorTime + 12 * 3600 * 1000000000){
             try{ 
                 if ((await* CyclesMonitor.get_canister_status(proxyCurrent.0)).memory_size > maxMemory){
                     ignore await* _stopAndCreateNewProxy();
@@ -317,7 +380,10 @@ shared(installMsg) actor class ProxyRoot() = this {
                         cyclesMonitor := await* CyclesMonitor.put(cyclesMonitor, cid);
                     };
                 };
-                cyclesMonitor := await* CyclesMonitor.monitor(Principal.fromActor(this), cyclesMonitor, INIT_CYCLES, INIT_CYCLES * 10, 0);
+                let monitor = await* CyclesMonitor.monitor(Principal.fromActor(this), cyclesMonitor, INIT_CYCLES, INIT_CYCLES * 10, 0);
+                if (Trie.size(cyclesMonitor) == Trie.size(monitor)){
+                    cyclesMonitor := monitor;
+                };
                 lastMonitorTime := Time.now();
              }catch(e){};
         };
@@ -337,7 +403,7 @@ shared(installMsg) actor class ProxyRoot() = this {
         Timer.cancelTimer(timerId);
     };
     system func postupgrade() {
-        timerId := Timer.recurringTimer(#seconds(3600*12), timerLoop);
+        timerId := Timer.recurringTimer(#seconds(3600*8), timerLoop);
     };
 
 };

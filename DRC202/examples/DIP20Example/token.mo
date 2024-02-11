@@ -174,22 +174,14 @@ shared(msg) actor class Token(
         return drc202.get(_txid);
     };
     /// returns txn record. It's an update method that will try to find txn record in the DRC202 canister if the record does not exist in this canister.
-    // public shared composite query func drc202_txn2(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
-    //     switch(drc202.get(_txid)){
-    //         case(?(txn)){ return ?txn; };
-    //         case(_){
-    //             let buckets = await drc202.drc202().location(Principal.fromActor(this), #txid(_txid), null);
-    //             for (bucketId in buckets.vals()){
-    //                 let bucket: T.Bucket = actor(Principal.toText(bucketId));
-    //                 switch(await bucket.txn(Principal.fromActor(this), _txid)){
-    //                     case(?(txn, time)){ return ?txn; };
-    //                     case(_){};
-    //                 };
-    //             };
-    //             return null;
-    //         };
-    //     };
-    // };
+    public shared func drc202_txn2(_txid: DRC202.Txid) : async (txn: ?DRC202.TxnRecord){
+        switch(drc202.get(_txid)){
+            case(?(txn)){ return ?txn; };
+            case(_){
+                return await* drc202.get2(Principal.fromActor(this), _txid);
+            };
+        };
+    };
     /// returns drc202 pool
     public query func drc202_pool() : async [(DRC202.Txid, Nat)]{
         return drc202.getPool();

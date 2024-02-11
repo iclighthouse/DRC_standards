@@ -70,15 +70,34 @@ module {
         };
         return na;
     };
+    public func toBytes32(_data: [Nat8]) : [Nat8]{
+        var ret = _data;
+        while (ret.size() < 32){
+            ret := Tools.arrayAppend([0:Nat8], ret);
+        };
+        if (ret.size() > 32){
+            ret := slice<Nat8>(ret, 0, ?31);
+        };
+        return ret;
+    };
+
     //version: 1bytes
     private let _data: [Nat8] = [1];
-    //amount: 9bytes(8bytes+1decimals)
+
+    // amount: 9bytes(8bytes+1decimals)
+    // The maximum value is Nat64Max * (10 ** 255). If value is greater than Nat64Max * (10 ** 255), it takes the value Nat64Max * (10 ** 255).
+    // This means:
+    // - amount > Nat64Max: retains about 19 bits of (decimal) precision, may lose some precision.
+    // - amount == Nat64Max * (10 ** 255): indicates overflow, but no error is reported.
     private func _amountEncode(_value: Nat) : [Nat8]{
         var value = _value;
         var decimals: Nat8 = 0;
-        while (value > Nat64Max){
+        while (value > Nat64Max and decimals < 255){
             value /= 10;
             decimals += 1;
+        };
+        if (value > Nat64Max){
+            value := Nat64Max;
         };
         return Tools.arrayAppend(Binary.BigEndian.fromNat64(Nat64.fromNat(value)), [decimals]);
     };
@@ -108,7 +127,7 @@ module {
         //version: 1bytes
         var data: [Nat8] = _data;
         //txid: 32bytes
-        data := Tools.arrayAppend(data, Blob.toArray(txn.txid));
+        data := Tools.arrayAppend(data, toBytes32(Blob.toArray(txn.txid)));
         //msgCaller: option 1byte + 1byte length + Up to 32bytes Content
         switch(txn.msgCaller){
             case(?(_msgCaller)){ // 1
@@ -125,7 +144,7 @@ module {
             };
         };
         //caller: 32bytes
-        data := Tools.arrayAppend(data, Blob.toArray(txn.caller));
+        data := Tools.arrayAppend(data, toBytes32(Blob.toArray(txn.caller)));
         //timestamp: 8bytes
         data := Tools.arrayAppend(data, Binary.BigEndian.fromNat64(Nat64.fromIntWrap(txn.timestamp)));
         //index: 8bytes
@@ -147,9 +166,9 @@ module {
             };
         };
         //from: 32bytes
-        data := Tools.arrayAppend(data, Blob.toArray(txn.transaction.from));
+        data := Tools.arrayAppend(data, toBytes32(Blob.toArray(txn.transaction.from)));
         //to: 32bytes
-        data := Tools.arrayAppend(data, Blob.toArray(txn.transaction.to));
+        data := Tools.arrayAppend(data, toBytes32(Blob.toArray(txn.transaction.to)));
         //value: amount 9bytes
         data := Tools.arrayAppend(data, _amountEncode(txn.transaction.value));
         //operation: option 1byte
@@ -169,12 +188,12 @@ module {
                 //expiration: 8bytes
                 data := Tools.arrayAppend(data, Binary.BigEndian.fromNat64(Nat64.fromIntWrap(v.expiration)));
                 //decider: 32bytes
-                data := Tools.arrayAppend(data, Blob.toArray(v.decider));
+                data := Tools.arrayAppend(data, toBytes32(Blob.toArray(v.decider)));
             };
             case(#executeTransfer(v)){
                 data := Tools.arrayAppend(data, [2: Nat8]);
                 //lockedTxid: 32bytes
-                data := Tools.arrayAppend(data, Blob.toArray(v.lockedTxid));
+                data := Tools.arrayAppend(data, toBytes32(Blob.toArray(v.lockedTxid)));
                 //fallback: amount 9bytes
                 data := Tools.arrayAppend(data, _amountEncode(v.fallback));
             };
