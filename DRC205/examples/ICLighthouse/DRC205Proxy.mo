@@ -34,6 +34,9 @@ import DRC205 "mo:icl/DRC205Types";
 import DRC205Bucket "DRC205Bucket";
 import DRC207 "mo:icl/DRC207";
 import IC "mo:icl/IC";
+import Timer "mo:base/Timer";
+import Error "mo:base/Error";
+import Text "mo:base/Text";
 
 // 0, principal "lr4ff-zqaaa-aaaak-ae2zq-cai" // Test
 // 0, principal "lw5dr-uiaaa-aaaak-ae2za-cai"
@@ -54,7 +57,7 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
     };
 
     let app_debug: Bool = false; /*config*/ 
-    var bucketCyclesInit: Nat = 10_000_000_000_000; //10T
+    var bucketCyclesInit: Nat = 5_000_000_000_000; //5T
     if (app_debug){
         bucketCyclesInit := 1_000_000_000_000; //1.0T
     };
@@ -63,9 +66,9 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
     private var standard_: Text = "drc205"; 
     private stable var isStopped: Bool = false;
     private stable var proxyRoot: Principal = initProxyRoot;
-    private stable var fee_: Nat = 1000000;  //cycles
+    private var fee_: Nat = 1000000;  //cycles
     private stable var owner: Principal = installMsg.caller;
-    private stable var maxMemory: Nat = 3800*1000*1000; // 3.8G /*config*/
+    private var maxMemory: Nat = 1490*1000*1000; // 1.49G /*config*/
     private stable var bucketCount: Nat = 0;
     private stable var appCount: Nat = 0;
     private stable var txnCount: Nat = initStartIndex;
@@ -77,10 +80,13 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
     // private stable var lastCheckCyclesTime: Time.Time = 0;
     private var blooms = TrieMap.TrieMap<Bucket, BloomFilter>(Principal.equal, Principal.hash);
     private stable var bloomsEntries : [(Bucket, [[Nat8]])] = []; // for upgrade
+    private stable var bloomsEntriesV2 : [(Bucket, (n: Nat, p: Float, num: Nat, filters: [([Nat8], Nat)]))] = []; // for upgrade
     private var blooms2 = TrieMap.TrieMap<Bucket, BloomFilter>(Principal.equal, Principal.hash);
     private stable var blooms2Entries : [(Bucket, [[Nat8]])] = []; // for upgrade
+    private stable var blooms2EntriesV2 : [(Bucket, (n: Nat, p: Float, num: Nat, filters: [([Nat8], Nat)]))] = []; // for upgrade
     private var blooms3 = TrieMap.TrieMap<Bucket, BloomFilter>(Principal.equal, Principal.hash);
     private stable var blooms3Entries : [(Bucket, [[Nat8]])] = []; // for upgrade
+    private stable var blooms3EntriesV2 : [(Bucket, (n: Nat, p: Float, num: Nat, filters: [([Nat8], Nat)]))] = []; // for upgrade
     private stable var apps: Trie.Trie<AppId, AppInfo> = Trie.empty(); 
     private stable var storeTxns = List.nil<(AppId, DataType, Nat)>();
     private stable var storeErrPool = List.nil<(AppId, DataType, Nat)>();
@@ -94,9 +100,11 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
     // Monitor
     private stable var cyclesMonitor: CyclesMonitor.MonitoredCanisters = Trie.empty(); 
     private stable var lastMonitorTime: Time.Time = 0;
+    private var NumberOfBatchAtOnce: Nat = 50;
+    private var lastError : Text = "";
 
     private func _onlyOwner(_caller: Principal) : Bool {
-        return _caller == owner or _caller == proxyRoot;
+        return Principal.isController(_caller) or _caller == proxyRoot;
     };
     private func keyb(t: Blob) : Trie.Key<Blob> { return { key = t; hash = Blob.hash(t) }; };
     private func keyp(t: Principal) : Trie.Key<Principal> { return { key = t; hash = Principal.hash(t) }; };
@@ -105,6 +113,11 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
     };
     private func _natToFloat(_n: Nat) : Float{
         return Float.fromInt64(Int64.fromNat64(Nat64.fromNat(_n)));
+    };
+    private func _createBloom(_n: ?Nat, _p: ?Float): BloomFilter{
+        let n: Nat = Option.get(_n, 100_000);
+        let p: Float = Option.get(_p, 0.002);
+        return Bloom.AutoScalingBloomFilter<Blob>(n, p, Bloom.blobHash);
     };
     // private func _getNonce(_a: Principal): Nat{
     //     switch(Trie.get(nonces, keyp(_a), Principal.equal)){
@@ -162,9 +175,9 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
         let bucketInfo: BucketInfo = await bucketActor.bucketInfo();
         buckets2 := Tools.arrayAppend([(bucket, Time.now(), txnCount)], buckets2);
         currentBucket := [(bucket, bucketInfo)];
-        blooms.put(bucket, Bloom.AutoScalingBloomFilter<Blob>(100000, 0.002, Bloom.blobHash));
-        blooms2.put(bucket, Bloom.AutoScalingBloomFilter<Blob>(100000, 0.002, Bloom.blobHash));
-        blooms3.put(bucket, Bloom.AutoScalingBloomFilter<Blob>(100000, 0.002, Bloom.blobHash));
+        blooms.put(bucket, _createBloom(null, null));
+        blooms2.put(bucket, _createBloom(null, null));
+        blooms3.put(bucket, _createBloom(null, null));
         bucketCount += 1;
         let ic: IC.Self = actor("aaaaa-aa");
         let settings = await ic.update_settings({
@@ -203,23 +216,19 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
     //         await* _topup(bucket);
     //     };
     // };
+    private var lastGetBucketInfoTime: Time.Time = 0;
     private func _getBucket() : async* Bucket{
         if (currentBucket.size() > 0){
             var bucket: Bucket = currentBucket[0].0;
-            if (Time.now() > lastMonitorTime + 2 * 24 * 3600 * 1000000000){
+            if (Time.now() > lastGetBucketInfoTime + 2 * 3600 * 1000000000 or currentBucket[0].1.memory > maxMemory * 9 / 10){
+                lastGetBucketInfoTime := Time.now();
                 try{ 
                     ignore await* _getBucketInfo(currentBucket[0].0);
-                    if (Trie.size(cyclesMonitor) == 0){
-                        for ((cid, t, i) in buckets2.vals()){
-                            cyclesMonitor := await* CyclesMonitor.put(cyclesMonitor, cid);
-                        };
-                    };
-                    cyclesMonitor := await* CyclesMonitor.monitor(Principal.fromActor(this), cyclesMonitor, bucketCyclesInit, bucketCyclesInit * 10, 0);
-                    lastMonitorTime := Time.now();
                 }catch(e){};
             };
-            if (currentBucket[0].1.memory >= maxMemory){
+            if (currentBucket[0].1.memory >= maxMemory or (currentBucket[0].1.memory >= maxMemory / 2 and Text.contains(lastError, #text("exceeded the instruction limit for single message execution")))){
                 bucket := await* _newBucket();
+                lastError := "Error: exceeded the instruction limit";
             };
             return bucket;
         } else {
@@ -281,7 +290,7 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
                 blooms.put(_bucket, bloom);
             };
             case(_){
-                let bloom = Bloom.AutoScalingBloomFilter<Blob>(100000, 0.002, Bloom.blobHash);
+                let bloom = _createBloom(null, null);
                 bloom.add(_sid);
                 blooms.put(_bucket, bloom);
             };
@@ -312,6 +321,9 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
             if (bloom.check2(hashs)){
                 res := Tools.arrayAppend(res, [bucket]);
             };
+            if (res.size() >= 3){
+                return res;
+            };
         };
         return res;
     };
@@ -322,7 +334,7 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
                 blooms2.put(_bucket, bloom);
             };
             case(_){
-                let bloom = Bloom.AutoScalingBloomFilter<Blob>(100000, 0.002, Bloom.blobHash);
+                let bloom = _createBloom(null, null);
                 bloom.add(_iid);
                 blooms2.put(_bucket, bloom);
             };
@@ -353,6 +365,9 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
             if (bloom.check2(hashs)){
                 res := Tools.arrayAppend(res, [bucket]);
             };
+            if (res.size() >= 3){
+                return res;
+            };
         };
         return res;
     };
@@ -363,11 +378,24 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
                 blooms3.put(_bucket, bloom);
             };
             case(_){
-                let bloom = Bloom.AutoScalingBloomFilter<Blob>(100000, 0.002, Bloom.blobHash);
+                let bloom = _createBloom(null, null);
                 bloom.add(_aid);
                 blooms3.put(_bucket, bloom);
             };
         };
+    };
+    private func _filterBloom3(_aid: Blob, _bucket: Principal) : ?Bucket{
+        var step: Nat = 0;
+        var hashs: [Hash.Hash] = [];
+        for ((bucket, bloom) in blooms3.entries()){
+            if (hashs.size() == 0){
+                hashs := Bloom.blobHash(_aid, bloom.getK());
+            };
+            if (_bucket == bucket and bloom.check2(hashs)){
+                return ?_bucket;
+            };
+        };
+        return null;
     };
     private func _checkBloom3_all(_aid: Blob) : [Bucket]{
         var res: [Bucket] = [];
@@ -379,6 +407,9 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
             if (bloom.check2(hashs)){
                 res := Tools.arrayAppend(res, [bucket]);
             };
+            // if (res.size() >= 3){
+            //     return res;
+            // };
         };
         return res;
     };
@@ -392,7 +423,9 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
                     let aid = SwapRecord.generateAid(app, txn.account);
                     _addBloom(bucket, sid);
                     _addBloom2(bucket, iid);
-                    _addBloom3(bucket, aid);
+                    if (_filterBloom3(aid, bucket) == null){
+                        _addBloom3(bucket, aid);
+                    };
                 };
                 case(#Bytes(txn)){
                     let sid = SwapRecord.generateSid(app, txn.txid);
@@ -413,37 +446,45 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
     };
     private func _execStorage() : async* (){
         var bucket: Bucket = currentBucket[0].0;
-        if (Time.now() > lastFetchBucketTime + 10*60*1000000000){
+        if (Time.now() > lastFetchBucketTime + 5*60*1000000000){
             bucket := await* _getBucket();
             lastFetchBucketTime := Time.now();
         };
         let bucketActor: DRC205Bucket.BucketActor = actor(Principal.toText(bucket));
+        var _pending = List.nil<(AppId, DataType, Nat)>();
         var _storing = List.nil<(AppId, DataType, Nat)>();
         var _bytesStoring = List.nil<(AppId, DataType, Nat)>();
         var storeBatch: [(_sid: Sid, _txn: TxnRecord)] = [];
         var storeBytesBatch: [(_sid: Sid, _data: [Nat8])] = [];
+        var i: Nat = 0;
         for ((app, dataType, callCount) in List.toArray(List.reverse(storeTxns)).vals()){
-            switch(dataType){
-                case(#Txn(txn)){
-                    let sid = SwapRecord.generateSid(app, txn.txid);
-                    let iid = SwapRecord.generateIid(app, txn.index);
-                    storeBatch := Tools.arrayAppend(storeBatch, [(_blobAppend([sid, iid, Principal.toBlob(app)]), txn)]); // the first item at 0 position
-                    _storing := List.push((app, dataType, callCount), _storing);
+            if (i < NumberOfBatchAtOnce){
+                switch(dataType){
+                    case(#Txn(txn)){
+                        let sid = SwapRecord.generateSid(app, txn.txid);
+                        let iid = SwapRecord.generateIid(app, txn.index);
+                        storeBatch := Tools.arrayAppend(storeBatch, [(_blobAppend([sid, iid, Principal.toBlob(app)]), txn)]); // the first item at 0 position
+                        _storing := List.push((app, dataType, callCount), _storing);
+                    };
+                    case(#Bytes(txn)){
+                        let sid = SwapRecord.generateSid(app, txn.txid);
+                        storeBytesBatch := Tools.arrayAppend(storeBytesBatch, [(sid, txn.data)]); // the first item at 0 position
+                        _bytesStoring := List.push((app, dataType, callCount), _bytesStoring);
+                    };
                 };
-                case(#Bytes(txn)){
-                    let sid = SwapRecord.generateSid(app, txn.txid);
-                    storeBytesBatch := Tools.arrayAppend(storeBytesBatch, [(sid, txn.data)]); // the first item at 0 position
-                    _bytesStoring := List.push((app, dataType, callCount), _bytesStoring);
-                };
+            }else{
+                _pending := List.push((app, dataType, callCount), _pending);
             };
+            i += 1;
         };
+        storeTxns := _pending;
         if (storeBatch.size() > 0 or storeBytesBatch.size() > 0){
-            storeTxns := List.nil<(AppId, DataType, Nat)>();
             if (storeBatch.size() > 0){
                 try{
                     await bucketActor.storeBatch(storeBatch);
                     _postLog(_storing);
                 }catch(e){
+                    lastError := Error.message(e);
                     storeTxns := List.append(storeTxns, _storing);
                 };
             };
@@ -452,6 +493,7 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
                     await bucketActor.storeBytesBatch(storeBytesBatch);
                     _postLog(_bytesStoring);
                 }catch(e){
+                    lastError := Error.message(e);
                     storeTxns := List.append(storeTxns, _bytesStoring);
                 };
             };
@@ -558,7 +600,9 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
         assert(amout >= fee_ or _onlyOwner(msg.caller));
         let accepted = Cycles.accept(fee_);
         let app: AppId = msg.caller;
-        storeTxns := List.push((app, #Txn(_txn), 0), storeTxns);
+        if ((to_candid(_txn)).size() <= 128 * 1024){ // 128 KB
+            storeTxns := List.push((app, #Txn(_txn), 0), storeTxns);
+        };
         if (Time.now() > lastStorageTime + 5*1000000000 and _tps(5, null).1 < MaxTPS*7){
             lastStorageTime := Time.now();
             await* _execStorage();
@@ -575,7 +619,9 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
         let accepted = Cycles.accept(fee_ * _txns.size());
         let app: AppId = msg.caller;
         for (_txn in _txns.vals()){
-            storeTxns := List.push((app, #Txn(_txn), 0), storeTxns);
+            if ((to_candid(_txn)).size() <= 128 * 1024){ // 128 KB
+                storeTxns := List.push((app, #Txn(_txn), 0), storeTxns);
+            };
         };
         if (Time.now() > lastStorageTime + 5*1000000000 and _tps(5, null).1 < MaxTPS*7){
             lastStorageTime := Time.now();
@@ -646,7 +692,15 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
         return res;
     };
     public query func location(_app: AppId, _arg: {#txid: Txid; #index: Nat; #account: AccountId}, _version: ?Nat8) : async [Bucket]{
-        return _locationV1(_app, _arg);
+        let res = _locationV1(_app, _arg);
+        if (res.size() > 1){ // CreateTime DESC
+            let tmp = Array.filter(buckets2, func (t: (Bucket, Time.Time, Nat)): Bool{
+                Option.isSome(Array.find(res, func (x: Bucket): Bool { t.0 == x }))
+            });
+            return Array.map(tmp, func(t:(Bucket, Time.Time, Nat)): Bucket{ t.0 });
+        }else{
+            return res;
+        };
     };
     public query func minInterval() : async Int{ //ns
         return 60*1000000000 / MaxTransPerAccount;
@@ -654,19 +708,25 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
     public query func tpsStats() : async (Float, Nat){
         return (_natToFloat(_tps(60, null).1) / 10.0, List.size(lastSessions.0)+List.size(lastSessions.1));
     };
-    
+    public query func getPoolSize() : async (Nat){
+        return (List.size(storeTxns));
+    };
+    public shared(msg) func debug_lastError(): async Text{
+        assert(_onlyOwner(msg.caller));
+        return lastError;
+    };
 
     /* 
     * Owner's Management
     */
-    public query func getOwner() : async Principal{  
-        return owner;
-    };
-    public shared(msg) func changeOwner(_newOwner: Principal) : async Bool{  
-        assert(_onlyOwner(msg.caller));
-        owner := _newOwner;
-        return true;
-    };
+    // public query func getOwner() : async Principal{  
+    //     return owner;
+    // };
+    // public shared(msg) func changeOwner(_newOwner: Principal) : async Bool{  
+    //     assert(_onlyOwner(msg.caller));
+    //     owner := _newOwner;
+    //     return true;
+    // };
     public shared(msg) func setFee(_fee: Nat) : async Bool{  
         assert(_onlyOwner(msg.caller));
         fee_ := _fee;
@@ -714,11 +774,6 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
         return txnCount;
     };
     
-    // receive cycles
-    public func wallet_receive(): async (){
-        let amout = Cycles.available();
-        let accepted = Cycles.accept(amout);
-    };
     //cycles withdraw
     public shared(msg) func cyclesWithdraw(_wallet: Principal, _amount: Nat): async (){
         assert(_onlyOwner(msg.caller));
@@ -750,6 +805,58 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
         return Iter.toArray(Trie.iter(cyclesMonitor));
     };
 
+    /// Returns a canister's caniter_status information.
+    public shared(msg) func debug_canister_status(_canisterId: Principal): async CyclesMonitor.canister_status {
+        assert(_onlyOwner(msg.caller));
+        return await* CyclesMonitor.get_canister_status(_canisterId);
+    };
+
+    /// Perform a monitoring. Typically, monitoring is implemented in a timer.
+    public shared(msg) func debug_monitor(): async (){
+        assert(_onlyOwner(msg.caller));
+        if (Trie.size(cyclesMonitor) == 0){
+            for ((canisterId, value) in Trie.iter(cyclesMonitor)){
+                try{
+                    cyclesMonitor := await* CyclesMonitor.put(cyclesMonitor, canisterId);
+                }catch(e){};
+            };
+        };
+        let monitor = await* CyclesMonitor.monitor(Principal.fromActor(this), cyclesMonitor, bucketCyclesInit, bucketCyclesInit * 50, 500_000_000);
+        if (Trie.size(cyclesMonitor) == Trie.size(monitor)){
+            cyclesMonitor := monitor;
+        };
+    };
+
+    public query func debug_bloomsStatus(_index: Nat): async ([(Bucket, (n: Nat, p: Float, num: Nat, filters: [(length: Nat, nonZero: Nat, Nat)]))]){
+        var bloomsData = blooms;
+        if (_index == 2){
+            bloomsData := blooms2;
+        }else if (_index == 3){
+            bloomsData := blooms3;
+        };
+        var size : Nat = bloomsData.size();
+        var temp : [var (Bucket, (n: Nat, p: Float, num: Nat, filters: [(length: Nat, nonZero: Nat, Nat)]))] = 
+        Array.init<(Bucket, (Nat, Float, Nat, [(Nat, Nat, Nat)]))>(size, (owner, (0, 0, 0, [])));
+        var i : Nat = 0;
+        label Test1 for ((k, v) in bloomsData.entries()) {
+            let blms = v.getData();
+            var stats: [(length: Nat, nonZero: Nat, Nat)] = [];
+            label Test2 for ((data, num) in blms.vals()){
+                var x: Nat = 0;
+                var y: Nat = 0;
+                for (bit in data.vals()){
+                    x += 1;
+                    if (bit != (0: Nat8)){ y += 1 };
+                };
+                stats := Tools.arrayAppend(stats, [(x, y, num)]);
+                // break Test2;
+            };
+            temp[i] := (k, (v.getN(), v.getP(), v.getNumItems(), stats));
+            i += 1;
+        };
+        return Array.freeze(temp);
+    };
+
     // DRC207 ICMonitor
     /// DRC207 support
     public query func drc207() : async DRC207.DRC207Support{
@@ -770,68 +877,126 @@ shared(installMsg) actor class ProxyActor(initStartIndex: Nat, initProxyRoot: Pr
     //     await ic.canister_status({ canister_id = Principal.fromActor(this) });
     // };
     /// receive cycles
-    // public func wallet_receive(): async (){
-    //     let amout = Cycles.available();
-    //     let accepted = Cycles.accept(amout);
-    // };
+    public func wallet_receive(): async (){
+        let amout = Cycles.available();
+        let accepted = Cycles.accept(amout);
+    };
     /// timer tick
     // public func timer_tick(): async (){
     //     //
     // };
+
+    private var isTimerRunning: Bool = false;
+    private func timerLoop() : async (){
+        if (isTimerRunning){
+            return ();
+        };
+        isTimerRunning := true;
+        if (Time.now() > lastMonitorTime + 6 * 3600 * 1000000000){
+            try{ 
+                let monitor = await* CyclesMonitor.monitor(Principal.fromActor(this), cyclesMonitor, bucketCyclesInit, bucketCyclesInit * 10, 0);
+                if (Trie.size(cyclesMonitor) == Trie.size(monitor)){
+                    cyclesMonitor := monitor;
+                };
+                lastMonitorTime := Time.now();
+             }catch(e){};
+        };
+        isTimerRunning := false;
+    };
+    private var timerId: Nat = 0;
+    public shared(msg) func timerStart(_intervalSeconds: Nat): async (){
+        assert(_onlyOwner(msg.caller));
+        Timer.cancelTimer(timerId);
+        timerId := Timer.recurringTimer(#seconds(_intervalSeconds), timerLoop);
+    };
+    public shared(msg) func timerStop(): async (){
+        assert(_onlyOwner(msg.caller));
+        Timer.cancelTimer(timerId);
+    };
 
     /*
     * upgrade functions
     */
     system func preupgrade() {
         var size : Nat = blooms.size();
-        var temp : [var (Bucket, [[Nat8]])] = Array.init<(Bucket, [[Nat8]])>(size, (owner, []));
-        size := 0;
+        var temp : [var (Bucket, (n: Nat, p: Float, num: Nat, filters: [([Nat8], Nat)]))] = 
+        Array.init<(Bucket, (Nat, Float, Nat, [([Nat8], Nat)]))>(size, (owner, (0, 0, 0, [])));
+        var i : Nat = 0;
         for ((k, v) in blooms.entries()) {
-            temp[size] := (k, v.getBitMap());
-            size += 1;
+            temp[i] := (k, (v.getN(), v.getP(), v.getNumItems(), v.getData()));
+            i += 1;
         };
-        bloomsEntries := Array.freeze(temp);
+        bloomsEntries := [];
+        bloomsEntriesV2 := Array.freeze(temp);
 
         size := blooms2.size();
-        var temp2 : [var (Bucket, [[Nat8]])] = Array.init<(Bucket, [[Nat8]])>(size, (owner, []));
-        size := 0;
+        var temp2 : [var (Bucket, (n: Nat, p: Float, num: Nat, filters: [([Nat8], Nat)]))] = 
+        Array.init<(Bucket, (Nat, Float, Nat, [([Nat8], Nat)]))>(size, (owner, (0, 0, 0, [])));
+        i := 0;
         for ((k, v) in blooms2.entries()) {
-            temp2[size] := (k, v.getBitMap());
-            size += 1;
+            temp2[i] := (k, (v.getN(), v.getP(), v.getNumItems(), v.getData()));
+            i += 1;
         };
-        blooms2Entries := Array.freeze(temp2);
+        blooms2Entries := [];
+        blooms2EntriesV2 := Array.freeze(temp2);
 
         size := blooms3.size();
-        var temp3 : [var (Bucket, [[Nat8]])] = Array.init<(Bucket, [[Nat8]])>(size, (owner, []));
-        size := 0;
+        var temp3 : [var (Bucket, (n: Nat, p: Float, num: Nat, filters: [([Nat8], Nat)]))] = 
+        Array.init<(Bucket, (Nat, Float, Nat, [([Nat8], Nat)]))>(size, (owner, (0, 0, 0, [])));
+        i := 0;
         for ((k, v) in blooms3.entries()) {
-            temp3[size] := (k, v.getBitMap());
-            size += 1;
+            temp3[i] := (k, (v.getN(), v.getP(), v.getNumItems(), v.getData()));
+            i += 1;
         };
-        blooms3Entries := Array.freeze(temp3);
+        blooms3Entries := [];
+        blooms3EntriesV2 := Array.freeze(temp3);
+
+        Timer.cancelTimer(timerId);
     };
 
     system func postupgrade() {
-        for ((k, v) in bloomsEntries.vals()) {
-            let temp = Bloom.AutoScalingBloomFilter<Blob>(100000, 0.002, Bloom.blobHash);
-            temp.setData(v);
-            blooms.put(k, temp);
-        };
-
-        for ((k, v) in blooms2Entries.vals()) {
-            let temp = Bloom.AutoScalingBloomFilter<Blob>(100000, 0.002, Bloom.blobHash);
-            temp.setData(v);
-            blooms2.put(k, temp);
-        };
-
-        for ((k, v) in blooms3Entries.vals()) {
-            let temp = Bloom.AutoScalingBloomFilter<Blob>(100000, 0.002, Bloom.blobHash);
-            temp.setData(v);
-            blooms3.put(k, temp);
+        if (bloomsEntries.size() > 0){
+            for ((k, v) in bloomsEntries.vals()) {
+                let temp = _createBloom(?100000, ?0.002);
+                temp.setData(Array.map<[Nat8], ([Nat8], Nat)>(v, func (t: [Nat8]): ([Nat8], Nat){ (t, 0) }), 0);
+                blooms.put(k, temp);
+            };
+            for ((k, v) in blooms2Entries.vals()) {
+                let temp = _createBloom(?100000, ?0.002);
+                temp.setData(Array.map<[Nat8], ([Nat8], Nat)>(v, func (t: [Nat8]): ([Nat8], Nat){ (t, 0) }), 0);
+                blooms2.put(k, temp);
+            };
+            for ((k, v) in blooms3Entries.vals()) {
+                let temp = _createBloom(?100000, ?0.002);
+                temp.setData(Array.map<[Nat8], ([Nat8], Nat)>(v, func (t: [Nat8]): ([Nat8], Nat){ (t, 0) }), 0);
+                blooms3.put(k, temp);
+            };
+        }else{ // V2
+            for ((k, (n, p, num, v)) in bloomsEntriesV2.vals()) {
+                let temp = _createBloom(?n, ?p);
+                temp.setData(v, num);
+                blooms.put(k, temp);
+            };
+            bloomsEntriesV2 := [];
+            for ((k, (n, p, num, v)) in blooms2EntriesV2.vals()) {
+                let temp = _createBloom(?n, ?p);
+                temp.setData(v, num);
+                blooms2.put(k, temp);
+            };
+            blooms2EntriesV2 := [];
+            for ((k, (n, p, num, v)) in blooms3EntriesV2.vals()) {
+                let temp = _createBloom(?n, ?p);
+                temp.setData(v, num);
+                blooms3.put(k, temp);
+            };
+            blooms3EntriesV2 := [];
         };
 
         if (buckets2.size() == 0){
             buckets2 := Array.map<Bucket, (Bucket, Time.Time, Nat)>(buckets, func(t: Bucket): (Bucket, Time.Time, Nat){ (t, 0, 0) });
         };
+
+        timerId := Timer.recurringTimer(#seconds(3600), timerLoop);
+
     };
 }

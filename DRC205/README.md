@@ -4,6 +4,7 @@ A common swap transaction record data type and scalability storage specification
  
 ## Latest upgrade: 
 
+2024-02-11: fix Bloom issue and getArchivedDexTxns().  
 2023-10-20: modify DRC202 Module; support composite queries (moc 0.9.4).  
 2023-6-1: del txnBytesHash().  
 2023-5-31: fix txnByAccountId().  

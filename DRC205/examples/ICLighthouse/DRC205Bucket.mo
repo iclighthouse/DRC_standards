@@ -15,12 +15,12 @@ import Array "mo:base/Array";
 import Trie "mo:base/Trie";
 import Cycles "mo:base/ExperimentalCycles";
 import CyclesWallet "mo:icl/CyclesWallet";
-import SwapRecord "./lib/SwapRecord";
+import SwapRecord "lib/SwapRecord";
 import DRC207 "mo:icl/DRC207";
 import Tools "mo:icl/Tools";
 import Text "mo:base/Text";
 import Hex "mo:icl/Hex";
-import Hash256 "./lib/Hash256";
+import Hash256 "lib/Hash256";
 import List "mo:base/List";
 import Option "mo:base/Option";
 
@@ -38,39 +38,191 @@ shared(installMsg) actor class BucketActor() = this {
 
     private stable var owner: Principal = installMsg.caller;
     private var bucketVersion: Nat8 = 1;
-    // private stable var data: Trie.Trie<Sid, ([Nat8], Time.Time)> = Trie.empty(); 
-    private stable var database: Trie.Trie<Sid, [([Nat8], Time.Time)]> = Trie.empty(); 
-    // private stable var txnData: Trie.Trie<Sid, (TxnRecordTemp, Time.Time)> = Trie.empty(); 
-    // private stable var txnData2: Trie.Trie<Sid, (TxnRecord, Time.Time)> = Trie.empty(); 
-    private stable var database2: Trie.Trie<Sid, [(TxnRecord, Time.Time)]> = Trie.empty(); 
+    // Issue: fail to add new data after dataset reaches 150,000 items "IC0522: Canister xxxxxxx exceeded the instruction limit for single message execution ." 
+    // To solve this problem, the data is stored in 3 tries.
+    private let databaseNumber: Nat = 3;
+    private let recordNumberPerDatabase: Nat = 150_000;
+    private stable var database: Trie.Trie<Sid, [([Nat8], Time.Time)]> = Trie.empty(); //
+    private stable var database1: Trie.Trie<Sid, [([Nat8], Time.Time)]> = Trie.empty();
+    private stable var database2: Trie.Trie<Sid, [([Nat8], Time.Time)]> = Trie.empty();
+    private stable var databaseTxns: Trie.Trie<Sid, [(TxnRecord, Time.Time)]> = Trie.empty(); 
     private stable var count: Nat = 0;
     private stable var lastStorage: (Sid, Time.Time) = (Blob.fromArray([]), 0);
     private stable var appIndexIds: Trie.Trie<Iid, Sid> = Trie.empty(); 
+    private stable var appIndexIds1: Trie.Trie<Iid, Sid> = Trie.empty(); 
+    private stable var appIndexIds2: Trie.Trie<Iid, Sid> = Trie.empty(); 
     private stable var appAccountIds: Trie.Trie2D<AccountId, AppId, List.List<Sid>> = Trie.empty(); 
+    private stable var appAccountIds1: Trie.Trie2D<AccountId, AppId, List.List<Sid>> = Trie.empty(); 
+    private stable var appAccountIds2: Trie.Trie2D<AccountId, AppId, List.List<Sid>> = Trie.empty(); 
 
     private func _onlyOwner(_caller: Principal) : Bool {
-        return _caller == owner;
+        return Principal.isController(_caller);
     };
     private func key(t: Sid) : Trie.Key<Sid> { return { key = t; hash = Blob.hash(t) }; };
     private func keyp(t: Principal) : Trie.Key<Principal> { return { key = t; hash = Principal.hash(t) }; };
     private func keyn(t: Nat) : Trie.Key<Nat> { return { key = t; hash = Tools.natHash(t) }; };
 
+    private func _database(_sid: Sid): (data: Trie.Trie<Sid, [([Nat8], Time.Time)]>, id: Nat){
+        if (Option.isSome(Trie.get(database, key(_sid), Blob.equal))){
+            return (database, 0);
+        }else if (Option.isSome(Trie.get(database1, key(_sid), Blob.equal))){
+            return (database1, 1);
+        }else if (Option.isSome(Trie.get(database2, key(_sid), Blob.equal))){
+            return (database2, 2);
+        }else if (Trie.size(database) >= recordNumberPerDatabase and Trie.size(database1) >= recordNumberPerDatabase){
+            return (database2, 2);
+        }else if (Trie.size(database) >= recordNumberPerDatabase){
+            return (database1, 1);
+        }else{
+            return (database, 0);
+        };
+    };
+    private func _saveDatabase(_data: Trie.Trie<Sid, [([Nat8], Time.Time)]>, _id: Nat): (){
+        if (_id == 0){
+            database := _data;
+        }else if (_id == 1){
+            database1 := _data;
+        }else{
+            database2 := _data;
+        };
+    };
+    private func _queryDatabase(_sid: Sid) : ?[([Nat8], Time.Time)]{
+        return _queryDatabaseStep(_sid, 0);
+    };
+    private func _queryDatabaseStep(_sid: Sid, _step: Nat/*0,1,2*/) : ?[([Nat8], Time.Time)]{
+        var db: Trie.Trie<Sid, [([Nat8], Time.Time)]> = Trie.empty();
+        if (_step == 0){
+            db := database2;
+        }else if (_step == 1){
+            db := database1;
+        }else if (_step == 2){
+            db := database;
+        }else{
+            return null;
+        };
+        switch(Trie.get(db, key(_sid), Blob.equal)){
+            case(?(values)){
+                return ?values;
+            };
+            case(_){
+                return _queryDatabaseStep(_sid, _step + 1);
+            };
+        };
+    };
+
+    private func _appIndexIds(_iid: Iid): (data: Trie.Trie<Iid, Sid>, id: Nat){
+        if (Option.isSome(Trie.get(appIndexIds, key(_iid), Blob.equal))){
+            return (appIndexIds, 0);
+        }else if (Option.isSome(Trie.get(appIndexIds1, key(_iid), Blob.equal))){
+            return (appIndexIds1, 1);
+        }else if (Option.isSome(Trie.get(appIndexIds2, key(_iid), Blob.equal))){
+            return (appIndexIds2, 2);
+        }else if (Trie.size(appIndexIds) >= recordNumberPerDatabase and Trie.size(appIndexIds1) >= recordNumberPerDatabase){
+            return (appIndexIds2, 2);
+        }else if (Trie.size(appIndexIds) >= recordNumberPerDatabase){
+            return (appIndexIds1, 1);
+        }else{
+            return (appIndexIds, 0);
+        };
+    };
+    private func _saveAppIndexIds(_data: Trie.Trie<Iid, Sid>, _id: Nat): (){
+        if (_id == 0){
+            appIndexIds := _data;
+        }else if (_id == 1){
+            appIndexIds1 := _data;
+        }else{
+            appIndexIds2 := _data;
+        };
+    };
+    private func _queryAppIndexIds(_iid: Iid) : ?Sid{
+        return _queryAppIndexIdsStep(_iid, 0);
+    };
+    private func _queryAppIndexIdsStep(_iid: Iid, _step: Nat/*0,1,2*/) : ?Sid{
+        var db: Trie.Trie<Iid, Sid> = Trie.empty();
+        if (_step == 0){
+            db := appIndexIds2;
+        }else if (_step == 1){
+            db := appIndexIds1;
+        }else if (_step == 2){
+            db := appIndexIds;
+        }else{
+            return null;
+        };
+        switch(Trie.get(db, key(_iid), Blob.equal)){
+            case(?(values)){
+                return ?values;
+            };
+            case(_){
+                return _queryAppIndexIdsStep(_iid, _step + 1);
+            };
+        };
+    };
+
+    private func _appAccountIds(_aid: AccountId): (data: Trie.Trie2D<AccountId, AppId, List.List<Sid>>, id: Nat){
+        if (Option.isSome(Trie.get(appAccountIds, key(_aid), Blob.equal))){
+            return (appAccountIds, 0);
+        }else if (Option.isSome(Trie.get(appAccountIds1, key(_aid), Blob.equal))){
+            return (appAccountIds1, 1);
+        }else if (Option.isSome(Trie.get(appAccountIds2, key(_aid), Blob.equal))){
+            return (appAccountIds2, 2);
+        }else if (Trie.size(appAccountIds) >= recordNumberPerDatabase / 3 and Trie.size(appAccountIds1) >= recordNumberPerDatabase / 3){
+            return (appAccountIds2, 2);
+        }else if (Trie.size(appAccountIds) >= recordNumberPerDatabase / 3){
+            return (appAccountIds1, 1);
+        }else{
+            return (appAccountIds, 0);
+        };
+    };
+    private func _saveAppAccountIds(_data: Trie.Trie2D<AccountId, AppId, List.List<Sid>>, _id: Nat): (){
+        if (_id == 0){
+            appAccountIds := _data;
+        }else if (_id == 1){
+            appAccountIds1 := _data;
+        }else{
+            appAccountIds2 := _data;
+        };
+    };
+    private func _queryAppAccountIds(_aid: AccountId) : ?Trie.Trie<AppId, List.List<Sid>>{
+        return _queryAppAccountIdsStep(_aid, 0);
+    };
+    private func _queryAppAccountIdsStep(_aid: AccountId, _step: Nat/*0,1,2*/) : ?Trie.Trie<AppId, List.List<Sid>>{
+        var db: Trie.Trie2D<AccountId, AppId, List.List<Sid>> = Trie.empty();
+        if (_step == 0){
+            db := appAccountIds2;
+        }else if (_step == 1){
+            db := appAccountIds1;
+        }else if (_step == 2){
+            db := appAccountIds;
+        }else{
+            return null;
+        };
+        switch(Trie.get(db, key(_aid), Blob.equal)){
+            case(?(value)){
+                return ?value;
+            };
+            case(_){
+                return _queryAppAccountIdsStep(_aid, _step + 1);
+            };
+        };
+    };
+
     private func _store(_sid: Sid, _data: [Nat8]) : (){
         let now = Time.now();
         var values : [([Nat8], Time.Time)] = [(_data, now)];
-        switch(Trie.get(database, key(_sid), Blob.equal)){
+        let (data, id) = _database(_sid);
+        switch(Trie.get(data, key(_sid), Blob.equal)){
             case(?(items)){ values := Tools.arrayAppend(items, values); };
             case(_){};
         };
-        let res = Trie.put(database, key(_sid), Blob.equal, values);
-        database := res.0;
+        let res = Trie.put(data, key(_sid), Blob.equal, values);
+        _saveDatabase(res.0, id);
         switch (res.1){
             case(?(v)){ lastStorage := (_sid, now); };
             case(_){ count += 1; lastStorage := (_sid, now); };
         };
     };
     private func _get(_sid: Sid) : ?([Nat8], Time.Time){
-        switch(Trie.get(database, key(_sid), Blob.equal)){
+        switch(_queryDatabase(_sid)){
             case(?(values)){
                 if (values.size() > 0){
                     return ?values[values.size() - 1];
@@ -82,12 +234,12 @@ shared(installMsg) actor class BucketActor() = this {
     // private func _store2(_sid: Sid, _data: TxnRecord) : (){
     //     let now = Time.now();
     //     var values : [(TxnRecord, Time.Time)] = [(_data, now)];
-    //     switch(Trie.get(database2, key(_sid), Blob.equal)){
+    //     switch(Trie.get(databaseTxns, key(_sid), Blob.equal)){
     //         case(?(items)){ values := Tools.arrayAppend(items, values); };
     //         case(_){};
     //     };
-    //     let res = Trie.put(database2, key(_sid), Blob.equal, values);
-    //     database2 := res.0;
+    //     let res = Trie.put(databaseTxns, key(_sid), Blob.equal, values);
+    //     databaseTxns := res.0;
     //     switch (res.1){
     //         case(?(v)){ lastStorage := (_sid, now); };
     //         case(_){ count += 1; lastStorage := (_sid, now); };
@@ -142,7 +294,7 @@ shared(installMsg) actor class BucketActor() = this {
         return res;
     };
     private func _get3(_sid: Sid, _merge: Bool) : [(TxnRecord, Time.Time)]{
-        switch(Trie.get(database, key(_sid), Blob.equal)){
+        switch(_queryDatabase(_sid)){
             case(?(values)){
                 let data = Array.mapFilter(values, func (item: ([Nat8], Time.Time)): ?(TxnRecord, Time.Time){
                     let data : ?TxnRecord = from_candid(Blob.fromArray(item.0));
@@ -154,7 +306,7 @@ shared(installMsg) actor class BucketActor() = this {
                 return if (_merge) { _mergerDetails(data) }else{ data };
             };
             case(_){
-                switch(Trie.get(database2, key(_sid), Blob.equal)){
+                switch(Trie.get(databaseTxns, key(_sid), Blob.equal)){
                     case(?(values)){
                         return if (_merge) { _mergerDetails(values) }else{ values };
                     };
@@ -178,7 +330,8 @@ shared(installMsg) actor class BucketActor() = this {
         let ids = _split(_sid);
         switch(ids.1){
             case(?(iid)){
-                appIndexIds := Trie.put(appIndexIds, key(iid), Blob.equal, ids.0).0;
+                let (data, id) = _appIndexIds(iid);
+                _saveAppIndexIds(Trie.put(data, key(iid), Blob.equal, ids.0).0, id);
             };
             case(_){};
         };
@@ -191,31 +344,35 @@ shared(installMsg) actor class BucketActor() = this {
         return ids.0;
     };
     private func _putAccountIdLog(_a: AccountId, _canisterId: Principal, _sid: Sid) : (){ 
-        switch(Trie.get(appAccountIds, key(_a), Blob.equal)){
+        let (data, id) = _appAccountIds(_a);
+        switch(Trie.get(data, key(_a), Blob.equal)){
             case(?(items)){
                 switch(Trie.get(items, keyp(_canisterId), Principal.equal)){
                     case(?(sids)){
                         var _sids = sids;
                         var count: Nat = 0;
-                        _sids := List.filter(sids, func (t: Sid): Bool{ // the last 6000 records
-                            if (t != _sid and count < 6000){ count += 1; return true } else { return false };
-                        });
-                        appAccountIds := Trie.put2D(appAccountIds, key(_a), Blob.equal, keyp(_canisterId), Principal.equal, List.push(_sid, _sids));
+                        // _sids := List.filter(sids, func (t: Sid): Bool{ // the last 6000 records
+                        //     if (t != _sid and count < 6000){ count += 1; return true } else { return false };
+                        // });
+                        let db = Trie.put2D(data, key(_a), Blob.equal, keyp(_canisterId), Principal.equal, List.push(_sid, _sids));
+                        _saveAppAccountIds(db, id);
                     };
                     case(_){
-                        appAccountIds := Trie.put2D(appAccountIds, key(_a), Blob.equal, keyp(_canisterId), Principal.equal, List.push(_sid, null));
+                        let db = Trie.put2D(data, key(_a), Blob.equal, keyp(_canisterId), Principal.equal, List.push(_sid, null));
+                        _saveAppAccountIds(db, id);
                     };
                 };
             };
             case(_){
-                appAccountIds := Trie.put2D(appAccountIds, key(_a), Blob.equal, keyp(_canisterId), Principal.equal, List.push(_sid, null));
+                let db = Trie.put2D(data, key(_a), Blob.equal, keyp(_canisterId), Principal.equal, List.push(_sid, null));
+                _saveAppAccountIds(db, id);
             };
         };
     };
     private func _getAccountIdLogs(_a: AccountId, _canisterId: ?Principal, _start: ?Nat, _length: ?Nat) : ([(Principal, Sid)], total: Nat){
         let start = Option.get(_start, 0);
         let length = Option.get(_length, 1000);
-        switch(Trie.get(appAccountIds, key(_a), Blob.equal)){
+        switch(_queryAppAccountIds(_a)){
             case(?(items)){
                 switch(_canisterId){
                     case(?(canisterId)){
@@ -294,7 +451,7 @@ shared(installMsg) actor class BucketActor() = this {
     };
     public query func txnBytesHistory(_app: AppId, _txid: Txid) : async [([Nat8], Time.Time)]{
         let _sid = SwapRecord.generateSid(_app, _txid);
-        switch(Trie.get(database, key(_sid), Blob.equal)){
+        switch(_queryDatabase(_sid)){
             case(?(values)){
                 return values;
             };
@@ -319,7 +476,7 @@ shared(installMsg) actor class BucketActor() = this {
     };
     public query func txnByIndex(_app: AppId, _blockIndex: Nat) : async [(TxnRecord, Time.Time)]{
         let _iid = SwapRecord.generateIid(_app, _blockIndex);
-        switch(Trie.get(appIndexIds, key(_iid), Blob.equal)){
+        switch(_queryAppIndexIds(_iid)){
             case(?(_sid)){
                 return _get3(_sid, true);
             };
@@ -344,12 +501,12 @@ shared(installMsg) actor class BucketActor() = this {
     };
     // public query func txnHash(_app: AppId, _txid: Txid, _index: Nat) : async ?Hex.Hex{
     //     let _sid = SwapRecord.generateSid(_app, _txid);
-    //     switch(Trie.get(database, key(_sid), Blob.equal)){
+    //     switch(_queryDatabase(_sid)){
     //         case(?(values)){
     //             return ?Hex.encode(Hash256.hash(null, values[_index].0));
     //         };
     //         case(_){
-    //             switch(Trie.get(database2, key(_sid), Blob.equal)){
+    //             switch(Trie.get(databaseTxns, key(_sid), Blob.equal)){
     //                 case(?(values)){
     //                     return ?Hex.encode(Hash256.hash(null, Blob.toArray(to_candid(values[_index].0))));
     //                 };
@@ -367,7 +524,7 @@ shared(installMsg) actor class BucketActor() = this {
     };
     // public query func txnBytesHash(_app: AppId, _txid: Txid, _index: Nat) : async ?Hex.Hex{
     //     let _sid = SwapRecord.generateSid(_app, _txid);
-    //     switch(Trie.get(database, key(_sid), Blob.equal)){
+    //     switch(_queryDatabase(_sid)){
     //         case(?(values)){
     //             return ?Hex.encode(Hash256.hash(null, values[_index].0));
     //         };
@@ -387,12 +544,14 @@ shared(installMsg) actor class BucketActor() = this {
     public query func last() : async (Sid, Time.Time){
         return lastStorage;
     };
-
-    // receive cycles
-    public func wallet_receive(): async (){
-        let amout = Cycles.available();
-        let accepted = Cycles.accept(amout);
+    public func dbCount(): async {database: (Nat, Nat, Nat); appIndexIds: (Nat, Nat, Nat); appAccountIds: (Nat, Nat, Nat);}{
+        return {
+            database = (Trie.size(database), Trie.size(database1), Trie.size(database2)); 
+            appIndexIds = (Trie.size(appIndexIds), Trie.size(appIndexIds1), Trie.size(appIndexIds2)); 
+            appAccountIds = (Trie.size(appAccountIds), Trie.size(appAccountIds1), Trie.size(appAccountIds2)); 
+        };
     };
+
     //cycles withdraw: _onlyOwner
     public shared(msg) func cyclesWithdraw(_wallet: Principal, _amount: Nat): async (){
         assert(_onlyOwner(msg.caller));
@@ -424,10 +583,10 @@ shared(installMsg) actor class BucketActor() = this {
     //     await ic.canister_status({ canister_id = Principal.fromActor(this) });
     // };
     /// receive cycles
-    // public func wallet_receive(): async (){
-    //     let amout = Cycles.available();
-    //     let accepted = Cycles.accept(amout);
-    // };
+    public func wallet_receive(): async (){
+        let amout = Cycles.available();
+        let accepted = Cycles.accept(amout);
+    };
     /// timer tick
     // public func timer_tick(): async (){
     //     //
@@ -468,7 +627,7 @@ shared(installMsg) actor class BucketActor() = this {
     //         database := Trie.put(database, key(k), Blob.equal, [v]).0;
     //     };
     //     for ((k, v) in Trie.iter(txnData2)) {
-    //         database2 := Trie.put(database2, key(k), Blob.equal, [v]).0;
+    //         databaseTxns := Trie.put(databaseTxns, key(k), Blob.equal, [v]).0;
     //     };
     // };
 
